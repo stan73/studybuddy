@@ -1,10 +1,42 @@
-// StudyBuddy Pro — KI-Proxy Edge Function
-// Version 2.0 | Deno · Supabase Edge Functions
-//
-// Zweck: API-Keys sicher server-seitig aufbewahren und alle KI-Anfragen proxyen.
-// Unterstützte Provider: Claude (Anthropic), OpenAI (GPT), Google Gemini
-//
-// Deploy: supabase functions deploy ai-proxy --project-ref qzmviwrpyfpjahcmbjoy
+/**
+ * @file index.ts — StudyBuddy Pro KI-Proxy Edge Function
+ * @description Supabase Edge Function (Deno-Runtime) die als sicherer Proxy
+ *              für alle KI-Anfragen fungiert. API-Keys verlassen den Server nie
+ *              nach der Speicherung — der Browser erhält ausschließlich Textantworten.
+ * @version 2.0.0
+ *
+ * @endpoints
+ *   POST /functions/v1/ai-proxy
+ *
+ * @request_body
+ *   {
+ *     provider: 'claude' | 'openai' | 'gemini',
+ *     messages: Array<{role: 'user'|'assistant', content: string}>,
+ *     system?:  string,           // System-Prompt
+ *     maxTok?:  number,           // Max. Tokens (default: 400)
+ *     apiKey?:  string,           // Nur für Kind/Demo-Sessions (kein JWT)
+ *   }
+ *
+ * @auth
+ *   Auth-Nutzer: Authorization: Bearer <supabase-jwt>
+ *     → JWT wird via supabase.auth.getUser() verifiziert
+ *     → Key wird aus api_keys-Tabelle gelesen (SERVICE_ROLE — RLS bypass)
+ *   Kind/Demo: kein Authorization-Header, apiKey im Body (HTTPS-verschlüsselt)
+ *     → Key wird direkt für die KI-Anfrage genutzt, NICHT gespeichert
+ *
+ * @security
+ *   - CORS: * (Browser-Anfragen von allen Origins erlaubt)
+ *   - SERVICE_ROLE_KEY: nur serverseitig, nie an Client weitergegeben
+ *   - Kein Logging von API-Keys oder Nutzeranfragen
+ *   - Alle Fehler geben generische Meldungen zurück (kein Stack-Trace)
+ *
+ * @environment_variables
+ *   SUPABASE_URL              — Automatisch von Supabase gesetzt
+ *   SUPABASE_SERVICE_ROLE_KEY — Automatisch von Supabase gesetzt
+ *
+ * @deploy
+ *   supabase functions deploy ai-proxy --project-ref qzmviwrpyfpjahcmbjoy
+ */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -16,10 +48,17 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** @type {string} Supabase Project URL (aus Umgebungsvariable) */
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+
+/** @type {string} Service Role Key — bypassed RLS für api_keys-Lesezugriff */
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Model-Konfiguration (spiegelt PROVIDERS in app.html)
+/**
+ * Standard-Modell je Provider.
+ * Muss mit PROVIDERS.models.fast in app.html synchron gehalten werden.
+ * @type {Record<string, string>}
+ */
 const MODELS: Record<string, string> = {
   claude: "claude-haiku-4-5-20251001",
   openai: "gpt-4o-mini",
@@ -140,6 +179,12 @@ serve(async (req: Request) => {
   }
 });
 
+/**
+ * Erstellt eine standardisierte JSON-Fehlerantwort mit CORS-Headern.
+ * @param {number} status  — HTTP-Statuscode
+ * @param {string} message — Fehlermeldung (für den Browser lesbar, kein Stack-Trace)
+ * @returns {Response}
+ */
 function err(status: number, message: string) {
   return new Response(JSON.stringify({ error: message }), {
     status,

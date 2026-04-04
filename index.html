@@ -247,6 +247,31 @@ footer a:hover { color: white; }
 <div id="toast" role="alert" aria-live="polite"></div>
 
 <script>
+/**
+ * @file index.html — StudyBuddy Pro Landing Page & Auth
+ * @description Öffentliche Einstiegsseite mit Features, Preisen, FAQ und Auth-Modal.
+ *              Alle Authentifizierungsflows (Login, Registrierung, Kind-PIN, Demo)
+ *              münden in einer Weiterleitung zu /app.html mit Session-Daten in
+ *              sessionStorage.
+ *
+ * @auth_flows
+ *   1. E-Mail/Passwort Login   → supabase.auth.signInWithPassword()
+ *                               → sessionStorage 'sb_session' → /app.html
+ *   2. Registrierung (3 Steps) → supabase.auth.signUp() + profiles.insert()
+ *                               → sofortiger Login + Redirect
+ *   3. Kind-Login (PIN)        → supabase RPC 'child_login(parent_email, child_name, pin)'
+ *                               → sessionStorage 'sb_child_session' → /app.html
+ *   4. Demo-Modus              → sessionStorage 'sb_demo_login' → /app.html
+ *   5. Passwort-Reset          → supabase.auth.resetPasswordForEmail()
+ *
+ * @security
+ *   - Alle Nutzereingaben werden via DOMPurify bereinigt (XSS-Schutz)
+ *   - Passwort-Validierung: min. 8 Zeichen, 1 Zahl, 1 Großbuchstabe
+ *   - Kind-PIN-Validierung: 4-stellig numerisch
+ *
+ * @see /app.html   — Haupt-App (nach Login)
+ * @see /supabase/migrations/001_schema.sql — child_login() RPC
+ */
 // ── FAQ Daten ────────────────────────────────────────────────────────────────
 const FAQS = [
   { q: 'Brauche ich einen Claude API Key?', a: 'Der API Key ist optional. Alle Grundfunktionen (Karteikarten, Lernplan, Pomodoro) funktionieren ohne API Key. Der Key wird nur für KI-generierte Inhalte (Tutor, automatische Kartenerstellung, Prüfungsfragen) benötigt.' },

@@ -83,11 +83,44 @@
 <div id="toast" role="alert" aria-live="assertive"></div>
 
 <script>
+/**
+ * @file app.html — StudyBuddy Pro Haupt-Applikation
+ * @description Single-Page-App für Schüler, Eltern und Lehrer.
+ *              Authentifizierung via Supabase Auth; Datenpersistenz in
+ *              Supabase PostgreSQL + localStorage-Fallback (offline-fähig).
+ *              KI-Anfragen werden ausschließlich über den serverseitigen
+ *              Supabase-Edge-Function-Proxy (ai-proxy) abgewickelt.
+ * @version 2.0.0
+ * @license MIT
+ *
+ * @architecture
+ *   Layout:  Sidebar (Navigation) + Main (Inhalt via Router)
+ *   Router:  goPage(page, params) → synchrone oder asynchrone Render-Funktion
+ *   State:   U (User), D (Daten), AI (Provider-Keys), PO (Pomodoro), EX (Prüfung), FC (Flashcards)
+ *   Auth:    Supabase → sessionStorage → Demo → Kind-PIN (Priorität absteigend)
+ *   DB:      Supabase Realtime nicht aktiv; Sync via fire-and-forget (syncStats, syncSession)
+ *
+ * @see /supabase/functions/ai-proxy/index.ts   — KI-Proxy Edge Function
+ * @see /supabase/migrations/001_schema.sql     — Datenbankschema
+ * @see /supabase/migrations/002_api_keys.sql   — API-Keys, Kind-Stats
+ */
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * @constant {Object} CFG — Globale App-Konfiguration (read-only zur Laufzeit)
+ * @property {string}   CLAUDE_MODEL  — Standard Claude-Modell für KI-Anfragen
+ * @property {string}   AI_PROXY      — URL des Supabase Edge Function AI-Proxys
+ * @property {number[]} GRADES        — Unterstützte Klassenstufen
+ * @property {Object}   SUBJECTS      — Fächer pro Klassenstufe
+ * @property {Object}   SM            — Emoji + Farbe pro Fach (Subject Map)
+ * @property {number[]} SR_DAYS       — Spaced-Repetition-Intervalle in Tagen [1,3,7,14,30]
+ * @property {Object}   XP            — XP-Belohnungen pro Aktion
+ * @property {number}   RATE_LIMIT    — Max. KI-Anfragen pro Minute
+ * @property {number}   CACHE_TTL     — Cache-Lebensdauer für KI-Antworten (ms)
+ */
 const CFG = {
   CLAUDE_MODEL: 'claude-haiku-4-5-20251001',
   CLAUDE_API: 'https://api.anthropic.com/v1/messages',
@@ -122,20 +155,65 @@ const CFG = {
 // ═══════════════════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════════════════
-let U = null; // User-Objekt
+/**
+ * @typedef {Object} UserState
+ * @property {string}   id           — UUID (Supabase) oder 'demo_<timestamp>' oder Kind-ID
+ * @property {string}   email        — E-Mail-Adresse (leer bei Kind-Accounts)
+ * @property {string}   full_name    — Anzeigename
+ * @property {'student'|'parent'|'teacher'} role
+ * @property {number}   grade        — Klassenstufe (5–13)
+ * @property {string}   school       — Schulform
+ * @property {string}   subscription — 'free' | 'family_plus' | 'family_pro' | 'teacher'
+ * @property {Array}    children     — Kinder-Objekte (nur bei parent)
+ * @property {boolean}  [isDemo]     — true = Demo-Modus (kein Supabase-Sync)
+ * @property {boolean}  [isChild]    — true = Kind-Login (PIN-Auth)
+ * @property {string}   [parentEmail] — E-Mail des Elternteils (für Key-Vererbung)
+ */
+/** @type {UserState|null} */
+let U = null;
+
+/**
+ * @typedef {Object} DataState
+ * @property {Object.<string, Array>} cards    — Karteikarten pro Fach
+ * @property {Array}  tasks                    — Aufgaben/Hausaufgaben
+ * @property {Array}  exams                    — Prüfungsergebnisse
+ * @property {Array}  sessions                 — Lernsessions (für Dashboard-Chart)
+ * @property {number} xp                       — Gesamte Erfahrungspunkte
+ * @property {number} streak                   — Lernstreak in Tagen
+ * @property {number} lastStudy                — Timestamp letzter Lerneinheit
+ * @property {number} correct                  — Korrekte Antworten gesamt
+ * @property {number} total                    — Beantwortete Fragen gesamt
+ */
+/** @type {DataState} */
 let D = { cards:{}, tasks:[], exams:[], sessions:[], xp:0, streak:0, lastStudy:0, correct:0, total:0 };
+
+/** @type {string} Aktuell angezeigte Seite (für Pomodoro-Timer-Check) */
 let _page = 'dashboard';
+/** @type {number} Anzahl KI-Anfragen im aktuellen Rate-Limit-Fenster */
 let _aiReqs = 0;
+/** @type {ReturnType<typeof setTimeout>|null} Rate-Limit-Reset-Timer */
 let _aiReset = null;
+/** @type {Map<string,{val:string,exp:number}>} In-Memory-Cache für KI-Antworten */
 const _aiCache = new Map();
 
 // ── AI Provider Konfiguration ─────────────────────────────────────────────────
-// Keys nur im Memory — NIEMALS in localStorage!
+/**
+ * @typedef {Object} AIState
+ * @property {'claude'|'openai'|'gemini'} provider — Aktiv gewählter Anbieter
+ * @property {string} claude      — Claude API Key (temporär; nach DB-Speicherung '')
+ * @property {string} openai      — OpenAI API Key (temporär)
+ * @property {string} gemini      — Google Gemini API Key (temporär)
+ * @property {string[]} _configured — Provider mit Key im Supabase-Backend
+ * @property {boolean} _hasDbKey  — true wenn aktueller Provider Key im Backend hat
+ */
+// Keys nur im Memory — NIEMALS persistent im localStorage!
 let AI = {
-  provider: 'claude',   // aktiver Provider
-  claude:  '',          // sk-ant-...
-  openai:  '',          // sk-...
-  gemini:  '',          // AIza...
+  provider:    'claude',  // aktiver Provider ('claude' | 'openai' | 'gemini')
+  claude:      '',        // sk-ant-… (nur temporär, wird nach DB-Speicherung geleert)
+  openai:      '',        // sk-…
+  gemini:      '',        // AIza…
+  _configured: [],        // Provider-Namen mit Key im Supabase-Backend
+  _hasDbKey:   false,     // true wenn mind. ein Key im Backend für aktuellen Provider liegt
 };
 
 const PROVIDERS = {
@@ -165,9 +243,15 @@ const PROVIDERS = {
   },
 };
 
-// AI-Keys speichern:
-//  • Authentifizierte Nutzer → Supabase DB (key verlässt Server nie wieder)
-//  • Demo/Kind → nur localStorage (geerbt vom Elternteil)
+/**
+ * Speichert die aktuellen AI-Provider-Einstellungen in localStorage.
+ * Zweck: Kind-Accounts erben den Key des Elternteils über localStorage
+ * (selbes Gerät). Für Auth-Nutzer wird der Key nach DB-Speicherung aus
+ * AI[provider] geleert — localStorage behält den Key für die Kindvererbung.
+ *
+ * @async
+ * @returns {Promise<void>}
+ */
 async function saveAIKeys() {
   const email = U?.email || U?.parentEmail || 'anon';
   // localStorage für Kind-Vererbung (key bleibt auf Gerät)
@@ -178,9 +262,14 @@ async function saveAIKeys() {
   } catch(e) {}
 }
 
-// AI-Keys laden:
-//  • Kinder: von Eltern-E-Mail aus localStorage
-//  • Authentifizierte: Provider-Status aus DB (key selbst bleibt im Backend)
+/**
+ * Lädt AI-Provider-Einstellungen aus localStorage in den AI-State.
+ *   - Kinder: emailOrParent = Eltern-E-Mail → erben Keys des Elternteils
+ *   - Auth-Nutzer: eigene E-Mail (Keys im Backend, nur provider-Name gespeichert)
+ *
+ * @param {string} [emailOrParent] — Schlüssel für localStorage-Eintrag
+ * @returns {boolean} true wenn Daten gefunden und geladen
+ */
 function loadAIKeys(emailOrParent) {
   const email = emailOrParent || U?.email || 'anon';
   try {
@@ -190,24 +279,40 @@ function loadAIKeys(emailOrParent) {
   return false;
 }
 
-// Konfigurierte Provider aus Supabase laden (für Auth-Nutzer)
-// Setzt AI.provider wenn noch nichts aktiv ist
+/**
+ * Lädt die im Supabase-Backend konfigurierten Provider via RPC.
+ * Wird fire-and-forget nach dem Login aufgerufen. Setzt AI._configured
+ * und AI._hasDbKey basierend auf dem Ergebnis der get_configured_providers()-Funktion.
+ * Keine Aktion für Kinder, Demo- oder unauthentifizierte Nutzer.
+ *
+ * @async
+ * @returns {Promise<void>}
+ */
 async function loadConfiguredProviders() {
   if (!sb || !U || U.isChild || U.isDemo) return;
   try {
     const { data } = await sb.rpc('get_configured_providers');
     if (data?.length) {
       AI._configured = data.map(r => r.provider);
-      // Aktiven Provider setzen wenn noch nicht gesetzt und DB-Key existiert
-      if (!activeKey() && AI._configured.includes(AI.provider)) {
-        AI._hasDbKey = true; // Flag: Key liegt im Backend
-      }
     }
-  } catch(e) {}
+    // _hasDbKey = true wenn der aktive Provider einen Key im Backend hat
+    AI._hasDbKey = (AI._configured || []).includes(AI.provider);
+  } catch(e) { /* Offline oder RPC-Fehler — ignorieren */ }
 }
 
+/**
+ * Gibt den im RAM gespeicherten Key für den aktiven Provider zurück.
+ * Für Auth-Nutzer nach DB-Speicherung leer ('') — Key liegt im Backend.
+ * @returns {string} API Key oder ''
+ */
 function activeKey() { return AI[AI.provider] || ''; }
-// Prüft ob ein Key verfügbar ist (im Memory oder im Backend)
+
+/**
+ * Prüft ob der aktive Provider einen verwendbaren Key hat —
+ * entweder im RAM (Demo/Kind) oder sicher im Supabase-Backend (Auth-Nutzer).
+ * Verwende diese Funktion für alle UI-Checks und Guards in AI-Aufrufen.
+ * @returns {boolean}
+ */
 function hasActiveKey() { return !!activeKey() || !!(AI._hasDbKey && (AI._configured||[]).includes(AI.provider)); }
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
@@ -220,9 +325,18 @@ const sb = (typeof window.supabase !== 'undefined')
 // ═══════════════════════════════════════════════════════════════════════════
 // STORAGE (sicher)
 // ═══════════════════════════════════════════════════════════════════════════
-// Datenschlüssel: pro User/Kind getrennt
+/**
+ * Generiert den localStorage-Schlüssel für Lernfortschrittsdaten.
+ * Daten sind pro User/Kind getrennt um Datenvermischung zu verhindern.
+ * @returns {string} z.B. 'sb_data_uuid-abc123'
+ */
 function _dataKey() { return 'sb_data_' + (U?.id || 'anon'); }
 
+/**
+ * Persistiert U und D in localStorage und triggert einen asynchronen DB-Sync.
+ * Kein await auf syncStats — Fehler (offline) werden ignoriert.
+ * Sollte nach jeder State-Mutation aufgerufen werden.
+ */
 function save() {
   try {
     localStorage.setItem('sb_user', JSON.stringify(U));
@@ -250,7 +364,14 @@ function loadDataForUser(userId) {
 }
 
 // ── DB-Sync (fire & forget) ───────────────────────────────────────────────
-// Synchronisiert XP/Streak/Stats in user_stats (für Cross-Device & Eltern-Dashboard)
+/**
+ * Synchronisiert XP/Streak/Statistiken in die Supabase-Tabelle `user_stats`.
+ * Ermöglicht Cross-Device-Zugriff und Eltern-Dashboard-Daten.
+ * Wird immer fire-and-forget aufgerufen; Offline-Fehler werden ignoriert.
+ * Kind-Accounts übersprungen (PIN-Verifikation serverseitig nötig).
+ * @async
+ * @returns {Promise<void>}
+ */
 async function syncStats() {
   if (!sb || !U || U.isDemo) return;
 
@@ -275,7 +396,16 @@ async function syncStats() {
   } catch(e) { /* Kein Fehler werfen — offline ist ok */ }
 }
 
-// Speichert eine Lernsession in Supabase
+/**
+ * Speichert eine abgeschlossene Lernsession in Supabase (Tabelle `sessions`).
+ * Wird beim Beenden des Pomodoro-Timers und nach Karteikarten-Sessions gerufen.
+ * @async
+ * @param {string} subject     — Fachname
+ * @param {string} type        — Session-Typ ('flashcard' | 'exam' | 'tutor' | 'pomodoro')
+ * @param {number} durationMin — Dauer in Minuten
+ * @param {number} xpEarned    — Verdiente XP
+ * @returns {Promise<void>}
+ */
 async function syncSession(subject, type, durationMin, xpEarned) {
   if (!sb || !U || U.isDemo || U.isChild) return;
   try {
@@ -291,12 +421,26 @@ async function syncSession(subject, type, durationMin, xpEarned) {
 // ═══════════════════════════════════════════════════════════════════════════
 // INPUT SANITIZATION (XSS-Schutz)
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Bereinigt einen String vollständig für sichere Ausgabe in innerHTML.
+ * Verwendet DOMPurify wenn verfügbar, sonst manuelles HTML-Escaping.
+ * Alle Nutzer-Eingaben MÜSSEN durch safe() oder safeHTML() geleitet werden.
+ * @param {*} str — Zu bereinigender Wert (nicht-Strings werden '' zurückgegeben)
+ * @returns {string} Sicherer HTML-Text ohne Tags oder Attribute
+ */
 function safe(str) {
   if (typeof str !== 'string') return '';
   if (window.DOMPurify) return DOMPurify.sanitize(str, { ALLOWED_TAGS:[], ALLOWED_ATTR:[] });
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/**
+ * Bereinigt HTML-String für sichere Ausgabe in innerHTML — erlaubt eine
+ * Whitelist an Formatierungs-Tags (b, i, code, ul, li usw.).
+ * Für KI-Antworten und Rich-Text-Inhalte verwenden.
+ * @param {string} html — HTML-String mit erlaubten Formatierungen
+ * @returns {string} Bereinigtes HTML
+ */
 function safeHTML(html) {
   if (window.DOMPurify) return DOMPurify.sanitize(html, {
     ALLOWED_TAGS:['b','i','em','strong','br','p','ul','ol','li','code','pre','span'],
@@ -307,9 +451,26 @@ function safeHTML(html) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MULTI-PROVIDER KI — via Supabase Edge Function (sicherer Proxy)
-// Keys werden nie im Browser-Memory exponiert, sondern nur im Backend
-// verwendet. Kind-Sessions übergeben den geerbten Key direkt (kein JWT).
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Sendet eine Anfrage an den KI-Provider über den serverseitigen Proxy.
+ * Authentifizierungsablauf:
+ *   1. Auth-Nutzer → JWT-Bearer-Token; Edge Function liest Key aus DB (sicher)
+ *   2. Kind/Demo   → Key aus RAM (vom Elternteil geerbt) wird im Body mitgegeben
+ *
+ * Beinhaltet:
+ *   - In-Memory-Cache (Cache-Dauer: CFG.CACHE_TTL)
+ *   - Rate-Limiting (CFG.RATE_LIMIT Anfragen/Minute)
+ *   - Fehlerweiterleitung an aufrufende Funktion (throw)
+ *
+ * @async
+ * @param {Array<{role:'user'|'assistant', content:string}>} messages — Gesprächsverlauf
+ * @param {string}  system   — System-Prompt (Rolle und Kontext des Assistenten)
+ * @param {number}  [maxTok=400] — Max. Tokens der Antwort
+ * @param {boolean} [useCache=true] — Cache nutzen (false für Echtzeit-Chat)
+ * @returns {Promise<string>} KI-Antwort als Plaintext
+ * @throws {Error} Bei Rate-Limit, fehlendem Key oder Proxy-Fehler
+ */
 async function ai(messages, system, maxTok=400, useCache=true) {
   const prov = AI.provider;
 
@@ -365,6 +526,19 @@ async function ai(messages, system, maxTok=400, useCache=true) {
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH & INIT
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Haupt-Initialisierungsfunktion — wird beim DOMContentLoaded aufgerufen.
+ * Auth-Kaskade (erste Übereinstimmung gewinnt):
+ *   1. Supabase-Session (echter Login via E-Mail/OAuth)
+ *   2. sessionStorage 'sb_session' (Redirect von index.html nach Login)
+ *   3. sessionStorage 'sb_demo_login' (Demo-Modus)
+ *   4. sessionStorage 'sb_child_session' (Kind-PIN-Login)
+ *   → Kein U gefunden: Redirect zur Landing Page (/)
+ *
+ * Nach erfolgreicher Auth: AI-Keys laden, Sidebar rendern, Dashboard anzeigen.
+ * @async
+ * @returns {Promise<void>}
+ */
 async function init() {
   load();
 
@@ -510,7 +684,7 @@ async function doLogout() {
   if (sb) await sb.auth.signOut();
   U = null;
   D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
-  AI = { provider:'claude', claude:'', openai:'', gemini:'' };
+  AI = { provider:'claude', claude:'', openai:'', gemini:'', _configured:[], _hasDbKey:false };
   localStorage.clear();
   sessionStorage.clear();
   window.location.href = '/';
@@ -590,6 +764,14 @@ function closeSidebar() {
 // ═══════════════════════════════════════════════════════════════════════════
 // ROUTER
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Navigiert zu einer Seite und rendert den Inhalt im #content-Container.
+ * Unterstützt sowohl synchrone als auch asynchrone Render-Funktionen.
+ * Async-Fehler werden über einen gemeinsamen Fehler-Handler angezeigt.
+ *
+ * @param {string} page   — Seitenname ('dashboard' | 'flashcards' | 'tutor' | ...)
+ * @param {Object} [params={}] — Optionale Parameter für die Render-Funktion
+ */
 function goPage(page, params={}) {
   _page = page;
   closeSidebar();
@@ -615,8 +797,8 @@ function goPage(page, params={}) {
   document.getElementById('header-title').textContent = titles[page] || page;
   document.title = (titles[page] || page) + ' — StudyBuddy Pro';
 
-  try { render(content, params); }
-  catch(e) {
+  // Fehler-Rendering (synchron + asynchron)
+  const _routerError = (e) => {
     console.error('[Router]', e);
     content.innerHTML = `<div style="text-align:center;padding:60px 20px">
       <div style="font-size:48px;margin-bottom:16px">⚠️</div>
@@ -624,7 +806,12 @@ function goPage(page, params={}) {
       <p style="color:var(--t3);margin-top:8px">${safe(e.message)}</p>
       <button class="btn btn-primary" style="margin-top:24px" onclick="goPage('dashboard')">Zum Dashboard</button>
     </div>`;
-  }
+  };
+  try {
+    // render() kann synchron (void) oder asynchron (Promise) sein
+    const ret = render(content, params);
+    if (ret instanceof Promise) ret.catch(_routerError);
+  } catch(e) { _routerError(e); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -800,6 +987,13 @@ function renderFC(el) {
     </div>`;
 }
 
+/**
+ * Bewertet eine Karteikarte nach dem SM-2-ähnlichen Spaced-Repetition-Algorithmus.
+ * Passt Level und nächstes Fälligkeitsdatum an, vergibt XP und rendert neu.
+ * @param {string} id     — Karten-ID
+ * @param {string} subj   — Fachname
+ * @param {0|1|2|3} rating — 0=Falsch, 1=Schwer, 2=Ok, 3=Leicht
+ */
 function rateCard(id, subj, rating) {
   const cards = D.cards[subj]||[];
   const card = cards.find(c=>c.id===id) || cards[FC.idx];
@@ -832,10 +1026,16 @@ function manualAddCard() {
   renderFC(document.getElementById('content'));
 }
 
+/**
+ * Generiert Karteikarten aus einem Freitext via KI.
+ * Parst das JSON-Array aus der KI-Antwort und fügt die Karten dem aktuellen Fach hinzu.
+ * @async
+ * @returns {Promise<void>}
+ */
 async function genCards() {
   const text = document.getElementById('gen-t')?.value.trim();
   if (!text) return toast('Text eingeben!');
-  if (!activeKey()) return toast('API Key in Einstellungen eintragen!');
+  if (!hasActiveKey()) return toast('API Key in Einstellungen eintragen!');
   const num = parseInt(document.getElementById('gen-n')?.value||5);
   toast('🤖 KI erstellt Karten…');
   try {
@@ -878,15 +1078,21 @@ function tutor(el) {
         <input class="input" id="chat-in" placeholder="Frag mich etwas…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}">
         <button class="btn btn-primary" onclick="sendMsg()">Senden →</button>
       </div>
-      <p style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">${activeKey()?`✓ ${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider} aktiv`:'⚠️ Kein API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Einstellungen</a>'}</p>
+      <p style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">${hasActiveKey()?`✓ ${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider} aktiv`:'⚠️ Kein API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Einstellungen</a>'}</p>
     </div>`;
 }
 
+/**
+ * Sendet eine Nutzernachricht an den KI-Tutor und zeigt die Antwort im Chat an.
+ * Verwaltet den lokalen Gesprächsverlauf (tutorMsgs) — max. 6 Messages im Kontext.
+ * @async
+ * @returns {Promise<void>}
+ */
 async function sendMsg() {
   const inp = document.getElementById('chat-in');
   const text = inp?.value.trim();
   if (!text) return;
-  if (!activeKey()) return toast('API Key in Einstellungen eintragen!');
+  if (!hasActiveKey()) return toast('API Key in Einstellungen eintragen!');
   inp.value = '';
 
   const msgs = document.getElementById('chat-msgs');
@@ -932,7 +1138,7 @@ function exam(el) {
             <select class="input" id="ex-num"><option value="5">5 Fragen</option><option value="8">8 Fragen</option><option value="10">10 Fragen</option></select>
           </div>
           <button class="btn btn-primary" onclick="startExam()">🚀 Prüfung starten</button>
-          <p style="font-size:12px;color:var(--t3);">${activeKey()?`✓ KI-Modus aktiv (${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider})`:'⚠️ Ohne API Key: Beispielfragen'}</p>
+          <p style="font-size:12px;color:var(--t3);">${hasActiveKey()?`✓ KI-Modus aktiv (${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider})`:'⚠️ Ohne API Key: Beispielfragen'}</p>
         </div>
       </div>
       ${(D.exams||[]).length ? `
@@ -947,6 +1153,12 @@ function exam(el) {
     </div>`;
 }
 
+/**
+ * Startet eine neue Prüfung: generiert Fragen via KI (wenn Key vorhanden)
+ * oder nutzt Fallback-Beispielfragen. Setzt EX-State und rendert die erste Frage.
+ * @async
+ * @returns {Promise<void>}
+ */
 async function startExam() {
   const subj = document.getElementById('ex-subj')?.value;
   const num = parseInt(document.getElementById('ex-num')?.value||5);
@@ -954,7 +1166,7 @@ async function startExam() {
   el.innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner" style="width:32px;height:32px;"></div><p style="margin-top:16px;color:var(--t3);">KI generiert Fragen…</p></div>';
 
   let qs = [];
-  if (activeKey()) {
+  if (hasActiveKey()) {
     try {
       const sys = `Prüfungsersteller für Klasse ${U.grade}. Nur JSON.`;
       const r = await ai([{role:'user',content:`${num} MC-Fragen zu ${subj} Klasse ${U.grade}. NUR JSON:[{"q":"Frage?","opts":["A","B","C","D"],"correct":0}]`}], sys, 2000);
@@ -995,6 +1207,11 @@ function renderExam(el) {
     </div>`;
 }
 
+/**
+ * Verarbeitet die Antwort auf eine Prüfungsfrage.
+ * Markiert richtige Antwort grün, falsche rot. Nach 1,2s nächste Frage.
+ * @param {number} i — Index der gewählten Option (0–3)
+ */
 function answerQ(i) {
   const q = EX.qs[EX.idx];
   const correct = i === q.correct;
@@ -1003,8 +1220,8 @@ function answerQ(i) {
   const btns = document.querySelectorAll('#opts button');
   btns.forEach((b,j) => {
     b.disabled = true;
-    if (j === q.correct) b.style.background = '#d1fae5'; b.style.borderColor='#10b981';
-    if (j === i && !correct) { b.style.background='#fee2e2'; b.style.borderColor='#ef4444'; }
+    if (j === q.correct) { b.style.background = '#d1fae5'; b.style.borderColor = '#10b981'; }
+    if (j === i && !correct) { b.style.background = '#fee2e2'; b.style.borderColor = '#ef4444'; }
   });
 
   setTimeout(() => { EX.idx++; renderExam(document.getElementById('content')); }, 1200);
@@ -1027,7 +1244,7 @@ function endExam(el) {
       <p style="color:var(--t2);">${EX.score} von ${EX.qs.length} Fragen richtig</p>
       <div class="progress" style="margin:20px 0;height:10px;"><div class="progress-bar" style="width:${pct}%;background:${pct>=70?'var(--acc-green)':pct>=50?'var(--acc-yellow)':'var(--acc-red)'}"></div></div>
       <div style="display:flex;gap:10px;justify-content:center;margin-top:24px;">
-        <button class="btn btn-primary" onclick="startExam()">Nochmal</button>
+        <button class="btn btn-primary" onclick="goPage('exam')">Nochmal</button>
         <button class="btn btn-secondary" onclick="goPage('dashboard')">Dashboard</button>
       </div>
     </div>`;
@@ -1504,7 +1721,7 @@ function settings(el) {
               ${Object.entries(PROVIDERS).map(([k,p])=>`
                 <button class="btn btn-sm ${AI.provider===k?'btn-primary':'btn-secondary'}"
                   onclick="AI.provider='${k}';saveAIKeys();settings(document.getElementById('content'));">
-                  ${p.emoji} ${p.name}${AI[k]?' ✓':''}
+                  ${p.emoji} ${p.name}${(AI[k]||(AI._configured||[]).includes(k))?' ✓':''}
                 </button>`).join('')}
             </div>
           </div>
@@ -1545,6 +1762,19 @@ function saveProfile() {
   save(); renderSidebar(); toast('✅ Profil gespeichert!');
 }
 
+/**
+ * Speichert einen neuen API Key für den gewählten Provider.
+ * Ablauf für Auth-Nutzer:
+ *   1. Key in AI[provider] setzen
+ *   2. saveAIKeys() → localStorage (für Kind-Vererbung)
+ *   3. Key per upsert in Supabase api_keys-Tabelle speichern
+ *   4. AI[provider] leeren (Key nur noch im Backend)
+ *   5. AI._hasDbKey + AI._configured aktualisieren
+ * Für Demo/Kind: nur Schritt 1–2 (kein DB-Aufruf).
+ * @async
+ * @param {string} providerKey — Provider-Schlüssel ('claude' | 'openai' | 'gemini')
+ * @returns {Promise<void>}
+ */
 async function saveProviderKey(providerKey) {
   const prov = PROVIDERS[providerKey];
   if (!prov) return;
@@ -1563,12 +1793,13 @@ async function saveProviderKey(providerKey) {
         { user_id: U.id, provider: providerKey, api_key: key, saved_at: new Date().toISOString() },
         { onConflict: 'user_id,provider' }
       );
-      // Nach Speichern den In-Memory-Key leeren (Key liegt jetzt im Backend)
-      AI[providerKey] = ''; // Backend hat es — kein Key im Browser
+      // In-Memory-Key leeren — Key liegt jetzt sicher im Backend.
+      // localStorage-Eintrag MIT Key bleibt erhalten: Kinder erben ihn vom Eltern-Account.
+      AI[providerKey] = ''; // Browser hält Key nicht mehr im RAM
       AI._hasDbKey = true;
       if (!AI._configured) AI._configured = [];
       if (!AI._configured.includes(providerKey)) AI._configured.push(providerKey);
-      await saveAIKeys(); // localStorage ebenfalls ohne Key (nur provider + flag)
+      // KEIN zweites saveAIKeys() — der erste Aufruf (mit dem echten Key) bleibt in localStorage
       toast(`✅ ${prov.emoji} ${prov.name} Key sicher im Backend gespeichert!`);
     } catch(e) {
       toast(`✅ ${prov.emoji} ${prov.name} Key gesetzt (lokal)!`);
@@ -1589,6 +1820,12 @@ function resetData() {
 // ═══════════════════════════════════════════════════════════════════════════
 // TOAST
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Zeigt eine temporäre Benachrichtigung am unteren Bildschirmrand.
+ * Mehrere Aufrufe in kurzer Folge setzen den Timer zurück (nur eine Toast gleichzeitig).
+ * @param {string} msg     — Nachrichtentext (darf Emojis enthalten)
+ * @param {number} [dur=3000] — Anzeigedauer in Millisekunden
+ */
 function toast(msg, dur=3000) {
   const t = document.getElementById('toast');
   t.textContent = msg;

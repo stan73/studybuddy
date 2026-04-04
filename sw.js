@@ -1,15 +1,35 @@
-// StudyBuddy Pro — Service Worker
-// Version 2.0 | Offline-Support & Caching
-//
-// Strategie:
-//  • App-Shell (HTML/CSS/JS) → Cache First (Offline möglich)
-//  • KI-Anfragen & Supabase → Network Only (kein Caching sensibler Daten)
-//  • Statische Assets (Icons, Bilder) → Stale-While-Revalidate
+/**
+ * @file sw.js — StudyBuddy Pro Service Worker
+ * @description PWA-Offline-Support und Caching-Strategie.
+ *              Ermöglicht das Öffnen der App ohne Internetverbindung (App-Shell).
+ *              API-Anfragen (Supabase, KI-Provider) werden nie gecacht.
+ * @version 2.0.0
+ *
+ * @caching_strategy
+ *   App-Shell (HTML/CSS/JS/Icons) → Cache First (offline vollständig nutzbar)
+ *   CDN-Assets (DOMPurify, Chart.js, Supabase JS) → Stale-While-Revalidate
+ *   Supabase-API / KI-Provider / Edge Functions → Network Only (nie cachen!)
+ *   POST-Anfragen → Network Only (immer)
+ *
+ * @versioning
+ *   Bei Änderungen an gecachten Assets: CACHE_NAME erhöhen (z.B. 'studybuddy-v3').
+ *   Der activate-Handler löscht automatisch alle alten Cache-Einträge.
+ *
+ * @security
+ *   API-Keys, JWT-Tokens und Supabase-Antworten werden NIEMALS gecacht.
+ *   Die NEVER_CACHE-Liste muss bei neuen externen Diensten erweitert werden.
+ */
 
+/** @type {string} Cache-Name — bei Asset-Änderungen inkrementieren */
 const CACHE_NAME = 'studybuddy-v2';
+/** @type {number} Maximales Cachealter in Millisekunden (7 Tage) */
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 Tage
 
-// App-Shell: diese Dateien immer cachen
+/**
+ * App-Shell-Dateien, die beim Service Worker Install vorgecacht werden.
+ * Änderungen hier erfordern eine Erhöhung von CACHE_NAME.
+ * @type {string[]}
+ */
 const PRECACHE = [
   '/',
   '/index.html',
@@ -23,7 +43,12 @@ const PRECACHE = [
   '/icons/icon-512.svg',
 ];
 
-// Nie cachen (sensible/dynamische Anfragen)
+/**
+ * URL-Fragmente, bei denen IMMER das Netzwerk genutzt wird.
+ * Sicherheitskritisch: API-Keys und Auth-Tokens dürfen nie gecacht werden.
+ * Bei neuen KI-Providern oder Supabase-Subdomains hier erweitern.
+ * @type {string[]}
+ */
 const NEVER_CACHE = [
   'supabase.co',
   'anthropic.com',
@@ -33,6 +58,10 @@ const NEVER_CACHE = [
 ];
 
 // ── Installation ─────────────────────────────────────────────────────────
+/**
+ * Install-Event: Alle PRECACHE-Dateien werden in den Cache geladen.
+ * skipWaiting() aktiviert den neuen SW sofort (kein Warten auf Tab-Schließen).
+ */
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting())
@@ -40,6 +69,10 @@ self.addEventListener('install', e => {
 });
 
 // ── Aktivierung: alte Caches löschen ────────────────────────────────────
+/**
+ * Activate-Event: Löscht alle Caches außer dem aktuellen CACHE_NAME.
+ * clients.claim() übernimmt sofort die Kontrolle über alle offenen Tabs.
+ */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -49,6 +82,15 @@ self.addEventListener('activate', e => {
 });
 
 // ── Fetch-Strategie ──────────────────────────────────────────────────────
+/**
+ * Fetch-Event: Routing aller Netzwerkanfragen nach Caching-Strategie.
+ * Reihenfolge der Checks:
+ *   1. NEVER_CACHE → direktes Netzwerk
+ *   2. Non-GET     → kein Caching
+ *   3. PRECACHE    → Cache First + Hintergrund-Update
+ *   4. CDN         → Stale-While-Revalidate
+ *   5. Sonstige    → Netzwerk ohne Caching
+ */
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
