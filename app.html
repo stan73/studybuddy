@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyBuddy Pro</title>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/layout.css">
+<!-- DOMPurify XSS-Schutz -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" integrity="sha512-tzcDOiFWAHGK9yCLjmCQbJFsAA2oOGULlNqAFl5VgZbdnMkInVqb/n1Ln9OVl3CiQpGjJwRc9jJwOHKd5f8g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Chart.js für Eltern-Dashboard -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+<div id="app" style="display:none;">
+  <!-- Sidebar Overlay (Mobile) -->
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" role="navigation" aria-label="Hauptnavigation">
+    <div class="sidebar-logo">
+      <h2>StudyBuddy <span style="color:var(--acc-yellow)">Pro</span></h2>
+      <span id="sb-version">v2.0</span>
+    </div>
+    <div class="sidebar-user">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="sidebar-avatar" id="sb-avatar">?</div>
+        <div>
+          <div class="sidebar-name" id="sb-name">Lädt...</div>
+          <div class="sidebar-role" id="sb-role"></div>
+        </div>
+      </div>
+    </div>
+    <div class="xp-bar-wrap" id="xp-wrap">
+      <div class="xp-label">
+        <span>⭐ XP</span>
+        <span id="xp-val">0</span>
+      </div>
+      <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav" role="menubar">
+      <!-- Dynamisch gefüllt je nach Rolle -->
+    </nav>
+    <div class="sidebar-footer">
+      <button class="nav-item" onclick="doLogout()" style="color:rgba(255,255,255,.4);" role="menuitem">
+        <span class="nav-icon">🚪</span> Abmelden
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main id="main" role="main">
+    <header id="header" role="banner">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button id="menu-toggle" onclick="toggleSidebar()" aria-label="Menü öffnen" aria-expanded="false">☰</button>
+        <h2 class="header-title" id="header-title">Dashboard</h2>
+      </div>
+      <div class="header-right">
+        <div class="streak-chip" id="streak-chip" aria-label="Lernstreak">🔥 <span id="streak-val">0</span> Tage</div>
+      </div>
+    </header>
+    <div id="content" role="region" aria-label="Seiteninhalt" aria-live="polite">
+      <div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:16px;">
+        <div class="spinner" style="width:32px;height:32px;"></div>
+        <p style="color:var(--t3);">Lädt…</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast" role="alert" aria-live="assertive"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+const CFG = {
+  CLAUDE_MODEL: 'claude-haiku-4-5-20251001',
+  CLAUDE_API: 'https://api.anthropic.com/v1/messages',
+  GRADES: [5,6,7,8,9,10,11,12,13],
+  SCHOOL_TYPES: ['Gymnasium','Realschule','Gesamtschule','Hauptschule'],
+  SUBJECTS: {
+    5:['Mathematik','Deutsch','Englisch','Biologie','Geschichte','Geografie','Kunst','Sport','Musik'],
+    6:['Mathematik','Deutsch','Englisch','Biologie','Geschichte','Geografie','Kunst','Sport','Latein'],
+    7:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Latein','Französisch'],
+    8:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Latein','Französisch'],
+    9:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Französisch'],
+    10:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Wirtschaft'],
+    11:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Philosophie'],
+    12:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Philosophie'],
+    13:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Philosophie'],
+  },
+  SM: {
+    'Mathematik':{e:'📐',c:'#6366f1'},'Deutsch':{e:'📖',c:'#8b5cf6'},'Englisch':{e:'🇬🇧',c:'#3b82f6'},
+    'Biologie':{e:'🌿',c:'#10b981'},'Chemie':{e:'⚗️',c:'#f59e0b'},'Physik':{e:'⚡',c:'#f97316'},
+    'Geschichte':{e:'🏛️',c:'#ef4444'},'Geografie':{e:'🌍',c:'#06b6d4'},'Informatik':{e:'💻',c:'#6366f1'},
+    'Latein':{e:'🏺',c:'#a78bfa'},'Französisch':{e:'🥐',c:'#ec4899'},'Kunst':{e:'🎨',c:'#f43f5e'},
+    'Musik':{e:'🎵',c:'#8b5cf6'},'Sport':{e:'⚽',c:'#10b981'},'Wirtschaft':{e:'📊',c:'#0ea5e9'},
+    'Philosophie':{e:'🤔',c:'#7c3aed'},default:{e:'📚',c:'#6366f1'}
+  },
+  SR_DAYS: [1,3,7,14,30],
+  XP: {CARD:10, CARD_WRONG:2, EXAM:50, TUTOR:5, POMO:30},
+  RATE_LIMIT: 3,
+  CACHE_TTL: 900000,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+let U = null; // User-Objekt
+let D = { cards:{}, tasks:[], exams:[], sessions:[], xp:0, streak:0, lastStudy:0, correct:0, total:0 };
+let apiKey = ''; // NIEMALS in localStorage!
+let _page = 'dashboard';
+let _aiReqs = 0;
+let _aiReset = null;
+const _aiCache = new Map();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STORAGE (sicher)
+// ═══════════════════════════════════════════════════════════════════════════
+function save() {
+  try {
+    localStorage.setItem('sb_user', JSON.stringify(U));
+    // API Key NICHT in localStorage!
+    const { ...dSave } = D;
+    localStorage.setItem('sb_data', JSON.stringify(dSave));
+  } catch(e) { console.warn('[Storage]', e.message); }
+}
+
+function load() {
+  try {
+    const u = localStorage.getItem('sb_user');
+    const d = localStorage.getItem('sb_data');
+    if (u) U = JSON.parse(u);
+    if (d) D = { ...D, ...JSON.parse(d) };
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INPUT SANITIZATION (XSS-Schutz)
+// ═══════════════════════════════════════════════════════════════════════════
+function safe(str) {
+  if (typeof str !== 'string') return '';
+  if (window.DOMPurify) return DOMPurify.sanitize(str, { ALLOWED_TAGS:[], ALLOWED_ATTR:[] });
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function safeHTML(html) {
+  if (window.DOMPurify) return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS:['b','i','em','strong','br','p','ul','ol','li','code','pre','span'],
+    ALLOWED_ATTR:['class','style']
+  });
+  return safe(html);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLAUDE API (Budget-bewusst)
+// ═══════════════════════════════════════════════════════════════════════════
+async function ai(messages, system, maxTok=400, useCache=true) {
+  if (!apiKey) throw new Error('Claude API Key fehlt — bitte in Einstellungen eintragen');
+  if (!apiKey.startsWith('sk-ant-')) throw new Error('Ungültiger API Key (muss mit sk-ant- beginnen)');
+
+  // Cache
+  if (useCache) {
+    const ck = 'ai_' + btoa(encodeURIComponent(system + JSON.stringify(messages))).slice(0,40);
+    const cached = _aiCache.get(ck);
+    if (cached && Date.now() < cached.exp) return cached.val;
+  }
+
+  // Rate-Limit
+  if (_aiReqs >= CFG.RATE_LIMIT) throw new Error('Zu viele KI-Anfragen — bitte kurz warten');
+  _aiReqs++;
+  if (!_aiReset) _aiReset = setTimeout(() => { _aiReqs=0; _aiReset=null; }, 60000);
+
+  const r = await fetch(CFG.CLAUDE_API, {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true',
+    },
+    body: JSON.stringify({ model:CFG.CLAUDE_MODEL, max_tokens:maxTok, system, messages }),
+  });
+
+  if (!r.ok) {
+    const e = await r.json().catch(()=>({}));
+    throw new Error(`API Fehler ${r.status}: ${e?.error?.message || r.statusText}`);
+  }
+  const text = (await r.json()).content?.[0]?.text || '';
+  if (useCache && text) {
+    const ck = 'ai_' + btoa(encodeURIComponent(system + JSON.stringify(messages))).slice(0,40);
+    _aiCache.set(ck, { val:text, exp: Date.now() + CFG.CACHE_TTL });
+  }
+  return text;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTH & INIT
+// ═══════════════════════════════════════════════════════════════════════════
+function init() {
+  load();
+
+  // Session von Landing-Page prüfen
+  const loginData = sessionStorage.getItem('sb_demo_login');
+  if (loginData) {
+    sessionStorage.removeItem('sb_demo_login');
+    const d = JSON.parse(loginData);
+    if (!U) {
+      U = {
+        id: 'demo_' + Date.now(),
+        email: d.email,
+        full_name: d.name || (d.role === 'parent' ? 'Demo Elternteil' : d.role === 'teacher' ? 'Demo Lehrer' : 'Demo Schüler'),
+        role: d.role || 'student',
+        grade: d.grade || '9',
+        school: d.school || 'Gymnasium',
+        subscription: 'free',
+        children: d.children || (d.role==='parent' ? [{id:'c1',name:'Max',grade:7},{id:'c2',name:'Lisa',grade:5}] : []),
+        isDemo: true,
+      };
+      save();
+    }
+  }
+
+  if (!U) { window.location.href = '/'; return; }
+
+  // Demo-Daten befüllen
+  if (U.isDemo && !Object.keys(D.cards).length) populateDemoData();
+
+  document.getElementById('app').style.display = 'flex';
+  renderSidebar();
+  goPage('dashboard');
+}
+
+function populateDemoData() {
+  D.xp = 1240; D.streak = 7; D.correct = 48; D.total = 60;
+  D.cards['Mathematik'] = [
+    {id:'c1',front:'Was ist der Satz des Pythagoras?',back:'a² + b² = c² (in rechtwinkligen Dreiecken)',level:2,due:0},
+    {id:'c2',front:'Was ist eine Primzahl?',back:'Eine natürliche Zahl > 1, die nur durch 1 und sich selbst teilbar ist',level:1,due:0},
+    {id:'c3',front:'Wie lautet die Formel für den Kreisumfang?',back:'U = 2 × π × r',level:3,due:Date.now()+86400000*3},
+  ];
+  D.cards['Deutsch'] = [
+    {id:'c4',front:'Was ist ein Metapher?',back:'Ein sprachliches Bild, das zwei Dinge ohne "wie" vergleicht (z.B. "Lebensweg")',level:1,due:0},
+    {id:'c5',front:'Was ist ein Hyperbel?',back:'Eine extreme Übertreibung als Stilmittel (z.B. "tausendmal gesagt")',level:0,due:0},
+  ];
+  D.tasks = [
+    {id:'t1',title:'Mathe Hausaufgaben S.47',subject:'Mathematik',due:new Date(Date.now()+86400000).toISOString().split('T')[0],completed:false},
+    {id:'t2',title:'Englisch Vokabeln Unit 5',subject:'Englisch',due:new Date(Date.now()+172800000).toISOString().split('T')[0],completed:false},
+    {id:'t3',title:'Biologie Zusammenfassung',subject:'Biologie',due:new Date(Date.now()-86400000).toISOString().split('T')[0],completed:true},
+  ];
+  D.exams = [
+    {id:'e1',subject:'Mathematik',score:8,total:10,date:new Date(Date.now()-604800000).toISOString()},
+    {id:'e2',subject:'Deutsch',score:7,total:10,date:new Date(Date.now()-1209600000).toISOString()},
+  ];
+  D.sessions = Array.from({length:7},(_,i)=>({
+    id:'s'+i, subject:'Mathematik', session_type:'flashcard',
+    duration_minutes: Math.floor(15+Math.random()*25),
+    xp_earned: Math.floor(30+Math.random()*70),
+    created_at: new Date(Date.now()-i*86400000).toISOString()
+  }));
+  save();
+}
+
+async function doLogout() {
+  if (!confirm('Wirklich abmelden?')) return;
+  U = null; D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
+  apiKey = '';
+  localStorage.clear();
+  window.location.href = '/';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════════════════
+function renderSidebar() {
+  document.getElementById('sb-name').textContent = safe(U.full_name || U.email);
+  document.getElementById('sb-role').textContent = U.role === 'student' ? `Klasse ${U.grade}` : U.role === 'parent' ? 'Elternteil' : 'Lehrer/in';
+  document.getElementById('sb-avatar').textContent = (U.full_name || U.email || '?')[0].toUpperCase();
+  updateXP();
+
+  const nav = document.getElementById('sidebar-nav');
+  let html = '';
+
+  if (U.role === 'student' || !U.role) {
+    html += `
+      <span class="sidebar-section-label">Lernen</span>
+      <button class="nav-item" data-page="dashboard" onclick="goPage('dashboard')" role="menuitem"><span class="nav-icon">🏠</span>Dashboard</button>
+      <button class="nav-item" data-page="subjects" onclick="goPage('subjects')" role="menuitem"><span class="nav-icon">📚</span>Fächer</button>
+      <button class="nav-item" data-page="flashcards" onclick="goPage('flashcards')" role="menuitem"><span class="nav-icon">🃏</span>Karteikarten</button>
+      <button class="nav-item" data-page="tutor" onclick="goPage('tutor')" role="menuitem"><span class="nav-icon">🤖</span>KI-Tutor</button>
+      <button class="nav-item" data-page="exam" onclick="goPage('exam')" role="menuitem"><span class="nav-icon">📝</span>Prüfungsmodus</button>
+      <span class="sidebar-section-label">Organisation</span>
+      <button class="nav-item" data-page="planner" onclick="goPage('planner')" role="menuitem"><span class="nav-icon">📅</span>Lernplan</button>
+      <button class="nav-item" data-page="pomodoro" onclick="goPage('pomodoro')" role="menuitem"><span class="nav-icon">🍅</span>Pomodoro</button>
+    `;
+  } else if (U.role === 'parent') {
+    html += `
+      <span class="sidebar-section-label">Familie</span>
+      <button class="nav-item" data-page="parent" onclick="goPage('parent')" role="menuitem"><span class="nav-icon">🏠</span>Übersicht</button>
+      <button class="nav-item" data-page="children" onclick="goPage('children')" role="menuitem"><span class="nav-icon">👧</span>Kinder</button>
+    `;
+  } else if (U.role === 'teacher') {
+    html += `
+      <span class="sidebar-section-label">Klasse</span>
+      <button class="nav-item" data-page="teacher" onclick="goPage('teacher')" role="menuitem"><span class="nav-icon">🏠</span>Dashboard</button>
+    `;
+  }
+
+  html += `
+    <span class="sidebar-section-label">Konto</span>
+    <button class="nav-item" data-page="subscription" onclick="goPage('subscription')" role="menuitem"><span class="nav-icon">💎</span>Abo & Preise</button>
+    <button class="nav-item" data-page="settings" onclick="goPage('settings')" role="menuitem"><span class="nav-icon">⚙️</span>Einstellungen</button>
+  `;
+
+  nav.innerHTML = html;
+}
+
+function updateXP() {
+  const xp = D.xp || 0;
+  const level = Math.floor(xp / 500) + 1;
+  const pct = (xp % 500) / 500 * 100;
+  document.getElementById('xp-val').textContent = xp + ' XP · Lv.' + level;
+  document.getElementById('xp-fill').style.width = pct + '%';
+  document.getElementById('streak-val').textContent = D.streak || 0;
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  const btn = document.getElementById('menu-toggle');
+  const open = sb.classList.toggle('open');
+  ov.classList.toggle('show', open);
+  btn.setAttribute('aria-expanded', open);
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+  document.getElementById('menu-toggle').setAttribute('aria-expanded','false');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUTER
+// ═══════════════════════════════════════════════════════════════════════════
+function goPage(page, params={}) {
+  _page = page;
+  closeSidebar();
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  const content = document.getElementById('content');
+  content.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:60px"><div class="spinner" style="width:28px;height:28px;"></div></div>';
+
+  const pages = {
+    dashboard, subjects, flashcards, tutor, exam, planner, pomodoro,
+    parent: parentDash, children: childrenPage, teacher: teacherDash,
+    subscription, settings
+  };
+
+  const render = pages[page];
+  if (!render) { goPage('dashboard'); return; }
+
+  const titles = {
+    dashboard:'Dashboard', subjects:'Fächer', flashcards:'Karteikarten', tutor:'KI-Tutor',
+    exam:'Prüfungsmodus', planner:'Lernplan', pomodoro:'Pomodoro',
+    parent:'Eltern-Übersicht', children:'Kinder', teacher:'Lehrer-Dashboard',
+    subscription:'Abo & Preise', settings:'Einstellungen'
+  };
+  document.getElementById('header-title').textContent = titles[page] || page;
+  document.title = (titles[page] || page) + ' — StudyBuddy Pro';
+
+  try { render(content, params); }
+  catch(e) {
+    console.error('[Router]', e);
+    content.innerHTML = `<div style="text-align:center;padding:60px 20px">
+      <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+      <h2>Fehler beim Laden</h2>
+      <p style="color:var(--t3);margin-top:8px">${safe(e.message)}</p>
+      <button class="btn btn-primary" style="margin-top:24px" onclick="goPage('dashboard')">Zum Dashboard</button>
+    </div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+function dashboard(el) {
+  const dueCards = Object.values(D.cards).flat().filter(c => (c.due||0) <= Date.now()).length;
+  const openTasks = (D.tasks||[]).filter(t => !t.completed).length;
+  const upcomingExams = (D.exams||[]).slice(-3).reverse();
+
+  el.innerHTML = `
+    <div class="page-header">
+      <h1>Guten Tag, ${safe((U.full_name||U.email||'').split(' ')[0])}! 👋</h1>
+      <p>Dein Lernfortschritt auf einen Blick</p>
+    </div>
+    <div class="grid-4" style="margin-bottom:24px;">
+      <div class="stat-card">
+        <div class="stat-icon">⭐</div>
+        <div class="stat-value">${D.xp||0}</div>
+        <div class="stat-label">XP-Punkte</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔥</div>
+        <div class="stat-value">${D.streak||0}</div>
+        <div class="stat-label">Tage Streak</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🃏</div>
+        <div class="stat-value">${dueCards}</div>
+        <div class="stat-label">Karten fällig</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value">${openTasks}</div>
+        <div class="stat-label">Aufgaben offen</div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 Aufgaben</div><button class="btn btn-primary btn-sm" onclick="goPage('planner')">Alle →</button></div>
+        ${(D.tasks||[]).filter(t=>!t.completed).slice(0,5).map(t=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <input type="checkbox" onchange="completeTask('${t.id}',this.checked)" style="cursor:pointer;width:16px;height:16px;">
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:500;">${safe(t.title)}</div>
+              <div style="font-size:12px;color:var(--t3);">${t.subject||''} ${t.due?'· fällig '+t.due:''}</div>
+            </div>
+          </div>`).join('') || '<p style="color:var(--t3);padding:16px 0;text-align:center;">Keine offenen Aufgaben 🎉</p>'}
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">⚡ Schnellstart</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${[['🃏','Karteikarten','flashcards'],['🤖','KI-Tutor','tutor'],['📝','Prüfung starten','exam'],['🍅','Pomodoro','pomodoro']].map(([e,n,p])=>`
+            <button class="btn btn-secondary" onclick="goPage('${p}')" style="flex-direction:column;height:72px;gap:4px;">
+              <span style="font-size:22px;">${e}</span>
+              <span style="font-size:12px;">${n}</span>
+            </button>`).join('')}
+        </div>
+      </div>
+    </div>
+    ${upcomingExams.length ? `
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header"><div class="card-title">📊 Letzte Prüfungsergebnisse</div></div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${upcomingExams.map(ex=>{
+          const pct = Math.round(ex.score/ex.total*100);
+          const color = pct>=70?'var(--acc-green)':pct>=50?'var(--acc-yellow)':'var(--acc-red)';
+          return `<div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:20px;">${CFG.SM[ex.subject]?.e||'📚'}</span>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;">${safe(ex.subject)}</div>
+              <div class="progress" style="margin-top:4px"><div class="progress-bar" style="width:${pct}%;background:${color}"></div></div>
+            </div>
+            <span style="font-weight:700;color:${color}">${ex.score}/${ex.total}</span>
+          </div>`;}).join('')}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+function completeTask(id, done) {
+  const task = D.tasks.find(t=>t.id===id);
+  if (task) { task.completed = done; save(); toast(done ? '✅ Aufgabe erledigt!' : 'Aufgabe wieder offen'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: FÄCHER
+// ═══════════════════════════════════════════════════════════════════════════
+function subjects(el) {
+  const subs = CFG.SUBJECTS[U.grade||9] || CFG.SUBJECTS[9];
+  el.innerHTML = `
+    <div class="page-header">
+      <h1>📚 Fächer</h1>
+      <p>Klasse ${U.grade||9} · ${subs.length} Fächer</p>
+    </div>
+    <div class="grid-auto">
+      ${subs.map(s => {
+        const m = CFG.SM[s]||CFG.SM.default;
+        const cards = (D.cards[s]||[]).length;
+        const due = (D.cards[s]||[]).filter(c=>(c.due||0)<=Date.now()).length;
+        return `<div class="card card-hover" onclick="goPage('flashcards',{subject:'${s}'})" style="cursor:pointer;border-left:4px solid ${m.c};">
+          <div style="font-size:28px;margin-bottom:8px;">${m.e}</div>
+          <div style="font-weight:700;font-size:15px;">${safe(s)}</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:4px;">${cards} Karten ${due>0?`· <span style="color:var(--acc-yellow)">${due} fällig</span>`:''}</div>
+        </div>`;}).join('')}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: KARTEIKARTEN
+// ═══════════════════════════════════════════════════════════════════════════
+let FC = { subj:null, idx:0, flipped:false };
+
+function flashcards(el, params={}) {
+  const subs = CFG.SUBJECTS[U.grade||9]||CFG.SUBJECTS[9];
+  FC.subj = params.subject || FC.subj || subs[0];
+  renderFC(el);
+}
+
+function renderFC(el) {
+  const cards = D.cards[FC.subj]||[];
+  const due = cards.filter(c=>(c.due||0)<=Date.now());
+  const card = due[FC.idx % Math.max(due.length,1)];
+
+  el.innerHTML = `
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1>🃏 Karteikarten</h1>
+        <p>${due.length} fällig · ${cards.length} gesamt</p>
+      </div>
+      <select class="input" style="width:auto;" onchange="FC.subj=this.value;FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
+        ${(CFG.SUBJECTS[U.grade||9]||[]).map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+
+    ${due.length ? `
+    <div style="max-width:500px;margin:0 auto;">
+      <div onclick="FC.flipped=!FC.flipped;renderFC(document.getElementById('content'))"
+           style="background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-xl);padding:48px 32px;text-align:center;cursor:pointer;min-height:200px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;box-shadow:var(--shadow-md);transition:transform .1s;" onmouseover="this.style.transform='scale(1.01)'" onmouseout="this.style.transform='scale(1)'">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);">${FC.flipped?'Antwort':'Frage'} ${FC.idx+1}/${due.length}</div>
+        <div style="font-size:18px;font-weight:600;line-height:1.5;">${safe(FC.flipped?card.back:card.front)}</div>
+        <div style="font-size:12px;color:var(--t3);">Klicken zum ${FC.flipped?'zurückdrehen':'Aufdecken'}</div>
+      </div>
+      ${FC.flipped ? `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px;">
+        ${[['😕','Falsch',0],['😐','Schwer',1],['🙂','Ok',2],['😄','Leicht',3]].map(([e,l,r])=>`
+          <button class="btn btn-secondary" onclick="rateCard('${card.id||FC.idx}','${FC.subj}',${r})" style="flex-direction:column;height:64px;font-size:11px;gap:2px;">
+            <span style="font-size:20px;">${e}</span><span>${l}</span>
+          </button>`).join('')}
+      </div>` : `<p style="text-align:center;color:var(--t3);margin-top:16px;font-size:13px;">Klicke auf die Karte um die Antwort zu sehen</p>`}
+    </div>` : `
+    <div style="text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">🎉</div>
+      <h2>Alle Karten für heute gelernt!</h2>
+      <p style="color:var(--t3);margin-top:8px;">Super Arbeit! Neue Karten werden morgen fällig.</p>
+    </div>`}
+
+    <div class="card" style="margin-top:24px;">
+      <div class="card-header"><div class="card-title">➕ Neue Karte / KI-Generierung</div></div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="grid-2">
+          <div class="field"><label>Vorderseite (Frage)</label><input class="input" id="nf" placeholder="Was ist...?"></div>
+          <div class="field"><label>Rückseite (Antwort)</label><input class="input" id="nb" placeholder="Die Antwort..."></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="manualAddCard()" style="align-self:flex-start;">Karte hinzufügen</button>
+        <div class="divider-text">oder mit KI generieren</div>
+        <div class="field"><label>Text eingeben (KI erstellt daraus Karten)</label><textarea class="input" id="gen-t" rows="3" placeholder="Lernstoff hier einfügen..."></textarea></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select class="input" id="gen-n" style="width:100px;"><option value="3">3 Karten</option><option value="5" selected>5 Karten</option><option value="8">8 Karten</option></select>
+          <button class="btn btn-primary btn-sm" onclick="genCards()">🤖 KI-Karten erstellen</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function rateCard(id, subj, rating) {
+  const cards = D.cards[subj]||[];
+  const card = cards.find(c=>c.id===id) || cards[FC.idx];
+  if (!card) return;
+
+  const newLevel = Math.max(0, Math.min(4, (card.level||0) + (rating >= 2 ? 1 : -1)));
+  const daysUntilNext = CFG.SR_DAYS[newLevel] * 86400000;
+  card.level = newLevel;
+  card.due = Date.now() + daysUntilNext;
+
+  D.correct = (D.correct||0) + (rating >= 2 ? 1 : 0);
+  D.total = (D.total||0) + 1;
+  D.xp = (D.xp||0) + (rating >= 2 ? CFG.XP.CARD : CFG.XP.CARD_WRONG);
+  save(); updateXP();
+
+  const due = (D.cards[subj]||[]).filter(c=>(c.due||0)<=Date.now());
+  if (due.length) FC.idx = (FC.idx + 1) % due.length;
+  FC.flipped = false;
+  renderFC(document.getElementById('content'));
+}
+
+function manualAddCard() {
+  const front = document.getElementById('nf')?.value.trim();
+  const back = document.getElementById('nb')?.value.trim();
+  if (!front || !back) return toast('Vorder- und Rückseite ausfüllen!');
+  if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
+  D.cards[FC.subj].push({id:'c'+Date.now(),front,back,level:0,due:0});
+  save(); toast('Karte hinzugefügt! ✓');
+  document.getElementById('nf').value=''; document.getElementById('nb').value='';
+  renderFC(document.getElementById('content'));
+}
+
+async function genCards() {
+  const text = document.getElementById('gen-t')?.value.trim();
+  if (!text) return toast('Text eingeben!');
+  if (!apiKey) return toast('API Key in Einstellungen eintragen!');
+  const num = parseInt(document.getElementById('gen-n')?.value||5);
+  toast('🤖 KI erstellt Karten…');
+  try {
+    const sys = `Karteikarten-Ersteller für Klasse ${U.grade}. Antworte NUR mit JSON.`;
+    const r = await ai([{role:'user',content:`${num} Karteikarten zu ${FC.subj} aus:\n${text.slice(0,2000)}\nNur JSON:[{"front":"Frage?","back":"Antwort"}]`}], sys, 1200);
+    const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
+    if (!parsed.length) throw new Error('Kein gültiges JSON');
+    if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
+    parsed.forEach(c=>{ if(c.front&&c.back) D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0}); });
+    save(); toast(`🎉 ${parsed.length} Karten erstellt!`);
+    document.getElementById('gen-t').value='';
+    renderFC(document.getElementById('content'));
+  } catch(e) { toast('❌ '+e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: KI-TUTOR
+// ═══════════════════════════════════════════════════════════════════════════
+let tutorMsgs = [];
+let tutorSubj = '';
+
+function tutor(el) {
+  tutorMsgs = [];
+  const subs = CFG.SUBJECTS[U.grade||9]||[];
+  tutorSubj = subs[0]||'Allgemein';
+  el.innerHTML = `
+    <div class="page-header"><h1>🤖 KI-Tutor</h1><p>Frag mich alles — ich helfe dir beim Lernen!</p></div>
+    <div style="max-width:720px;margin:0 auto;">
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <select class="input" style="width:auto;" onchange="tutorSubj=this.value">
+          ${subs.map(s=>`<option>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div id="chat-msgs" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;min-height:360px;max-height:480px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+        <div style="background:var(--pri-l);color:var(--pri-d);padding:12px 16px;border-radius:var(--r-md);max-width:85%;font-size:14px;">
+          👋 Hallo! Ich bin dein KI-Tutor. Stell mir eine Frage zu ${tutorSubj} oder einem anderen Fach — ich helfe dir gerne!
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <input class="input" id="chat-in" placeholder="Frag mich etwas…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}">
+        <button class="btn btn-primary" onclick="sendMsg()">Senden →</button>
+      </div>
+      <p style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">${apiKey?'✓ API Key aktiv':'⚠️ Kein API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Einstellungen</a>'}</p>
+    </div>`;
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('chat-in');
+  const text = inp?.value.trim();
+  if (!text) return;
+  if (!apiKey) return toast('API Key in Einstellungen eintragen!');
+  inp.value = '';
+
+  const msgs = document.getElementById('chat-msgs');
+  msgs.innerHTML += `<div style="background:var(--pri);color:white;padding:12px 16px;border-radius:var(--r-md);max-width:85%;align-self:flex-end;font-size:14px;">${safe(text)}</div>`;
+  msgs.innerHTML += `<div id="typing" style="color:var(--t3);font-size:13px;animation:pulse 1s infinite;">✍️ Tutor tippt…</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  tutorMsgs.push({role:'user', content:text});
+
+  try {
+    const sys = `Du bist StudyBuddy, ein freundlicher Lernassistent für Klasse ${U.grade} im Fach ${tutorSubj}. Erkläre verständlich auf Deutsch, max. 3–4 Sätze.`;
+    const history = tutorMsgs.slice(-6).map(m=>({role:m.role,content:m.content.slice(0,400)}));
+    const answer = await ai(history, sys, 400, false);
+    document.getElementById('typing')?.remove();
+    tutorMsgs.push({role:'assistant',content:answer});
+    msgs.innerHTML += `<div style="background:var(--bg-2);padding:12px 16px;border-radius:var(--r-md);max-width:85%;font-size:14px;line-height:1.6;">${safeHTML(answer.replace(/\n/g,'<br>'))}</div>`;
+    D.xp = (D.xp||0) + CFG.XP.TUTOR; save(); updateXP();
+  } catch(e) {
+    document.getElementById('typing')?.remove();
+    msgs.innerHTML += `<div style="background:#fee2e2;color:#991b1b;padding:12px 16px;border-radius:var(--r-md);max-width:85%;font-size:13px;">❌ ${safe(e.message)}</div>`;
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: PRÜFUNGSMODUS
+// ═══════════════════════════════════════════════════════════════════════════
+let EX = { active:false, qs:[], idx:0, score:0, subj:'', answered:false };
+
+function exam(el) {
+  if (EX.active) { renderExam(el); return; }
+  const subs = CFG.SUBJECTS[U.grade||9]||[];
+  el.innerHTML = `
+    <div class="page-header"><h1>📝 Prüfungsmodus</h1><p>Teste dein Wissen mit KI-generierten Fragen</p></div>
+    <div style="max-width:500px;margin:0 auto;">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Neue Prüfung starten</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="field"><label>Fach</label>
+            <select class="input" id="ex-subj">${subs.map(s=>`<option>${s}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Anzahl Fragen</label>
+            <select class="input" id="ex-num"><option value="5">5 Fragen</option><option value="8">8 Fragen</option><option value="10">10 Fragen</option></select>
+          </div>
+          <button class="btn btn-primary" onclick="startExam()">🚀 Prüfung starten</button>
+          <p style="font-size:12px;color:var(--t3);">${apiKey?'✓ KI-Modus aktiv':'⚠️ Ohne API Key: Beispielfragen'}</p>
+        </div>
+      </div>
+      ${(D.exams||[]).length ? `
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header"><div class="card-title">Letzte Ergebnisse</div></div>
+        ${(D.exams||[]).slice(-5).reverse().map(e=>{
+          const pct=Math.round(e.score/e.total*100);
+          const c=pct>=70?'var(--acc-green)':pct>=50?'var(--acc-yellow)':'var(--acc-red)';
+          return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;">
+            <span>${safe(e.subject)}</span><span style="font-weight:700;color:${c}">${e.score}/${e.total} (${pct}%)</span></div>`;}).join('')}
+      </div>` : ''}
+    </div>`;
+}
+
+async function startExam() {
+  const subj = document.getElementById('ex-subj')?.value;
+  const num = parseInt(document.getElementById('ex-num')?.value||5);
+  const el = document.getElementById('content');
+  el.innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner" style="width:32px;height:32px;"></div><p style="margin-top:16px;color:var(--t3);">KI generiert Fragen…</p></div>';
+
+  let qs = [];
+  if (apiKey) {
+    try {
+      const sys = `Prüfungsersteller für Klasse ${U.grade}. Nur JSON.`;
+      const r = await ai([{role:'user',content:`${num} MC-Fragen zu ${subj} Klasse ${U.grade}. NUR JSON:[{"q":"Frage?","opts":["A","B","C","D"],"correct":0}]`}], sys, 2000);
+      qs = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]').filter(q=>q.q&&q.opts?.length===4);
+    } catch(e) { toast('❌ '+e.message); }
+  }
+
+  // Fallback-Fragen wenn keine KI
+  if (!qs.length) {
+    qs = [
+      {q:`Was ist ein typisches Thema in ${subj}?`,opts:['Option A','Option B','Option C','Option D'],correct:0},
+      {q:`Welche Methode wird in ${subj} häufig genutzt?`,opts:['Methode 1','Methode 2','Methode 3','Methode 4'],correct:1},
+    ];
+  }
+
+  EX = { active:true, qs, idx:0, score:0, subj, answered:false };
+  renderExam(el);
+}
+
+function renderExam(el) {
+  if (EX.idx >= EX.qs.length) { endExam(el); return; }
+  const q = EX.qs[EX.idx];
+  const pct = Math.round((EX.idx)/EX.qs.length*100);
+  el.innerHTML = `
+    <div class="page-header"><h1>📝 ${safe(EX.subj)} — Frage ${EX.idx+1}/${EX.qs.length}</h1></div>
+    <div style="max-width:600px;margin:0 auto;">
+      <div class="progress" style="margin-bottom:20px;"><div class="progress-bar" style="width:${pct}%"></div></div>
+      <div class="card" style="margin-bottom:16px;">
+        <p style="font-size:17px;font-weight:600;line-height:1.5;" id="q-text">${safe(q.q)}</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;" id="opts">
+        ${q.opts.map((o,i)=>`
+          <button class="btn btn-secondary" onclick="answerQ(${i})" style="text-align:left;justify-content:flex-start;padding:14px 18px;">
+            <span style="width:24px;height:24px;border-radius:50%;background:var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">${['A','B','C','D'][i]}</span>
+            ${safe(o)}
+          </button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function answerQ(i) {
+  const q = EX.qs[EX.idx];
+  const correct = i === q.correct;
+  if (correct) EX.score++;
+
+  const btns = document.querySelectorAll('#opts button');
+  btns.forEach((b,j) => {
+    b.disabled = true;
+    if (j === q.correct) b.style.background = '#d1fae5'; b.style.borderColor='#10b981';
+    if (j === i && !correct) { b.style.background='#fee2e2'; b.style.borderColor='#ef4444'; }
+  });
+
+  setTimeout(() => { EX.idx++; renderExam(document.getElementById('content')); }, 1200);
+}
+
+function endExam(el) {
+  EX.active = false;
+  const pct = Math.round(EX.score/EX.qs.length*100);
+  const emoji = pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '💪';
+  const msg = pct >= 80 ? 'Ausgezeichnet!' : pct >= 60 ? 'Gut gemacht!' : 'Weiter üben!';
+
+  D.exams = [...(D.exams||[]), {id:'e'+Date.now(),subject:EX.subj,score:EX.score,total:EX.qs.length,date:new Date().toISOString()}];
+  D.xp = (D.xp||0) + CFG.XP.EXAM; save(); updateXP();
+
+  el.innerHTML = `
+    <div style="text-align:center;padding:60px 20px;max-width:480px;margin:0 auto;">
+      <div style="font-size:64px;margin-bottom:16px;">${emoji}</div>
+      <h1 style="font-size:28px;">${msg}</h1>
+      <div style="font-size:48px;font-weight:800;color:var(--pri);margin:16px 0;">${pct}%</div>
+      <p style="color:var(--t2);">${EX.score} von ${EX.qs.length} Fragen richtig</p>
+      <div class="progress" style="margin:20px 0;height:10px;"><div class="progress-bar" style="width:${pct}%;background:${pct>=70?'var(--acc-green)':pct>=50?'var(--acc-yellow)':'var(--acc-red)'}"></div></div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:24px;">
+        <button class="btn btn-primary" onclick="startExam()">Nochmal</button>
+        <button class="btn btn-secondary" onclick="goPage('dashboard')">Dashboard</button>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: LERNPLAN
+// ═══════════════════════════════════════════════════════════════════════════
+function planner(el) {
+  const subs = CFG.SUBJECTS[U.grade||9]||[];
+  const today = new Date().toISOString().split('T')[0];
+  el.innerHTML = `
+    <div class="page-header"><h1>📅 Lernplan</h1><p>Aufgaben und Prüfungsvorbereitung</p></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">✏️ Aufgabe hinzufügen</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="field"><label>Titel</label><input class="input" id="t-title" placeholder="Hausaufgaben, Zusammenfassung…"></div>
+          <div class="grid-2">
+            <div class="field"><label>Fach</label><select class="input" id="t-subj">${subs.map(s=>`<option>${s}</option>`).join('')}</select></div>
+            <div class="field"><label>Fällig</label><input class="input" id="t-due" type="date" value="${today}"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addTask()">Hinzufügen</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 Alle Aufgaben</div></div>
+        <div id="task-list" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;">
+          ${renderTaskList()}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderTaskList() {
+  const tasks = D.tasks||[];
+  if (!tasks.length) return '<p style="color:var(--t3);text-align:center;padding:20px;">Noch keine Aufgaben</p>';
+  return tasks.map(t=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-2);border-radius:var(--r-md);${t.completed?'opacity:.5':''}">
+      <input type="checkbox" ${t.completed?'checked':''} onchange="completeTask('${t.id}',this.checked);document.getElementById('task-list').innerHTML=renderTaskList();" style="cursor:pointer;">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500;${t.completed?'text-decoration:line-through':''}">${safe(t.title)}</div>
+        <div style="font-size:11px;color:var(--t3);">${t.subject||''} ${t.due?'· '+t.due:''}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="deleteTask('${t.id}')">🗑</button>
+    </div>`).join('');
+}
+
+function addTask() {
+  const title = document.getElementById('t-title')?.value.trim();
+  const subj = document.getElementById('t-subj')?.value;
+  const due = document.getElementById('t-due')?.value;
+  if (!title) return toast('Titel eingeben!');
+  D.tasks = [...(D.tasks||[]), {id:'t'+Date.now(),title,subject:subj,due,completed:false}];
+  save(); toast('✅ Aufgabe hinzugefügt!');
+  document.getElementById('t-title').value='';
+  document.getElementById('task-list').innerHTML = renderTaskList();
+}
+
+function deleteTask(id) {
+  D.tasks = (D.tasks||[]).filter(t=>t.id!==id); save();
+  document.getElementById('task-list').innerHTML = renderTaskList();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: POMODORO
+// ═══════════════════════════════════════════════════════════════════════════
+let PO = { running:false, work:25, break:5, sec:0, isBreak:false, timer:null, sessions:0 };
+
+function pomodoro(el) {
+  clearInterval(PO.timer); PO.timer=null;
+  PO.sec = PO.work * 60; PO.isBreak=false; PO.running=false;
+  renderPomo(el);
+}
+
+function renderPomo(el) {
+  const min = Math.floor(PO.sec/60).toString().padStart(2,'0');
+  const sec = (PO.sec%60).toString().padStart(2,'0');
+  const progress = PO.isBreak ? (1-(PO.sec/(PO.break*60)))*100 : (1-(PO.sec/(PO.work*60)))*100;
+  el.innerHTML = `
+    <div class="page-header"><h1>🍅 Pomodoro-Timer</h1><p>Fokussiertes Lernen in Intervallen</p></div>
+    <div style="max-width:400px;margin:0 auto;text-align:center;">
+      <div class="card" style="padding:40px;">
+        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:${PO.isBreak?'var(--acc-green)':'var(--pri)'};margin-bottom:16px;">
+          ${PO.isBreak?'☕ Pause':'🎯 Fokus'} · Session ${PO.sessions+1}
+        </div>
+        <div style="font-size:64px;font-weight:800;letter-spacing:-2px;color:var(--t1);font-variant-numeric:tabular-nums;">${min}:${sec}</div>
+        <div class="progress" style="margin:20px 0;height:8px;"><div class="progress-bar" style="width:${progress}%;background:${PO.isBreak?'var(--acc-green)':'var(--pri)'}"></div></div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:8px;">
+          <button class="btn btn-primary btn-lg" onclick="togglePomo()">${PO.running?'⏸ Pause':'▶ Start'}</button>
+          <button class="btn btn-secondary" onclick="resetPomo()">↺ Reset</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-around;">
+          <div><div style="font-size:13px;color:var(--t3);">Fokus</div>
+            <input type="number" value="${PO.work}" min="5" max="60" class="input" style="width:60px;text-align:center;" onchange="PO.work=parseInt(this.value)||25;if(!PO.running){PO.sec=PO.work*60;renderPomo(document.getElementById('content'));}">
+          </div>
+          <div><div style="font-size:13px;color:var(--t3);">Pause</div>
+            <input type="number" value="${PO.break}" min="1" max="30" class="input" style="width:60px;text-align:center;" onchange="PO.break=parseInt(this.value)||5;">
+          </div>
+          <div><div style="font-size:13px;color:var(--t3);">Sessions</div>
+            <div style="font-size:24px;font-weight:700;">${PO.sessions}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function togglePomo() {
+  if (PO.running) {
+    clearInterval(PO.timer); PO.running=false;
+  } else {
+    PO.running=true;
+    PO.timer = setInterval(()=>{
+      PO.sec--;
+      if (PO.sec <= 0) {
+        if (!PO.isBreak) {
+          PO.sessions++; PO.isBreak=true; PO.sec=PO.break*60;
+          D.xp=(D.xp||0)+CFG.XP.POMO; save(); updateXP();
+          toast('🎉 Fokus-Session geschafft! +'+CFG.XP.POMO+' XP. Pause!');
+        } else {
+          PO.isBreak=false; PO.sec=PO.work*60;
+          toast('⏰ Pause vorbei! Neue Fokus-Session.');
+        }
+      }
+      if (_page === 'pomodoro') renderPomo(document.getElementById('content'));
+    }, 1000);
+  }
+  if (_page === 'pomodoro') renderPomo(document.getElementById('content'));
+}
+
+function resetPomo() {
+  clearInterval(PO.timer); PO.running=false; PO.isBreak=false; PO.sec=PO.work*60;
+  if (_page === 'pomodoro') renderPomo(document.getElementById('content'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: ELTERN-DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+function parentDash(el) {
+  const children = U.children||[];
+  el.innerHTML = `
+    <div class="page-header">
+      <h1>👨‍👩‍👧 Eltern-Dashboard</h1>
+      <p>${children.length} Kinder · Lernfortschritt auf einen Blick</p>
+    </div>
+    ${!children.length ? `
+      <div class="card" style="text-align:center;padding:48px;">
+        <div style="font-size:48px;margin-bottom:16px;">👧</div>
+        <h2>Noch keine Kinder</h2>
+        <p style="color:var(--t3);margin-top:8px;">Füge deine Kinder hinzu um ihren Lernfortschritt zu sehen.</p>
+        <button class="btn btn-primary" style="margin-top:20px;" onclick="goPage('children')">Kinder hinzufügen →</button>
+      </div>` : `
+    <div class="grid-2" style="margin-bottom:24px;">
+      ${children.map(c=>`
+        <div class="card card-hover" style="cursor:pointer;" onclick="goPage('children')">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--sec));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:18px;">${(c.name||'K')[0]}</div>
+            <div>
+              <div style="font-weight:700;">${safe(c.name)}</div>
+              <div style="font-size:13px;color:var(--t3);">Klasse ${c.grade}</div>
+            </div>
+          </div>
+          <div class="grid-2" style="gap:10px;">
+            <div style="text-align:center;background:var(--bg-2);padding:10px;border-radius:var(--r-md);">
+              <div style="font-size:20px;font-weight:800;color:var(--pri);">${Math.floor(Math.random()*800+200)}</div>
+              <div style="font-size:11px;color:var(--t3);">XP gesamt</div>
+            </div>
+            <div style="text-align:center;background:var(--bg-2);padding:10px;border-radius:var(--r-md);">
+              <div style="font-size:20px;font-weight:800;color:var(--acc-yellow);">${Math.floor(Math.random()*10+1)}</div>
+              <div style="font-size:11px;color:var(--t3);">🔥 Streak</div>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📊 Lernzeit diese Woche</div></div>
+      <canvas id="weekly-chart" height="100"></canvas>
+    </div>`}`;
+
+  // Chart rendern
+  if (children.length && typeof Chart !== 'undefined') {
+    setTimeout(()=>{
+      const ctx = document.getElementById('weekly-chart');
+      if (!ctx) return;
+      const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+      new Chart(ctx, {
+        type:'bar',
+        data:{
+          labels:days,
+          datasets: children.map((c,i)=>({
+            label: c.name,
+            data: days.map(()=>Math.floor(Math.random()*45+5)),
+            backgroundColor: ['rgba(99,102,241,.7)','rgba(139,92,246,.7)','rgba(16,185,129,.7)'][i]||'rgba(99,102,241,.7)',
+          }))
+        },
+        options:{ responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true,title:{display:true,text:'Minuten'}}} }
+      });
+    }, 100);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: KINDER-VERWALTUNG
+// ═══════════════════════════════════════════════════════════════════════════
+function childrenPage(el) {
+  const children = U.children||[];
+  el.innerHTML = `
+    <div class="page-header"><h1>👧 Kinder</h1><p>${children.length} Kinder in deiner Familie</p></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">➕ Kind hinzufügen</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="field"><label>Name</label><input class="input" id="c-name" placeholder="Vorname des Kindes"></div>
+          <div class="field"><label>Klasse</label><select class="input" id="c-grade">${CFG.GRADES.map(g=>`<option value="${g}">${g}. Klasse</option>`).join('')}</select></div>
+          <button class="btn btn-primary btn-sm" onclick="addChild()">Hinzufügen</button>
+        </div>
+      </div>
+      <div>
+        ${children.map(c=>`
+          <div class="card" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--sec));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;">${(c.name||'K')[0]}</div>
+              <div><div style="font-weight:600;">${safe(c.name)}</div><div style="font-size:13px;color:var(--t3);">Klasse ${c.grade}</div></div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="removeChild('${c.id}')">Entfernen</button>
+          </div>`).join('')||'<div class="card" style="text-align:center;padding:24px;color:var(--t3);">Noch keine Kinder</div>'}
+      </div>
+    </div>`;
+}
+
+function addChild() {
+  const name = document.getElementById('c-name')?.value.trim();
+  const grade = document.getElementById('c-grade')?.value;
+  if (!name) return toast('Name eingeben!');
+  U.children = [...(U.children||[]), {id:'ch'+Date.now(),name,grade}];
+  save(); toast('Kind hinzugefügt!');
+  childrenPage(document.getElementById('content'));
+}
+
+function removeChild(id) {
+  if (!confirm('Kind wirklich entfernen?')) return;
+  U.children = (U.children||[]).filter(c=>c.id!==id); save();
+  childrenPage(document.getElementById('content'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: LEHRER
+// ═══════════════════════════════════════════════════════════════════════════
+function teacherDash(el) {
+  el.innerHTML = `
+    <div class="page-header"><h1>👩‍🏫 Lehrer-Dashboard</h1><p>Phase 3 — Coming soon</p></div>
+    <div class="card" style="text-align:center;padding:60px;">
+      <div style="font-size:48px;margin-bottom:16px;">🚧</div>
+      <h2>Lehrer-Features kommen in Phase 3</h2>
+      <p style="color:var(--t3);margin-top:8px;">Klassen-Dashboard, Materialien hochladen und Schüler-Berichte sind in Entwicklung.</p>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: ABO
+// ═══════════════════════════════════════════════════════════════════════════
+function subscription(el) {
+  const plans = [
+    {id:'free',name:'🌱 Starter',price:'0€',period:'kostenlos',features:['1 Schüler','Grundfunktionen','10 KI-Karten/Monat'],popular:false},
+    {id:'family_plus',name:'👨‍👩‍👧 Family Plus',price:'9,99€',period:'/ Monat',features:['Bis 3 Kinder','Eltern-Dashboard','100 KI-Karten','Wochenberichte'],popular:true},
+    {id:'family_pro',name:'🚀 Family Pro',price:'14,99€',period:'/ Monat',features:['Bis 6 Kinder','Alle Features','Unbegrenzte KI-Karten','Priority Support'],popular:false},
+    {id:'teacher',name:'👩‍🏫 Teacher',price:'6,99€',period:'/ Monat',features:['30 Schüler','Klassen-Dashboard','Materialien hochladen'],popular:false},
+  ];
+  el.innerHTML = `
+    <div class="page-header"><h1>💎 Abo & Preise</h1><p>Dein aktuelles Abo: <strong>${U.subscription||'free'}</strong></p></div>
+    <div class="grid-2">
+      ${plans.map(p=>`
+        <div class="card" style="${p.popular?'border-color:var(--pri);':''}position:relative;">
+          ${p.popular?'<div style="position:absolute;top:-12px;left:24px;background:var(--pri);color:white;padding:4px 14px;border-radius:99px;font-size:11px;font-weight:700;">⭐ Beliebt</div>':''}
+          <div style="font-size:17px;font-weight:700;margin-bottom:8px;">${p.name}</div>
+          <div style="font-size:32px;font-weight:800;color:var(--t1);">${p.price} <span style="font-size:14px;font-weight:500;color:var(--t3);">${p.period}</span></div>
+          <div style="margin:16px 0;display:flex;flex-direction:column;gap:8px;">
+            ${p.features.map(f=>`<div style="display:flex;gap:8px;font-size:13px;color:var(--t2);"><span style="color:var(--acc-green);font-weight:700;">✓</span>${f}</div>`).join('')}
+          </div>
+          <button class="btn ${p.popular?'btn-primary':'btn-secondary'} btn-full" onclick="toast('Zahlungsintegration kommt in Phase 3!')">
+            ${U.subscription===p.id ? '✓ Aktueller Plan' : 'Wählen'}
+          </button>
+        </div>`).join('')}
+    </div>
+    <div class="card" style="margin-top:20px;text-align:center;">
+      <p style="color:var(--t2);font-size:13px;">Zahlung per <strong>Kreditkarte</strong>, <strong>PayPal</strong>, <strong>Apple Pay</strong> und <strong>Google Pay</strong> — jederzeit kündbar.</p>
+      <p style="color:var(--t3);font-size:12px;margin-top:8px;">Zahlungsabwicklung kommt in Phase 3 (Stripe-Integration)</p>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE: EINSTELLUNGEN
+// ═══════════════════════════════════════════════════════════════════════════
+function settings(el) {
+  el.innerHTML = `
+    <div class="page-header"><h1>⚙️ Einstellungen</h1></div>
+    <div style="max-width:600px;display:flex;flex-direction:column;gap:20px;">
+      <div class="card">
+        <div class="card-header"><div class="card-title">👤 Profil</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="grid-2">
+            <div class="field"><label>Name</label><input class="input" id="s-name" value="${safe(U.full_name||'')}"></div>
+            <div class="field"><label>E-Mail</label><input class="input" value="${safe(U.email||'')}" readonly></div>
+          </div>
+          ${U.role==='student'?`<div class="grid-2">
+            <div class="field"><label>Klasse</label><select class="input" id="s-grade">${CFG.GRADES.map(g=>`<option value="${g}" ${U.grade==g?'selected':''}>${g}. Klasse</option>`).join('')}</select></div>
+            <div class="field"><label>Schulform</label><select class="input" id="s-school">${CFG.SCHOOL_TYPES.map(s=>`<option ${U.school===s?'selected':''}>${s}</option>`).join('')}</select></div>
+          </div>`:''}
+          <button class="btn btn-primary btn-sm" onclick="saveProfile()">Profil speichern</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">🤖 KI-Einstellungen</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="field">
+            <label>Claude API Key</label>
+            <input class="input" id="s-ak" type="password" placeholder="sk-ant-…" value="${apiKey?'••••••••••••':''}">
+            <p style="font-size:11px;color:var(--t3);margin-top:4px;">Für KI-Tutor und Karteikarten-Generierung. Wird nicht gespeichert — bei jedem Start neu eingeben. <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style="color:var(--pri)">API Key holen →</a></p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveApiKey()">API Key setzen</button>
+          ${apiKey?'<div class="badge badge-success" style="align-self:flex-start;">✓ API Key aktiv</div>':'<div class="badge badge-warning" style="align-self:flex-start;">⚠️ Kein API Key gesetzt</div>'}
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--danger);">
+        <div class="card-header"><div class="card-title" style="color:var(--danger);">⚠️ Gefahrenzone</div></div>
+        <p style="font-size:13px;color:var(--t2);margin-bottom:12px;">Lernfortschritte zurücksetzen (DSGVO: Recht auf Löschung)</p>
+        <button class="btn btn-danger btn-sm" onclick="resetData()">Alle Lernfortschritte löschen</button>
+      </div>
+    </div>`;
+}
+
+function saveProfile() {
+  U.full_name = document.getElementById('s-name')?.value.trim() || U.full_name;
+  if (U.role==='student') {
+    U.grade = document.getElementById('s-grade')?.value || U.grade;
+    U.school = document.getElementById('s-school')?.value || U.school;
+  }
+  save(); renderSidebar(); toast('✅ Profil gespeichert!');
+}
+
+function saveApiKey() {
+  const key = document.getElementById('s-ak')?.value.trim();
+  if (!key || key === '••••••••••••') return toast('API Key eingeben!');
+  if (!key.startsWith('sk-ant-')) return toast('Ungültiger Key — muss mit sk-ant- beginnen');
+  apiKey = key; // Nur Memory, nie localStorage!
+  toast('✅ API Key gesetzt!');
+  settings(document.getElementById('content'));
+}
+
+function resetData() {
+  if (!confirm('Wirklich alle Lernfortschritte löschen? Dies kann nicht rückgängig gemacht werden.')) return;
+  D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
+  save(); updateXP(); toast('Daten gelöscht!');
+  goPage('dashboard');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════════════
+function toast(msg, dur=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

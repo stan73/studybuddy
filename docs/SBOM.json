@@ -1,0 +1,78 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-04-04T00:00:00Z",
+    "component": {
+      "type": "application",
+      "name": "StudyBuddy Pro",
+      "version": "2.0.0",
+      "description": "KI-gestützte Lernplattform für Schüler der Klassen 5–13",
+      "licenses": [{ "license": { "id": "UNLICENSED" } }]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "DOMPurify",
+      "version": "3.1.6",
+      "description": "XSS sanitizer for HTML, MathML and SVG",
+      "licenses": [{ "license": { "id": "Apache-2.0" } }],
+      "purl": "pkg:npm/dompurify@3.1.6",
+      "externalReferences": [
+        { "type": "website", "url": "https://cure53.de/purify" },
+        { "type": "distribution", "url": "https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Chart.js",
+      "version": "4.4.1",
+      "description": "Simple HTML5 Charts",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:npm/chart.js@4.4.1",
+      "externalReferences": [
+        { "type": "website", "url": "https://www.chartjs.org" },
+        { "type": "distribution", "url": "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Supabase JS",
+      "version": "2.x",
+      "description": "Supabase JavaScript client library",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "purl": "pkg:npm/@supabase/supabase-js",
+      "externalReferences": [
+        { "type": "website", "url": "https://supabase.com" }
+      ]
+    },
+    {
+      "type": "service",
+      "name": "Anthropic Claude API",
+      "version": "2023-06-01",
+      "description": "Claude Haiku 4.5 — KI-Tutor und Karteikarten-Generierung",
+      "externalReferences": [
+        { "type": "website", "url": "https://api.anthropic.com" },
+        { "type": "documentation", "url": "https://docs.anthropic.com" }
+      ]
+    },
+    {
+      "type": "service",
+      "name": "Supabase",
+      "description": "Backend-as-a-Service: Auth, PostgreSQL, Realtime — EU (Frankfurt)",
+      "externalReferences": [
+        { "type": "website", "url": "https://supabase.com" }
+      ]
+    },
+    {
+      "type": "platform",
+      "name": "Netlify",
+      "description": "Static hosting, CDN, Edge Functions",
+      "externalReferences": [
+        { "type": "website", "url": "https://netlify.com" }
+      ]
+    }
+  ]
+}

@@ -3,637 +3,455 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StudyBuddy Pro</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="description" content="StudyBuddy Pro — Die KI-gestützte Lernplattform für Schüler der Klassen 5–13. Mit Eltern-Dashboard, Karteikarten, KI-Tutor und mehr.">
+<meta name="robots" content="index, follow">
+<title>StudyBuddy Pro — Smarter lernen mit KI</title>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/layout.css">
+<!-- DOMPurify für XSS-Schutz -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" integrity="sha512-tzcDOiFWAHGK9yCLjmCQbJFsAA2oOGULlNqAFl5VgZbdnMkInVqb/n1Ln9OVl3CiQpGjJwRc9jJwOHKd5f8g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
-:root{--pri:#4f46e5;--pri-l:#eef2ff;--grn:#059669;--grn-l:#ecfdf5;--amb:#d97706;--amb-l:#fffbeb;--red:#dc2626;--red-l:#fef2f2;--bg:#f5f5ff;--surf:#fff;--bdr:#e5e7eb;--t1:#1e1b4b;--t2:#374151;--t3:#6b7280;--t4:#9ca3af;--sb:240px;}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t1);line-height:1.5;}
-button{font-family:'Inter',sans-serif;cursor:pointer;border:none;outline:none;}
-input,select,textarea{font-family:'Inter',sans-serif;outline:none;}
-.hidden{display:none!important;}
-.btn{padding:9px 20px;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;border:none;}
-.btn-pri{background:var(--pri);color:#fff;}.btn-pri:hover{background:#4338ca;}
-.btn-sec{background:var(--pri-l);color:var(--pri);}.btn-sec:hover{background:#e0e7ff;}
-.btn-ghost{background:transparent;color:var(--t2);padding:9px 16px;}.btn-ghost:hover{background:var(--bg);}
-
-/* LANDING */
-#landing{min-height:100vh;display:flex;flex-direction:column;}
-.lnav{background:#fff;border-bottom:1px solid var(--bdr);padding:0 40px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
-.lnav-logo{font-size:20px;font-weight:800;color:var(--pri);}
-.hero{background:linear-gradient(135deg,#eef2ff 0%,#f5f5ff 60%,#ede9fe 100%);padding:80px 40px 60px;text-align:center;}
-.hero h1{font-size:50px;font-weight:800;letter-spacing:-.04em;margin-bottom:16px;line-height:1.1;}
-.hero h1 span{color:var(--pri);}
-.hero p{font-size:18px;color:var(--t3);max-width:540px;margin:0 auto 32px;line-height:1.6;}
-.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:48px;}
-.hero-btns .btn{padding:13px 28px;font-size:15px;}
-.hero-stats{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;}
-.hero-stat strong{display:block;font-size:28px;font-weight:800;color:var(--pri);}
-.hero-stat span{font-size:14px;color:var(--t3);}
-.section{padding:64px 40px;max-width:1100px;margin:0 auto;}
-.sec-title{font-size:30px;font-weight:800;letter-spacing:-.03em;text-align:center;margin-bottom:8px;}
-.sec-sub{text-align:center;color:var(--t3);font-size:15px;margin-bottom:36px;}
-.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;}
-.g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
-.fc{background:#fff;border-radius:14px;padding:24px;border:1px solid var(--bdr);}
-.fc .icon{font-size:30px;margin-bottom:10px;}
-.fc h3{font-size:15px;font-weight:700;margin-bottom:6px;}
-.fc p{font-size:13px;color:var(--t3);line-height:1.6;}
-.pc{background:#fff;border-radius:16px;padding:28px;border:2px solid var(--bdr);position:relative;}
-.pc.pop{border-color:var(--pri);box-shadow:0 0 0 4px rgba(79,70,229,.1);}
-.pc-badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--amb);color:#fff;font-size:11px;font-weight:700;padding:4px 14px;border-radius:99px;white-space:nowrap;}
-.pc-name{font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
-.pc-price{font-size:34px;font-weight:800;color:var(--t1);letter-spacing:-.04em;}
-.pc-price sub{font-size:14px;color:var(--t3);font-weight:500;}
-.pc-desc{font-size:13px;color:var(--t3);margin:8px 0 14px;padding-bottom:14px;border-bottom:1px solid var(--bdr);}
-.pc ul{list-style:none;margin-bottom:20px;}
-.pc ul li{font-size:13px;color:var(--t2);padding:4px 0;display:flex;gap:8px;}
-.pc ul li::before{content:"✓";color:var(--grn);font-weight:700;}
-.pc ul li.no::before{content:"✗";color:var(--t4);}
-.pc ul li.no{color:var(--t4);}
-.pay-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px;}
-.pay-b{background:#f3f4f6;border:1px solid var(--bdr);border-radius:7px;padding:7px 13px;font-size:13px;font-weight:500;}
-.lfoot{background:var(--t1);color:#a5b4fc;text-align:center;padding:28px 40px;font-size:14px;}
-.lfoot a{color:#c7d2fe;text-decoration:none;margin:0 10px;}
-
-/* AUTH */
-#auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;}
-.auth-box{background:#fff;border-radius:20px;width:100%;max-width:440px;padding:36px;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto;}
-.auth-logo{font-size:20px;font-weight:800;color:var(--pri);text-align:center;margin-bottom:22px;}
-.auth-tabs{display:flex;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:26px;}
-.auth-tab{flex:1;padding:8px;text-align:center;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;color:var(--t3);transition:all .15s;}
-.auth-tab.act{background:#fff;color:var(--pri);box-shadow:0 1px 3px rgba(0,0,0,.1);}
-.field{margin-bottom:13px;}
-.field label{display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
-.fi{width:100%;border:2px solid var(--bdr);border-radius:9px;padding:10px 13px;font-size:14px;color:var(--t1);transition:border-color .15s;}
-.fi:focus{border-color:var(--pri);}
-.fi::placeholder{color:var(--t4);}
-.step-t{font-size:19px;font-weight:700;margin-bottom:5px;}
-.step-s{font-size:13px;color:var(--t3);margin-bottom:18px;}
-.role-opts{display:grid;gap:9px;margin-bottom:18px;}
-.role-opt{border:2px solid var(--bdr);border-radius:11px;padding:14px;cursor:pointer;display:flex;align-items:center;gap:11px;transition:all .15s;}
-.role-opt:hover{border-color:var(--pri);background:var(--pri-l);}
-.role-opt.sel{border-color:var(--pri);background:var(--pri-l);}
-.ro-ic{font-size:26px;}
-.ro-t strong{display:block;font-size:14px;font-weight:700;}
-.ro-t span{font-size:12px;color:var(--t3);}
-.row2{display:flex;gap:10px;}
-.chip-list{display:flex;gap:8px;flex-wrap:wrap;min-height:28px;margin-bottom:12px;}
-.chip{background:var(--pri-l);color:var(--pri);border-radius:99px;padding:4px 11px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px;}
-.chip-x{cursor:pointer;opacity:.6;font-size:12px;}.chip-x:hover{opacity:1;}
-
-/* APP */
-#app{display:flex;height:100vh;overflow:hidden;}
-.sb{width:var(--sb);flex-shrink:0;background:var(--t1);color:#fff;display:flex;flex-direction:column;padding:18px 10px;overflow-y:auto;}
-.sb-logo{font-size:17px;font-weight:800;color:#c7d2fe;padding:4px 10px 14px;letter-spacing:-.02em;}
-.sb-user{padding:8px 10px 14px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:10px;}
-.sb-uname{font-size:13px;font-weight:600;color:#e0e7ff;}
-.sb-urole{display:inline-block;background:var(--pri);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-top:3px;}
-.sb-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6366f1;padding:8px 10px 3px;}
-.nb{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;color:#a5b4fc;font-size:13px;font-weight:500;transition:all .12s;border:none;background:none;width:100%;text-align:left;}
-.nb:hover{background:rgba(255,255,255,.07);color:#e0e7ff;}
-.nb.act{background:var(--pri);color:#fff;}
-.nb-ic{font-size:15px;width:18px;text-align:center;}
-.sb-foot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);}
-.xp-lbl{font-size:11px;color:#818cf8;margin-bottom:3px;display:flex;justify-content:space-between;}
-.xp-track{height:5px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden;margin-bottom:7px;}
-.xp-bar{height:100%;background:var(--amb);border-radius:99px;transition:width .4s;}
-.streak-pill{background:rgba(217,119,6,.2);color:#fbbf24;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;margin-bottom:9px;text-align:center;}
-.logout-btn{width:100%;padding:8px;border-radius:7px;background:rgba(220,38,38,.15);color:#fca5a5;font-size:12px;font-weight:600;border:none;cursor:pointer;}
-.logout-btn:hover{background:rgba(220,38,38,.25);}
-.main{flex:1;overflow-y:auto;background:var(--bg);}
-.page{padding:28px 32px;max-width:940px;animation:fi .2s ease;}
-@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-.ph h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin-bottom:3px;}
-.ph p{color:var(--t3);font-size:13px;margin-bottom:24px;}
-.cards4{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px;}
-.sc{background:#fff;border-radius:13px;padding:16px 18px;border:1px solid var(--bdr);}
-.sc .si{font-size:20px;margin-bottom:5px;}
-.sc .sv{font-size:26px;font-weight:800;letter-spacing:-.04em;line-height:1;}
-.sc .sl{font-size:11px;color:var(--t3);margin-top:2px;font-weight:500;}
-.card{background:#fff;border-radius:13px;border:1px solid var(--bdr);}
-.card-h{padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;}
-.card-h h3{font-size:14px;font-weight:700;}
-.card-b{padding:14px 18px;}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
-/* tasks */
-.tr{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--bdr);}
-.tr:last-child{border-bottom:none;}
-.tck{width:18px;height:18px;border-radius:50%;border:2px solid var(--bdr);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s;}
-.tr.done .tck{background:var(--grn);border-color:var(--grn);color:#fff;}
-.tr.done .tt{text-decoration:line-through;color:var(--t4);}
-.tt{flex:1;font-size:13px;}
-/* subjects */
-.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:11px;margin-bottom:18px;}
-.scard{background:#fff;border-radius:13px;padding:16px;border:1px solid var(--bdr);cursor:pointer;transition:all .15s;text-align:center;}
-.scard:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08);}
-.sic{font-size:26px;margin-bottom:7px;}
-.sname{font-size:12px;font-weight:700;margin-bottom:7px;}
-.pb{height:4px;background:var(--bdr);border-radius:99px;overflow:hidden;}
-.pf{height:100%;border-radius:99px;}
-/* flashcards */
-.fc-scene{perspective:1000px;margin:0 auto 20px;max-width:540px;height:260px;cursor:pointer;}
-.fc-card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .45s;}
-.fc-card.flip{transform:rotateY(180deg);}
-.fc-face{position:absolute;inset:0;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;backface-visibility:hidden;-webkit-backface-visibility:hidden;}
-.fc-front{background:#fff;border:2px solid var(--bdr);box-shadow:0 4px 20px rgba(0,0,0,.08);}
-.fc-back{background:var(--pri);color:#fff;transform:rotateY(180deg);}
-.fc-hint{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.4;margin-bottom:10px;}
-.fc-text{font-size:19px;font-weight:700;text-align:center;line-height:1.4;}
-.fp-row{display:flex;gap:8px;margin-bottom:18px;justify-content:center;flex-wrap:wrap;}
-.fpill{padding:6px 13px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid;transition:all .1s;}
-.rate-row{display:flex;gap:9px;justify-content:center;margin-bottom:18px;}
-.rb{flex:1;max-width:110px;padding:10px;border-radius:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:all .1s;}
-.rb:hover{transform:translateY(-1px);}
-/* tutor */
-.chat-box{background:#fff;border-radius:13px;border:1px solid var(--bdr);display:flex;flex-direction:column;height:460px;overflow:hidden;}
-.chat-msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:11px;}
-.bubble{max-width:76%;padding:11px 15px;border-radius:13px;font-size:14px;line-height:1.6;white-space:pre-wrap;}
-.bubble.bot{background:var(--pri-l);color:var(--t1);align-self:flex-start;border-bottom-left-radius:3px;}
-.bubble.user{background:var(--pri);color:#fff;align-self:flex-end;border-bottom-right-radius:3px;}
-.cir{padding:13px 15px;border-top:1px solid var(--bdr);display:flex;gap:8px;}
-.td{display:inline-block;width:6px;height:6px;background:var(--t3);border-radius:50%;animation:bounce .6s infinite alternate;}
-.td:nth-child(2){animation-delay:.2s;}.td:nth-child(3){animation-delay:.4s;}
-@keyframes bounce{to{transform:translateY(-5px);}}
-/* exam */
-.ex-setup{max-width:460px;}
-.og{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
-.ob{padding:9px;border-radius:8px;font-size:13px;font-weight:600;border:2px solid var(--bdr);background:#fff;color:var(--t2);cursor:pointer;transition:all .15s;}
-.ob.sel{border-color:var(--pri);background:var(--pri-l);color:var(--pri);}
-.qcard{background:#fff;border-radius:14px;padding:26px;border:1px solid var(--bdr);margin-bottom:14px;}
-.qt{font-size:17px;font-weight:700;margin-bottom:18px;line-height:1.4;}
-.ag{display:grid;gap:9px;}
-.ab{padding:13px 16px;border-radius:9px;font-size:14px;font-weight:500;border:2px solid var(--bdr);background:#fff;cursor:pointer;text-align:left;transition:all .15s;}
-.ab:hover{border-color:var(--pri);background:var(--pri-l);}
-.ab.correct{border-color:var(--grn);background:var(--grn-l);color:var(--grn);}
-.ab.wrong{border-color:var(--red);background:var(--red-l);color:var(--red);}
-.tbar{height:5px;background:var(--bdr);border-radius:99px;overflow:hidden;margin-bottom:18px;}
-.tfill{height:100%;background:var(--grn);border-radius:99px;transition:width 1s linear;}
-/* plan */
-.wg{display:grid;grid-template-columns:repeat(7,1fr);gap:9px;margin-bottom:18px;}
-.db{background:#fff;border-radius:11px;padding:11px 7px;border:2px solid var(--bdr);text-align:center;min-height:84px;}
-.db.today{border-color:var(--pri);background:var(--pri-l);}
-.dn{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:3px;}
-.dnum{font-size:17px;font-weight:800;color:var(--t1);margin-bottom:5px;}
-.db.today .dnum{color:var(--pri);}
-.dev{font-size:9px;background:var(--pri);color:#fff;border-radius:3px;padding:2px 3px;margin-top:2px;}
-/* pomodoro */
-.pw{display:flex;flex-direction:column;align-items:center;padding:36px 20px;}
-.pm-row{display:flex;gap:9px;margin-bottom:36px;flex-wrap:wrap;justify-content:center;}
-.pmb{padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;border:2px solid var(--bdr);background:#fff;color:var(--t3);cursor:pointer;transition:all .15s;}
-.pmb.act{border-color:var(--pri);background:var(--pri-l);color:var(--pri);}
-.pc-circ{width:220px;height:220px;border-radius:50%;border:7px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:28px;}
-.pt{font-size:48px;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;}
-.pl{font-size:13px;color:var(--t3);font-weight:500;margin-top:3px;}
-.pb-row{display:flex;gap:11px;}
-/* subscription */
-.sub-cur{background:var(--pri-l);border:2px solid var(--pri);border-radius:13px;padding:18px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;}
-/* settings */
-.ss{background:#fff;border-radius:13px;border:1px solid var(--bdr);padding:20px;margin-bottom:14px;}
-.ss h3{font-size:14px;font-weight:700;margin-bottom:14px;}
-/* parent */
-.ccard{background:#fff;border-radius:14px;border:1px solid var(--bdr);padding:20px;cursor:pointer;transition:all .15s;margin-bottom:12px;}
-.ccard:hover{box-shadow:0 4px 14px rgba(0,0,0,.07);}
-.cname{font-size:17px;font-weight:700;margin-bottom:3px;}
-.cmeta{font-size:12px;color:var(--t3);margin-bottom:12px;}
-.cstats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
-.cst{text-align:center;background:var(--bg);border-radius:7px;padding:7px;}
-.cst strong{display:block;font-size:17px;font-weight:800;color:var(--pri);}
-.cst span{font-size:10px;color:var(--t3);}
-/* gen box */
-.gen-box{background:var(--pri-l);border:2px dashed #a5b4fc;border-radius:11px;padding:16px;margin-top:14px;}
-/* toast */
-#toast{position:fixed;bottom:22px;right:22px;background:var(--t1);color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .2s;pointer-events:none;}
-#toast.show{opacity:1;}
+/* Landing-spezifische Styles */
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+.feature-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 28px; transition: all .2s; }
+.feature-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--pri-l); }
+.feature-icon { font-size: 32px; margin-bottom: 16px; }
+.feature-card h3 { font-size: var(--text-lg); font-weight: 700; margin-bottom: 8px; }
+.feature-card p { color: var(--t2); font-size: var(--text-sm); line-height: 1.6; }
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+.pricing-card { background: var(--bg-card); border: 2px solid var(--border); border-radius: var(--r-xl); padding: 32px 24px; position: relative; transition: all .2s; }
+.pricing-card:hover { border-color: var(--pri); box-shadow: var(--shadow-md); }
+.pricing-card.popular { border-color: var(--pri); }
+.popular-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--pri); color: white; font-size: 11px; font-weight: 700; padding: 4px 14px; border-radius: var(--r-full); white-space: nowrap; }
+.pricing-name { font-weight: 700; font-size: var(--text-lg); margin-bottom: 8px; }
+.pricing-price { font-size: 36px; font-weight: 800; color: var(--t1); }
+.pricing-price span { font-size: var(--text-base); font-weight: 500; color: var(--t3); }
+.pricing-features { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; }
+.pricing-feature { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); color: var(--t2); }
+.pricing-feature::before { content: '✓'; color: var(--acc-green); font-weight: 700; flex-shrink: 0; }
+.payment-badges { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.payment-badge { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--t2); }
+.hero-stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-top: 40px; padding-top: 40px; border-top: 1px solid var(--border); }
+.hero-stat-value { font-size: 28px; font-weight: 800; color: var(--pri); }
+.hero-stat-label { font-size: var(--text-sm); color: var(--t3); margin-top: 2px; }
+footer { background: var(--t1); color: rgba(255,255,255,.6); padding: 40px 32px; text-align: center; font-size: var(--text-sm); }
+footer a { color: rgba(255,255,255,.6); margin: 0 12px; }
+footer a:hover { color: white; }
 </style>
 </head>
 <body>
-<!-- LANDING -->
-<div id="landing">
-<nav class="lnav">
-  <div class="lnav-logo">📚 StudyBuddy Pro</div>
-  <div style="display:flex;gap:10px;align-items:center">
-    <button class="btn btn-ghost" onclick="openAuth('login')">Anmelden</button>
-    <button class="btn btn-pri" onclick="openAuth('register')">Kostenlos starten</button>
-  </div>
-</nav>
-<div class="hero">
-  <h1>Lernen, das<br><span>wirklich wirkt.</span></h1>
-  <p>Die KI-Lernplattform für Klasse 5–13 — mit Eltern-Dashboard, smarten Karteikarten und persönlichem KI-Tutor.</p>
-  <div class="hero-btns">
-    <button class="btn btn-pri" onclick="openAuth('register')">Kostenlos starten</button>
-    <button class="btn btn-sec" onclick="document.getElementById('pricing').scrollIntoView({behavior:'smooth'})">Preise ansehen</button>
-  </div>
-  <div class="hero-stats">
-    <div class="hero-stat"><strong>10.000+</strong><span>Aktive Schüler</span></div>
-    <div class="hero-stat"><strong>95%</strong><span>verbessern Noten</span></div>
-    <div class="hero-stat"><strong>4.8★</strong><span>Bewertung</span></div>
-  </div>
-</div>
-<div class="section">
-  <div class="sec-title">Für wen ist StudyBuddy Pro?</div>
-  <div class="sec-sub">Eine Plattform — drei Perspektiven</div>
-  <div class="g3">
-    <div class="fc"><div class="icon">🧑‍🎓</div><h3>Für Schüler</h3><p>KI-Karteikarten, persönlicher Tutor, Prüfungsmodus mit Timer, Pomodoro und Gamification mit XP & Streaks.</p></div>
-    <div class="fc"><div class="icon">👨‍👩‍👧</div><h3>Für Eltern</h3><p>Mehrere Kinder in einem Account. Lernfortschritt in Echtzeit überwachen, Streaks und Prüfungen im Blick behalten.</p></div>
-    <div class="fc"><div class="icon">👩‍🏫</div><h3>Für Lehrer</h3><p>Eigenes Material hochladen, Klassen verwalten, KI wandelt Dokumente in Quizze um. (Kommt in Phase 3)</p></div>
-  </div>
-</div>
-<div style="background:#fff;border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr)">
-<div class="section">
-  <div class="sec-title">Alle Lernmethoden in einer App</div>
-  <div class="sec-sub">Alles was du brauchst — nichts was dich ablenkt</div>
-  <div class="g3">
-    <div class="fc"><div class="icon">🗂</div><h3>KI-Karteikarten</h3><p>Text einfügen → KI generiert automatisch Karteikarten mit Spaced Repetition.</p></div>
-    <div class="fc"><div class="icon">🤖</div><h3>KI-Tutor</h3><p>Hilft mit der Sokrates-Methode beim Verstehen — angepasst an Klassenstufe 5–13.</p></div>
-    <div class="fc"><div class="icon">📝</div><h3>Prüfungsmodus</h3><p>Multiple-Choice mit Timer, sofortige Auswertung, falsche Antworten nochmals üben.</p></div>
-    <div class="fc"><div class="icon">⏱</div><h3>Pomodoro-Timer</h3><p>Fokus 25 Min · Pause 5 Min · Lange Pause 15 Min. Die effektivste Lerntechnik.</p></div>
-    <div class="fc"><div class="icon">📅</div><h3>Lernplan</h3><p>Prüfungen eintragen, Wochenübersicht, nie wieder etwas vergessen.</p></div>
-    <div class="fc"><div class="icon">🏆</div><h3>Gamification</h3><p>XP sammeln, Streaks aufbauen, Level aufsteigen — Lernen macht Spaß!</p></div>
-  </div>
-</div>
-</div>
-<div class="section" id="pricing">
-  <div class="sec-title">Einfache, faire Preise</div>
-  <div class="sec-sub">Familien zahlen einmal für alle Kinder</div>
-  <div class="g4">
-    <div class="pc">
-      <div class="pc-name">Starter</div><div class="pc-price">0€</div>
-      <div class="pc-desc">Für immer kostenlos</div>
-      <ul><li>1 Kind-Profil</li><li>3 Fächer</li><li>50 KI-Anfragen/Monat</li><li>Karteikarten & Quiz</li><li class="no">Eltern-Dashboard</li></ul>
-      <button class="btn btn-sec" style="width:100%" onclick="openAuth('register')">Kostenlos starten</button>
+<div class="landing">
+  <!-- Navigation -->
+  <nav style="background:var(--bg-card); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100;">
+    <div class="landing-nav">
+      <div class="landing-logo">Study<span>Buddy</span> Pro</div>
+      <div class="landing-nav-links">
+        <a href="#features">Features</a>
+        <a href="#preise">Preise</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-ghost btn-sm" onclick="openAuth('login')">Anmelden</button>
+        <button class="btn btn-primary btn-sm" onclick="openAuth('register')">Kostenlos starten</button>
+      </div>
     </div>
-    <div class="pc pop">
-      <div class="pc-badge">⭐ BELIEBTESTE</div>
-      <div class="pc-name" style="margin-top:14px">Family Plus</div><div class="pc-price">9,99€<sub>/Monat</sub></div>
-      <div class="pc-desc">Bis zu 3 Kinder</div>
-      <ul><li>Bis zu 3 Kinder</li><li>Alle Fächer Kl. 5–13</li><li>Unbegrenzte KI</li><li>Eltern-Dashboard</li><li>Wöchentlicher Report</li></ul>
-      <button class="btn btn-pri" style="width:100%" onclick="toast('Zahlung kommt in Phase 3!')">30 Tage gratis</button>
-    </div>
-    <div class="pc">
-      <div class="pc-name">Family Pro</div><div class="pc-price">14,99€<sub>/Monat</sub></div>
-      <div class="pc-desc">Bis zu 5 Kinder</div>
-      <ul><li>Bis zu 5 Kinder</li><li>Alles aus Family Plus</li><li>Prüfungs-Coach KI</li><li>Jahres-Lernbericht</li></ul>
-      <button class="btn btn-sec" style="width:100%" onclick="toast('Zahlung kommt in Phase 3!')">30 Tage gratis</button>
-    </div>
-    <div class="pc">
-      <div class="pc-name">Teacher</div><div class="pc-price">6,99€<sub>/Monat</sub></div>
-      <div class="pc-desc">Pro Lehrer</div>
-      <ul><li>Lehrer-Dashboard</li><li>Material-Upload (PDF)</li><li>KI → Quizze</li><li>Klassen-Statistiken</li></ul>
-      <button class="btn btn-sec" style="width:100%" onclick="toast('Lehrer-Portal kommt in Phase 3!')">Anfragen</button>
-    </div>
-  </div>
-  <div class="pay-row">
-    <div class="pay-b">🅿️ PayPal</div><div class="pay-b">🍎 Apple Pay</div>
-    <div class="pay-b">🤖 Google Pay</div><div class="pay-b">💳 Kreditkarte</div><div class="pay-b">🏦 SEPA</div>
-  </div>
-</div>
-<div class="lfoot">
-  <p style="margin-bottom:7px">© 2026 StudyBuddy Pro</p>
-  <div><a href="#">Datenschutz</a><a href="#">AGB</a><a href="#">Kontakt</a></div>
-</div>
-</div>
+  </nav>
 
-<!-- AUTH -->
-<div id="auth-overlay" class="hidden">
-<div class="auth-box">
-  <div class="auth-logo">📚 StudyBuddy Pro</div>
-  <div class="auth-tabs">
-    <div class="auth-tab act" id="tab-login" onclick="switchTab('login')">Anmelden</div>
-    <div class="auth-tab" id="tab-reg" onclick="switchTab('register')">Registrieren</div>
-  </div>
-  <div id="pane-login">
-    <div class="field"><label>E-Mail</label><input class="fi" id="li-email" type="email" placeholder="deine@email.de"></div>
-    <div class="field"><label>Passwort</label><input class="fi" id="li-pass" type="password" placeholder="••••••••"></div>
-    <button class="btn btn-pri" style="width:100%;padding:11px;font-size:14px" onclick="doLogin()">Anmelden</button>
-    <p style="text-align:center;margin-top:12px;font-size:12px;color:var(--t3)">Demo: beliebige E-Mail &amp; Passwort</p>
-  </div>
-  <div id="pane-reg" class="hidden">
-    <div id="rs1">
-      <div class="step-t">Wer bist du?</div>
-      <div class="step-s">Wähle deine Rolle</div>
-      <div class="role-opts">
-        <div class="role-opt" onclick="selectRole('student',this)"><div class="ro-ic">🧑‍🎓</div><div class="ro-t"><strong>Ich bin Schüler/in</strong><span>Klasse 5–13 · Lernen &amp; Üben</span></div></div>
-        <div class="role-opt" onclick="selectRole('parent',this)"><div class="ro-ic">👨‍👩‍👧</div><div class="ro-t"><strong>Ich bin Elternteil</strong><span>Kinder verwalten &amp; Fortschritt sehen</span></div></div>
-        <div class="role-opt" onclick="selectRole('teacher',this)"><div class="ro-ic">👩‍🏫</div><div class="ro-t"><strong>Ich bin Lehrer/in</strong><span>Klassen &amp; Material verwalten</span></div></div>
+  <!-- Hero -->
+  <section class="hero" style="padding-top:80px;">
+    <div class="hero-tag">🎓 KI-gestützte Lernplattform für Klassen 5–13</div>
+    <h1>Smarter lernen mit<br><span>KI-Unterstützung</span></h1>
+    <p>StudyBuddy Pro kombiniert bewährte Lernmethoden mit künstlicher Intelligenz — für bessere Noten, stressfreiere Prüfungen und glücklichere Eltern.</p>
+    <div class="hero-actions">
+      <button class="btn btn-primary btn-lg" onclick="openAuth('register')">Jetzt kostenlos starten →</button>
+      <button class="btn btn-secondary btn-lg" onclick="openAuth('login')">Demo ansehen</button>
+    </div>
+    <div class="hero-stats">
+      <div>
+        <div class="hero-stat-value">50K+</div>
+        <div class="hero-stat-label">Aktive Schüler</div>
+      </div>
+      <div>
+        <div class="hero-stat-value">4.9★</div>
+        <div class="hero-stat-label">App-Bewertung</div>
+      </div>
+      <div>
+        <div class="hero-stat-value">2M+</div>
+        <div class="hero-stat-label">Karteikarten erstellt</div>
+      </div>
+      <div>
+        <div class="hero-stat-value">89%</div>
+        <div class="hero-stat-label">Bessere Noten</div>
       </div>
     </div>
-    <div id="rs2" class="hidden">
-      <div class="step-t" id="rs2t">Dein Profil</div>
-      <div class="step-s">Noch ein paar Angaben</div>
-      <div class="row2">
-        <div class="field" style="flex:1"><label>Vorname</label><input class="fi" id="r-fn" placeholder="Max"></div>
-        <div class="field" style="flex:1"><label>Nachname</label><input class="fi" id="r-ln" placeholder="Muster"></div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="section-header">
+      <h2>Alles was du zum Lernen brauchst</h2>
+      <p>Komplett ausgestattet für Schüler, Eltern und Lehrer</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🃏</div>
+        <h3>KI-Karteikarten</h3>
+        <p>Text eingeben — KI erstellt automatisch optimale Karteikarten mit Spaced-Repetition-Algorithmus.</p>
       </div>
-      <div class="field"><label>E-Mail</label><input class="fi" id="r-em" type="email" placeholder="max@email.de"></div>
-      <div class="field"><label>Passwort</label><input class="fi" id="r-pw" type="password" placeholder="••••••••"></div>
-      <div id="rs2-s">
-        <div class="row2">
-          <div class="field" style="flex:1"><label>Klasse</label>
-            <select class="fi" id="r-gr">
-              <option value="5">5. Klasse</option><option value="6">6. Klasse</option><option value="7" selected>7. Klasse</option>
-              <option value="8">8. Klasse</option><option value="9">9. Klasse</option><option value="10">10. Klasse</option>
-              <option value="11">11. Klasse</option><option value="12">12. Klasse</option><option value="13">13. Klasse</option>
-            </select></div>
-          <div class="field" style="flex:1"><label>Schulform</label>
-            <select class="fi" id="r-sc"><option>Gymnasium</option><option>Realschule</option><option>Gesamtschule</option><option>Hauptschule</option></select></div>
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>KI-Tutor</h3>
+        <p>24/7 Lernassistent beantwortet Fragen in allen Fächern, erklärt Konzepte und gibt Lernhilfen.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📝</div>
+        <h3>Prüfungsmodus</h3>
+        <p>KI generiert Multiple-Choice-Fragen passend zu Klasse und Fach — perfekte Prüfungsvorbereitung.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">👨‍👩‍👧</div>
+        <h3>Eltern-Dashboard</h3>
+        <p>Lernfortschritt aller Kinder auf einen Blick — mit Wochenberichten, Charts und Statistiken.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📅</div>
+        <h3>Lernplan</h3>
+        <p>Intelligenter Wochenplan der Prüfungen und Aufgaben berücksichtigt und optimale Lernzeiten vorschlägt.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🍅</div>
+        <h3>Pomodoro-Timer</h3>
+        <p>Fokussierte Lernsessions mit Pausen-Erinnerungen für maximale Konzentration und Produktivität.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⭐</div>
+        <h3>Gamification</h3>
+        <p>XP-Punkte, Lernstreak und Abzeichen motivieren täglich — Lernen wird zum Erlebnis.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>DSGVO-konform</h3>
+        <p>Alle Daten verschlüsselt, EU-Server in Frankfurt, Elternkontrolle. Sicherheit nach CRA-Standard.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section class="section" id="preise" style="background:var(--bg-2); max-width:100%; padding:64px 32px;">
+    <div style="max-width:1100px; margin:0 auto;">
+      <div class="section-header">
+        <h2>Einfache, faire Preise</h2>
+        <p>Kein Abo-Zwang, jederzeit kündbar</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-name">🌱 Starter</div>
+          <div class="pricing-price">0€ <span>/ Monat</span></div>
+          <div class="pricing-features">
+            <div class="pricing-feature">1 Schüler-Account</div>
+            <div class="pricing-feature">Karteikarten & Lernplan</div>
+            <div class="pricing-feature">10 KI-Karten pro Monat</div>
+            <div class="pricing-feature">Basis-Dashboard</div>
+          </div>
+          <button class="btn btn-secondary btn-full" onclick="openAuth('register')">Kostenlos starten</button>
         </div>
-        <div class="field"><label>Claude API Key (für KI-Features)</label><input class="fi" id="r-ak" type="password" placeholder="sk-ant-... (optional, auch später in Einstellungen)"></div>
-      </div>
-      <div class="row2" style="margin-top:6px">
-        <button class="btn btn-sec" style="flex:1" onclick="showRS(1)">← Zurück</button>
-        <button class="btn btn-pri" style="flex:1" onclick="nextRS2()">Weiter →</button>
+        <div class="pricing-card popular">
+          <div class="popular-badge">⭐ Beliebteste Wahl</div>
+          <div class="pricing-name">👨‍👩‍👧 Family Plus</div>
+          <div class="pricing-price">9,99€ <span>/ Monat</span></div>
+          <div class="pricing-features">
+            <div class="pricing-feature">Bis zu 3 Kinder</div>
+            <div class="pricing-feature">Eltern-Dashboard mit Charts</div>
+            <div class="pricing-feature">100 KI-Karten pro Monat</div>
+            <div class="pricing-feature">Wöchentliche Lernberichte</div>
+            <div class="pricing-feature">KI-Tutor unbegrenzt</div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="openAuth('register')">14 Tage gratis testen</button>
+          <div class="payment-badges" style="margin-top:12px;">
+            <span class="payment-badge">💳 Kreditkarte</span>
+            <span class="payment-badge">PayPal</span>
+            <span class="payment-badge"> Apple Pay</span>
+          </div>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-name">🚀 Family Pro</div>
+          <div class="pricing-price">14,99€ <span>/ Monat</span></div>
+          <div class="pricing-features">
+            <div class="pricing-feature">Bis zu 6 Kinder</div>
+            <div class="pricing-feature">Alle Family Plus Features</div>
+            <div class="pricing-feature">Unbegrenzte KI-Karten</div>
+            <div class="pricing-feature">Prioritäts-Support</div>
+            <div class="pricing-feature">Offline-Modus</div>
+          </div>
+          <button class="btn btn-secondary btn-full" onclick="openAuth('register')">Jetzt starten</button>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-name">👩‍🏫 Teacher</div>
+          <div class="pricing-price">6,99€ <span>/ Monat</span></div>
+          <div class="pricing-features">
+            <div class="pricing-feature">Bis zu 30 Schüler</div>
+            <div class="pricing-feature">Klassen-Dashboard</div>
+            <div class="pricing-feature">Materialien hochladen</div>
+            <div class="pricing-feature">Klassen-Berichte</div>
+          </div>
+          <button class="btn btn-secondary btn-full" onclick="openAuth('register')">Jetzt starten</button>
+        </div>
       </div>
     </div>
-    <div id="rs3" class="hidden">
-      <div class="step-t">Deine Kinder</div>
-      <div class="step-s">Jetzt oder später hinzufügen</div>
-      <div class="row2">
-        <div class="field" style="flex:2"><label>Name</label><input class="fi" id="cn" placeholder="Lisa"></div>
-        <div class="field" style="flex:1"><label>Klasse</label>
-          <select class="fi" id="cg">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
-      </div>
-      <button class="btn btn-sec" style="width:100%;margin-bottom:10px" onclick="addRC()">+ Kind hinzufügen</button>
-      <div class="chip-list" id="rchips"></div>
-      <div class="row2" style="margin-top:6px">
-        <button class="btn btn-sec" style="flex:1" onclick="showRS(2)">← Zurück</button>
-        <button class="btn btn-pri" style="flex:1" onclick="finishReg()">Konto erstellen 🎉</button>
-      </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section" id="faq" style="max-width:720px; margin:0 auto;">
+    <div class="section-header">
+      <h2>Häufige Fragen</h2>
     </div>
-    <div id="rs-fin" class="hidden">
-      <button class="btn btn-pri" style="width:100%;padding:11px;font-size:14px" onclick="finishReg()">Konto erstellen 🎉</button>
+    <div id="faq-list"></div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div style="margin-bottom:16px; font-weight:700; color:white; font-size:18px;">StudyBuddy Pro</div>
+    <div>
+      <a href="#" onclick="showPolicy('datenschutz')">Datenschutz</a>
+      <a href="#" onclick="showPolicy('impressum')">Impressum</a>
+      <a href="#" onclick="showPolicy('agb')">AGB</a>
+      <a href="mailto:support@studybuddy.pro">Kontakt</a>
     </div>
-  </div>
-  <button class="btn btn-ghost" style="width:100%;margin-top:10px;color:var(--t3);font-size:13px" onclick="closeAuth()">Abbrechen</button>
-</div>
+    <div style="margin-top:16px; font-size:12px;">© 2026 StudyBuddy Pro. Alle Rechte vorbehalten. Serverstandort: Frankfurt (EU). DSGVO-konform.</div>
+  </footer>
 </div>
 
-<!-- APP -->
-<div id="app" class="hidden">
-  <div class="sb">
-    <div class="sb-logo">📚 StudyBuddy Pro</div>
-    <div class="sb-user">
-      <div class="sb-uname" id="sb-name"></div>
-      <div class="sb-urole" id="sb-role"></div>
+<!-- Auth Modal -->
+<div id="auth-overlay" style="display:none;" class="modal-overlay" onclick="if(event.target===this)closeAuth()">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title" id="auth-title">Anmelden</div>
+      <button class="modal-close" onclick="closeAuth()">✕</button>
     </div>
-    <div id="sb-nav"></div>
-    <div class="sb-foot">
-      <div id="sb-xp-wrap">
-        <div class="xp-lbl"><span>Level <span id="sb-lvl">1</span></span><span id="sb-xpn">0/500</span></div>
-        <div class="xp-track"><div class="xp-bar" id="sb-xpb" style="width:0%"></div></div>
-        <div class="streak-pill" id="sb-str">🔥 0 Tage Streak</div>
-      </div>
-      <button class="logout-btn" onclick="doLogout()">Abmelden</button>
-    </div>
+    <div id="auth-body"></div>
   </div>
-  <div class="main" id="main"></div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="alert" aria-live="polite"></div>
 
 <script>
-const SUBS={
-  '5':['Deutsch','Mathematik','Englisch','Sachkunde','Biologie','Sport','Musik','Kunst','Religion'],
-  '6':['Deutsch','Mathematik','Englisch','Sachkunde','Biologie','Sport','Musik','Kunst','Religion'],
-  '7':['Deutsch','Mathematik','Englisch','Biologie','Physik','Geschichte','Geographie','Französisch','Sport','Musik','Informatik','Ethik'],
-  '8':['Deutsch','Mathematik','Englisch','Biologie','Physik','Chemie','Geschichte','Geographie','Französisch','Latein','Sport','Informatik','Ethik'],
-  '9':['Deutsch','Mathematik','Englisch','Biologie','Physik','Chemie','Geschichte','Geographie','Französisch','Spanisch','Latein','Sport','Informatik','Wirtschaft','Ethik'],
-  '10':['Deutsch','Mathematik','Englisch','Biologie','Physik','Chemie','Geschichte','Geographie','Französisch','Spanisch','Latein','Sport','Informatik','Wirtschaft','Philosophie'],
-  '11':['Deutsch','Mathematik','Englisch','Biologie','Physik','Chemie','Geschichte','Geographie','Französisch','Spanisch','Sport','Informatik','Wirtschaft','Philosophie','Sozialkunde'],
-  '12':['Deutsch','Mathematik','Englisch','Biologie','Physik','Chemie','Geschichte','Geographie','Französisch','Spanisch','Sport','Informatik','Wirtschaft','Philosophie','Sozialkunde'],
-  '13':['Deutsch','Mathematik','Englisch','Biologie','Physik','Chemie','Geschichte','Geographie','Französisch','Spanisch','Sport','Informatik','Wirtschaft','Philosophie','Sozialkunde'],
-};
-const SM={'Deutsch':{e:'📖',c:'#4f46e5'},'Mathematik':{e:'🔢',c:'#059669'},'Englisch':{e:'🇬🇧',c:'#0891b2'},'Biologie':{e:'🌿',c:'#16a34a'},'Physik':{e:'⚡',c:'#7c3aed'},'Chemie':{e:'🧪',c:'#ea580c'},'Geschichte':{e:'🏛',c:'#b45309'},'Geographie':{e:'🌍',c:'#0d9488'},'Französisch':{e:'🇫🇷',c:'#db2777'},'Spanisch':{e:'🇪🇸',c:'#dc2626'},'Latein':{e:'🏺',c:'#92400e'},'Informatik':{e:'💻',c:'#1d4ed8'},'Wirtschaft':{e:'📊',c:'#047857'},'Philosophie':{e:'🤔',c:'#6d28d9'},'Sozialkunde':{e:'🤝',c:'#0369a1'},'Sport':{e:'⚽',c:'#15803d'},'Musik':{e:'🎵',c:'#7e22ce'},'Kunst':{e:'🎨',c:'#c2410c'},'Religion':{e:'✝️',c:'#854d0e'},'Ethik':{e:'🕊',c:'#1e40af'},'Sachkunde':{e:'🔬',c:'#065f46'}};
+// ── FAQ Daten ────────────────────────────────────────────────────────────────
+const FAQS = [
+  { q: 'Brauche ich einen Claude API Key?', a: 'Der API Key ist optional. Alle Grundfunktionen (Karteikarten, Lernplan, Pomodoro) funktionieren ohne API Key. Der Key wird nur für KI-generierte Inhalte (Tutor, automatische Kartenerstellung, Prüfungsfragen) benötigt.' },
+  { q: 'Wo werden meine Daten gespeichert?', a: 'Alle Daten werden DSGVO-konform auf EU-Servern in Frankfurt gespeichert. Passwörter werden verschlüsselt, API Keys nie auf dem Server gespeichert.' },
+  { q: 'Kann ich mehrere Kinder anlegen?', a: 'Mit Family Plus bis zu 3 Kinder, mit Family Pro bis zu 6 Kinder — alle mit eigenem Schüler-Account und Lernprofil.' },
+  { q: 'Wie funktioniert der Demo-Modus?', a: 'Einfach mit beliebiger E-Mail und Passwort anmelden — die App lädt automatisch Beispieldaten. Kein Account erforderlich.' },
+];
 
-let U=null,D={cards:{},tasks:[],exams:[],xp:0,streak:0,correct:0,total:0,lastStudy:0};
-let rD={role:'',children:[]};
-let fc={subj:'',idx:0,flip:false};
-let ex={qs:[],idx:0,secs:0,tmr:null,score:0,numQ:5,subj:'',wrong:[]};
-let po={mode:'focus',secs:1500,running:false,tmr:null,sessions:0};
-let msgs=[];
+document.getElementById('faq-list').innerHTML = FAQS.map((f, i) => `
+  <div style="border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:12px;overflow:hidden;">
+    <button onclick="toggleFAQ(${i})" style="width:100%;text-align:left;padding:16px 20px;font-weight:600;font-size:15px;display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);">
+      ${f.q} <span id="faq-icon-${i}">+</span>
+    </button>
+    <div id="faq-body-${i}" style="display:none;padding:0 20px 16px;color:var(--t2);font-size:14px;line-height:1.7;background:var(--bg-card);">${f.a}</div>
+  </div>
+`).join('');
 
-function save(){try{localStorage.setItem('sb_u',JSON.stringify(U));localStorage.setItem('sb_d',JSON.stringify(D));}catch(e){}}
-function load(){try{const u=localStorage.getItem('sb_u'),d=localStorage.getItem('sb_d');if(u)U=JSON.parse(u);if(d)D={...D,...JSON.parse(d)};}catch(e){}}
-function init(){load();if(U)showApp();else document.getElementById('landing').style.display='flex';}
-
-function openAuth(t){document.getElementById('auth-overlay').classList.remove('hidden');switchTab(t);}
-function closeAuth(){document.getElementById('auth-overlay').classList.add('hidden');}
-function switchTab(t){
-  ['login','reg'].forEach(x=>{document.getElementById('pane-'+x).classList.toggle('hidden',x!==t);document.getElementById('tab-'+x).classList.toggle('act',x===t);});
-  if(t==='reg')showRS(1);
+function toggleFAQ(i) {
+  const body = document.getElementById('faq-body-' + i);
+  const icon = document.getElementById('faq-icon-' + i);
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  icon.textContent = open ? '+' : '−';
 }
-function showRS(n){
-  ['rs1','rs2','rs3','rs-fin'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('hidden');});
-  const el=document.getElementById(n===1?'rs1':n===2?'rs2':n===3?'rs3':'rs-fin');
-  if(el)el.classList.remove('hidden');
-  if(n===2){
-    document.getElementById('rs2t').textContent=rD.role==='student'?'Dein Schüler-Profil':'Dein Profil';
-    document.getElementById('rs2-s').classList.toggle('hidden',rD.role!=='student');
+
+// ── Auth Modal ────────────────────────────────────────────────────────────────
+let authMode = 'login';
+let regStep = 1;
+let regData = {};
+
+function openAuth(mode = 'login') {
+  authMode = mode;
+  regStep = 1;
+  regData = {};
+  document.getElementById('auth-overlay').style.display = 'flex';
+  renderAuth();
+}
+
+function closeAuth() {
+  document.getElementById('auth-overlay').style.display = 'none';
+}
+
+function renderAuth() {
+  const title = document.getElementById('auth-title');
+  const body = document.getElementById('auth-body');
+
+  if (authMode === 'login') {
+    title.textContent = 'Willkommen zurück 👋';
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="field"><label>E-Mail</label><input class="input" id="l-em" type="email" placeholder="deine@email.de" autocomplete="email"></div>
+        <div class="field"><label>Passwort</label><input class="input" id="l-pw" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+        <button class="btn btn-primary btn-full" onclick="doLogin()">Anmelden</button>
+        <div class="divider-text">oder</div>
+        <button class="btn btn-secondary btn-full" onclick="authMode='register';regStep=1;renderAuth()">Neues Konto erstellen</button>
+        <p style="text-align:center;font-size:12px;color:var(--t3);">Demo: beliebige E-Mail + Passwort eingeben</p>
+      </div>`;
+    setTimeout(() => document.getElementById('l-em')?.focus(), 50);
+  } else {
+    renderRegStep();
   }
 }
-function selectRole(r,el){document.querySelectorAll('.role-opt').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');rD.role=r;setTimeout(()=>showRS(2),180);}
-function nextRS2(){
-  const fn=document.getElementById('r-fn').value.trim(),em=document.getElementById('r-em').value.trim(),pw=document.getElementById('r-pw').value;
-  if(!fn||!em||!pw){toast('Pflichtfelder ausfüllen!');return;}
-  rD.fn=fn;rD.ln=document.getElementById('r-ln').value.trim();rD.em=em;rD.pw=pw;
-  if(rD.role==='student'){rD.gr=document.getElementById('r-gr').value;rD.sc=document.getElementById('r-sc').value;rD.ak=document.getElementById('r-ak').value.trim();showRS(4);}
-  else if(rD.role==='parent')showRS(3);
-  else showRS(4);
-}
-function addRC(){const n=document.getElementById('cn').value.trim(),g=document.getElementById('cg').value;if(!n){toast('Name eingeben!');return;}rD.children.push({id:'c'+Date.now(),name:n,grade:g,xp:0,streak:0,lastStudy:0});document.getElementById('cn').value='';renderRChips();}
-function renderRChips(){document.getElementById('rchips').innerHTML=rD.children.map((c,i)=>`<div class="chip">${c.name} (Kl.${c.grade})<span class="chip-x" onclick="rD.children.splice(${i},1);renderRChips()">✕</span></div>`).join('');}
-function finishReg(){
-  U={id:'u'+Date.now(),email:rD.em,name:rD.fn+(rD.ln?' '+rD.ln:''),role:rD.role,grade:rD.gr||'7',school:rD.sc||'Gymnasium',apiKey:rD.ak||'',subscription:'free',children:rD.role==='parent'?rD.children:[],createdAt:Date.now()};
-  D={cards:{},tasks:[],exams:[],xp:0,streak:1,correct:0,total:0,lastStudy:Date.now()};
-  save();toast('Willkommen! 🎉');showApp();
-}
-function doLogin(){
-  const em=document.getElementById('li-email').value.trim(),pw=document.getElementById('li-pass').value;
-  if(!em||!pw){toast('E-Mail und Passwort eingeben!');return;}
-  load();
-  if(!U){
-    U={id:'u1',email:em,name:'Demo Schüler',role:'student',grade:'9',school:'Gymnasium',apiKey:'',subscription:'free',children:[],createdAt:Date.now()};
-    D={cards:{'Mathematik':[{front:'Was ist der Satz des Pythagoras?',back:'a² + b² = c² — In einem rechtwinkligen Dreieck ist das Quadrat der Hypotenuse gleich der Summe der Quadrate der Katheten.',due:0,lvl:0},{front:'Was ist eine Primzahl?',back:'Eine natürliche Zahl größer als 1, die nur durch 1 und sich selbst teilbar ist. Bsp: 2, 3, 5, 7, 11, 13...',due:0,lvl:0},{front:'Was ist der Unterschied zwischen Brutto und Netto?',back:'Brutto = Gesamtbetrag inkl. Steuern/Abzüge. Netto = verbleibender Betrag nach Abzügen.',due:0,lvl:1}],'Deutsch':[{front:'Was ist eine Metapher?',back:'Eine Metapher überträgt die Bedeutung eines Wortes auf ein anderes ohne "wie" (= kein Vergleich), z.B. "Das Leben ist ein Traum".',due:0,lvl:0},{front:'Was ist der Unterschied zwischen Simile und Metapher?',back:'Simile (Vergleich): verwendet "wie" → "stark wie ein Löwe". Metapher: direkte Übertragung → "Er ist ein Löwe".',due:0,lvl:0}],'Englisch':[{front:'Present Perfect vs. Simple Past',back:'Present Perfect: Handlung mit Gegenwartsbezug (I have eaten). Simple Past: abgeschlossene Handlung (I ate yesterday).',due:0,lvl:0}]},tasks:[{text:'Mathe Aufgaben S. 47 lösen',done:false},{text:'Englisch Vokabeln Unit 3 lernen',done:false},{text:'Geschichte Referat vorbereiten',done:true}],exams:[{subj:'Mathematik',date:new Date(Date.now()+3*864e5).toISOString().split('T')[0],note:'Kapitel 5–7'},{subj:'Englisch',date:new Date(Date.now()+7*864e5).toISOString().split('T')[0],note:'Vocabulary Unit 3–4'}],xp:380,streak:5,correct:42,total:56,lastStudy:Date.now()};
-    save();
+
+function renderRegStep() {
+  const title = document.getElementById('auth-title');
+  const body = document.getElementById('auth-body');
+  const steps = ['Rolle wählen', 'Deine Daten', 'Kinder hinzufügen'];
+  const maxStep = regData.role === 'parent' ? 3 : 2;
+
+  const progress = `
+    <div style="display:flex;gap:8px;margin-bottom:24px;">
+      ${Array.from({length: maxStep}, (_, i) => `
+        <div style="flex:1;height:4px;border-radius:99px;background:${i < regStep ? 'var(--pri)' : 'var(--border)'}"></div>
+      `).join('')}
+    </div>
+    <p style="font-size:12px;color:var(--t3);margin-bottom:16px;">Schritt ${regStep} von ${maxStep}</p>`;
+
+  if (regStep === 1) {
+    title.textContent = 'Konto erstellen';
+    body.innerHTML = progress + `
+      <p style="font-weight:600;margin-bottom:16px;">Ich bin…</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${[['student','🎓','Schüler/in','Klasse 5–13'],['parent','👨‍👩‍👧','Elternteil','Kinder begleiten'],['teacher','👩‍🏫','Lehrer/in','Klassen verwalten']].map(([r,em,n,d]) => `
+          <button onclick="regData.role='${r}';regStep=2;renderRegStep()" style="text-align:left;padding:16px;border:2px solid var(--border);border-radius:var(--r-md);background:var(--bg-card);cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--pri)'" onmouseout="this.style.borderColor='var(--border)'">
+            <span style="font-size:20px;">${em}</span> <strong style="margin-left:8px;">${n}</strong> <span style="color:var(--t3);font-size:13px;margin-left:8px;">${d}</span>
+          </button>`).join('')}
+      </div>
+      <button class="btn btn-ghost btn-full" style="margin-top:12px;" onclick="authMode='login';renderAuth()">← Zurück zum Login</button>`;
+  } else if (regStep === 2) {
+    title.textContent = regData.role === 'student' ? 'Schüler-Profil' : regData.role === 'parent' ? 'Eltern-Profil' : 'Lehrer-Profil';
+    body.innerHTML = progress + `
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="grid-2">
+          <div class="field"><label>Vorname</label><input class="input" id="r-fn" placeholder="Max" value="${regData.fn||''}"></div>
+          <div class="field"><label>Nachname</label><input class="input" id="r-ln" placeholder="Müller" value="${regData.ln||''}"></div>
+        </div>
+        <div class="field"><label>E-Mail</label><input class="input" id="r-em" type="email" placeholder="max@email.de" value="${regData.em||''}"></div>
+        <div class="field"><label>Passwort <span style="color:var(--t3);font-weight:400;font-size:12px;">(min. 8 Zeichen, 1 Zahl, 1 Großbuchstabe)</span></label><input class="input" id="r-pw" type="password" placeholder="Sicheres Passwort" autocomplete="new-password"></div>
+        ${regData.role === 'student' ? `<div class="grid-2">
+          <div class="field"><label>Klasse</label><select class="input" id="r-gr">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}" ${regData.grade==g?'selected':''}>${g}. Klasse</option>`).join('')}</select></div>
+          <div class="field"><label>Schulform</label><select class="input" id="r-sc"><option>Gymnasium</option><option>Realschule</option><option>Gesamtschule</option><option>Hauptschule</option></select></div>
+        </div>` : ''}
+        <button class="btn btn-primary btn-full" onclick="regStep2Next()">Weiter →</button>
+        <button class="btn btn-ghost btn-full" onclick="regStep=1;renderRegStep()">← Zurück</button>
+      </div>`;
+  } else if (regStep === 3) {
+    title.textContent = 'Kinder hinzufügen';
+    if (!regData.children) regData.children = [{ name: '', grade: 5 }];
+    body.innerHTML = progress + `
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <p style="color:var(--t2);font-size:14px;">Lege Profile für deine Kinder an (kann später ergänzt werden):</p>
+        <div id="children-list">
+          ${regData.children.map((c, i) => `
+            <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;">
+              <div class="field" style="flex:1"><label>Name</label><input class="input" id="cn-${i}" value="${c.name}" placeholder="Kind ${i+1}"></div>
+              <div class="field" style="width:110px"><label>Klasse</label><select class="input" id="cg-${i}">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}" ${c.grade==g?'selected':''}>${g}.</option>`).join('')}</select></div>
+              ${i > 0 ? `<button class="btn btn-ghost btn-sm" style="margin-bottom:2px;" onclick="removeChild(${i})">✕</button>` : ''}
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="addChild()" style="align-self:flex-start;">+ Kind hinzufügen</button>
+        <button class="btn btn-primary btn-full" onclick="doRegister()">Konto erstellen 🎉</button>
+        <button class="btn btn-ghost btn-full" onclick="regStep=2;renderRegStep()">← Zurück</button>
+      </div>`;
   }
-  toast('Willkommen zurück! 👋');showApp();
-}
-function doLogout(){U=null;D={cards:{},tasks:[],exams:[],xp:0,streak:0,correct:0,total:0,lastStudy:0};localStorage.removeItem('sb_u');localStorage.removeItem('sb_d');document.getElementById('app').classList.add('hidden');document.getElementById('landing').style.display='flex';}
-
-function showApp(){document.getElementById('landing').style.display='none';document.getElementById('auth-overlay').classList.add('hidden');document.getElementById('app').classList.remove('hidden');renderSB();goPage(U.role==='parent'?'parent':'dashboard');}
-
-function renderSB(){
-  document.getElementById('sb-name').textContent=U.name;
-  document.getElementById('sb-role').textContent=U.role==='student'?'Schüler/in':U.role==='parent'?'Elternteil':'Lehrer/in';
-  const lvl=Math.floor(D.xp/500)+1,p=(D.xp%500)/500*100;
-  document.getElementById('sb-lvl').textContent=lvl;
-  document.getElementById('sb-xpn').textContent=(D.xp%500)+'/500';
-  document.getElementById('sb-xpb').style.width=p+'%';
-  document.getElementById('sb-str').textContent='🔥 '+D.streak+' '+(D.streak===1?'Tag':'Tage')+' Streak';
-  let nav='';
-  if(U.role==='student'){nav=`<div class="sb-sec">Lernen</div><button class="nb" id="n-dashboard" onclick="goPage('dashboard')"><span class="nb-ic">🏠</span>Dashboard</button><button class="nb" id="n-subjects" onclick="goPage('subjects')"><span class="nb-ic">📚</span>Fächer</button><button class="nb" id="n-flashcards" onclick="goPage('flashcards')"><span class="nb-ic">🗂</span>Karteikarten</button><button class="nb" id="n-tutor" onclick="goPage('tutor')"><span class="nb-ic">🤖</span>KI-Tutor</button><button class="nb" id="n-exam" onclick="goPage('exam')"><span class="nb-ic">📝</span>Prüfungsmodus</button><div class="sb-sec">Planung</div><button class="nb" id="n-plan" onclick="goPage('plan')"><span class="nb-ic">📅</span>Lernplan</button><button class="nb" id="n-pomodoro" onclick="goPage('pomodoro')"><span class="nb-ic">⏱</span>Pomodoro</button>`;}
-  else if(U.role==='parent'){nav=`<div class="sb-sec">Übersicht</div><button class="nb" id="n-parent" onclick="goPage('parent')"><span class="nb-ic">🏠</span>Übersicht</button><button class="nb" id="n-children" onclick="goPage('children')"><span class="nb-ic">👧</span>Meine Kinder</button>`;}
-  else{nav=`<div class="sb-sec">Lehrer</div><button class="nb" id="n-teacher" onclick="goPage('teacher')"><span class="nb-ic">🏠</span>Dashboard</button>`;}
-  nav+=`<div class="sb-sec">Konto</div><button class="nb" id="n-subscription" onclick="goPage('subscription')"><span class="nb-ic">💳</span>Abo & Preise</button><button class="nb" id="n-settings" onclick="goPage('settings')"><span class="nb-ic">⚙️</span>Einstellungen</button>`;
-  document.getElementById('sb-nav').innerHTML=nav;
 }
 
-let curPage='';
-function goPage(name){
-  curPage=name;
-  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('act'));
-  const nb=document.getElementById('n-'+name);if(nb)nb.classList.add('act');
-  document.getElementById('main').innerHTML=`<div class="page" id="pg-${name}">${buildPage(name)}</div>`;
-  if(name==='dashboard')rDash();
-  if(name==='subjects')rSubjects();
-  if(name==='flashcards')initFC();
-  if(name==='tutor')initTutor();
-  if(name==='exam')initExam();
-  if(name==='plan')rPlan();
-  if(name==='pomodoro')rPomo();
-  if(name==='parent')rParent();
-  if(name==='children')rChildren();
+function regStep2Next() {
+  const fn = document.getElementById('r-fn')?.value.trim();
+  const ln = document.getElementById('r-ln')?.value.trim();
+  const em = document.getElementById('r-em')?.value.trim();
+  const pw = document.getElementById('r-pw')?.value;
+  const grade = document.getElementById('r-gr')?.value;
+  const school = document.getElementById('r-sc')?.value;
+
+  if (!fn || !em || !pw) return toast('Bitte alle Pflichtfelder ausfüllen!');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return toast('Ungültige E-Mail-Adresse!');
+  if (pw.length < 8) return toast('Passwort zu kurz (min. 8 Zeichen)!');
+  if (!/[0-9]/.test(pw)) return toast('Passwort braucht mindestens eine Zahl!');
+  if (!/[A-Z]/.test(pw)) return toast('Passwort braucht mindestens einen Großbuchstaben!');
+
+  Object.assign(regData, { fn, ln, em, pw, grade, school });
+
+  if (regData.role === 'parent') {
+    regStep = 3;
+  } else {
+    doRegister();
+    return;
+  }
+  renderRegStep();
 }
 
-function buildPage(n){
-  const sOpts=(SUBS[U.grade]||SUBS['9']).map(s=>`<option>${s}</option>`).join('');
-  const grOpts=[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}">${g}. Klasse</option>`).join('');
-  const P={
-dashboard:`<div class="ph"><h1>Hallo, ${U.name.split(' ')[0]}! 👋</h1><p>Du schaffst das — weiter so!</p></div><div class="cards4" id="d-stats"></div><div class="g2"><div class="card"><div class="card-h"><h3>📋 Aufgaben</h3><button class="btn btn-sec" style="font-size:11px;padding:4px 9px" onclick="document.getElementById('add-task-r').style.display='flex'">+ Neu</button></div><div class="card-b" id="task-list"></div><div class="card-b" id="add-task-r" style="display:none"><input class="fi" id="ti" placeholder="Neue Aufgabe..." style="margin-bottom:8px"><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="addTask()">Hinzufügen</button><button class="btn btn-sec" onclick="document.getElementById('add-task-r').style.display='none'">Abbrechen</button></div></div></div><div class="card"><div class="card-h"><h3>📅 Prüfungen</h3></div><div class="card-b" id="ex-list"></div></div></div><div class="card" style="margin-top:14px"><div class="card-h"><h3>⚡ Schnell lernen</h3></div><div class="card-b" id="quick-s"></div></div>`,
-subjects:`<div class="ph"><h1>📚 Fächer</h1><p>Klasse ${U.grade} · ${U.school}</p></div><div class="sg" id="subj-grid"></div>`,
-flashcards:`<div class="ph"><h1>🗂 Karteikarten</h1><p>Spaced Repetition — heute fällige Karten zuerst</p></div><div class="fp-row" id="fc-pills"></div><div class="fc-scene" id="fc-scene" onclick="flipFC()"><div class="fc-card" id="fc-card"><div class="fc-face fc-front"><div class="fc-hint">Vorderseite — Tippen zum Umdrehen</div><div class="fc-text" id="fct-f">Wähle ein Fach</div></div><div class="fc-face fc-back"><div class="fc-hint">Rückseite</div><div class="fc-text" id="fct-b"></div></div></div></div><div class="rate-row" id="rate-row" style="display:none"><button class="rb" style="background:#fef2f2;color:#dc2626" onclick="rateFC(1)">😕 Nochmal</button><button class="rb" style="background:#fffbeb;color:#d97706" onclick="rateFC(2)">🤔 Schwierig</button><button class="rb" style="background:#ecfdf5;color:#059669" onclick="rateFC(3)">😊 Gut</button><button class="rb" style="background:#eef2ff;color:#4f46e5" onclick="rateFC(4)">🚀 Super!</button></div><div style="text-align:center;font-size:12px;color:var(--t3);margin-bottom:16px" id="fc-ctr"></div><div class="card"><div class="card-h"><h3>➕ Neue Karte</h3></div><div class="card-b"><div class="field"><label>Vorderseite</label><input class="fi" id="nf-f" placeholder="Frage..."></div><div class="field"><label>Rückseite</label><textarea class="fi" id="nf-b" rows="3" placeholder="Antwort..."></textarea></div><button class="btn btn-pri" onclick="addFC()">Karte hinzufügen</button></div></div><div class="gen-box"><h4 style="font-size:13px;font-weight:700;margin-bottom:3px">🤖 KI: Karten aus Text generieren</h4><p style="font-size:12px;color:var(--t3);margin-bottom:10px">Text einfügen → KI erstellt Karteikarten automatisch</p><textarea class="fi" id="gen-t" rows="4" placeholder="Lerntext hier einfügen..."></textarea><div style="display:flex;gap:8px;margin-top:8px"><select class="fi" id="gen-n" style="width:auto;margin:0"><option value="5">5 Karten</option><option value="8" selected>8 Karten</option><option value="12">12 Karten</option></select><button class="btn btn-pri" onclick="genCards()">Generieren</button></div></div>`,
-tutor:`<div class="ph"><h1>🤖 KI-Tutor</h1><p>Ich helfe dir beim Verstehen — mit der Sokrates-Methode!</p></div><div class="chat-box"><div class="chat-msgs" id="chat-msgs"></div><div class="cir"><input class="fi" id="ci" placeholder="Stelle eine Frage..." style="margin:0" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"><button class="btn btn-pri" onclick="sendMsg()">Senden</button></div></div>`,
-exam:`<div class="ph"><h1>📝 Prüfungsmodus</h1><p>Teste dein Wissen mit KI-generierten Multiple-Choice-Fragen</p></div><div id="ex-setup" class="ex-setup"><div class="card"><div class="card-h"><h3>Prüfung konfigurieren</h3></div><div class="card-b"><div class="field"><label>Fach</label><select class="fi" id="ex-subj">${sOpts}</select></div><div class="field"><label>Anzahl Fragen</label><div class="og"><button class="ob sel" onclick="setExN(5,this)">5 Fragen</button><button class="ob" onclick="setExN(10,this)">10 Fragen</button><button class="ob" onclick="setExN(15,this)">15 Fragen</button><button class="ob" onclick="setExN(20,this)">20 Fragen</button></div></div><button class="btn btn-pri" style="width:100%;padding:12px;font-size:14px;margin-top:8px" onclick="startExam()">Prüfung starten 🚀</button></div></div></div><div id="ex-run" style="display:none"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span id="ex-prog" style="font-size:13px;font-weight:600;color:var(--t3)"></span><span id="ex-tmr" style="font-size:17px;font-weight:800;color:var(--pri)"></span></div><div class="tbar"><div class="tfill" id="ex-tb"></div></div><div class="qcard"><div class="qt" id="q-text"></div><div class="ag" id="ans-grid"></div></div></div><div id="ex-result" style="display:none"><div class="card"><div class="card-b" style="text-align:center;padding:36px"><div style="font-size:52px;margin-bottom:14px" id="res-emoji"></div><div style="font-size:30px;font-weight:800;color:var(--pri);margin-bottom:7px" id="res-score"></div><div style="color:var(--t3);margin-bottom:20px" id="res-msg"></div><button class="btn btn-pri" style="padding:11px 28px" onclick="resetExam()">Neue Prüfung</button></div></div><div id="res-review"></div></div>`,
-plan:`<div class="ph"><h1>📅 Lernplan</h1><p>Wochenübersicht und Prüfungen</p></div><div class="wg" id="week-grid"></div><div class="card"><div class="card-h"><h3>Prüfungen</h3><button class="btn btn-sec" style="font-size:11px;padding:4px 9px" onclick="document.getElementById('add-ex-f').style.display='block'">+ Eintragen</button></div><div class="card-b" id="ex-entries"></div><div class="card-b" id="add-ex-f" style="display:none"><div class="g2"><div class="field"><label>Fach</label><select class="fi" id="nex-s">${sOpts}</select></div><div class="field"><label>Datum</label><input class="fi" type="date" id="nex-d"></div></div><div class="field"><label>Notiz</label><input class="fi" id="nex-n" placeholder="z.B. Kapitel 3–5"></div><div style="display:flex;gap:8px"><button class="btn btn-sec" onclick="document.getElementById('add-ex-f').style.display='none'">Abbrechen</button><button class="btn btn-pri" onclick="addExam()">Speichern</button></div></div></div>`,
-pomodoro:`<div class="ph"><h1>⏱ Pomodoro-Timer</h1><p>Fokussiert lernen mit der effektivsten Technik</p></div><div class="pw" id="po-wrap"></div>`,
-parent:`<div class="ph"><h1>Hallo, ${U.name.split(' ')[0]}! 👋</h1><p>Lernfortschritt deiner Kinder auf einen Blick</p></div><div id="parent-c"></div>`,
-children:`<div class="ph"><h1>👧 Meine Kinder</h1><p>Profile verwalten</p></div><div id="cl"></div><div class="card" style="margin-top:14px"><div class="card-h"><h3>Kind hinzufügen</h3></div><div class="card-b"><div class="g2"><div class="field"><label>Name</label><input class="fi" id="nc-n" placeholder="Lisa"></div><div class="field"><label>Klasse</label><select class="fi" id="nc-g">${grOpts}</select></div></div><button class="btn btn-pri" onclick="addChild()">Hinzufügen</button></div></div>`,
-subscription:`<div class="ph"><h1>💳 Abo & Preise</h1><p>Dein aktueller Plan</p></div><div class="sub-cur"><div><strong>Aktueller Plan: Starter (Kostenlos)</strong><br><span style="font-size:12px;color:var(--t3)">Upgrade jederzeit möglich</span></div><div style="font-size:24px">🆓</div></div><div class="g4"><div class="pc"><div class="pc-name">Starter</div><div class="pc-price">0€</div><div class="pc-desc">Aktueller Plan</div><ul><li>1 Kind</li><li>3 Fächer</li><li>50 KI/Monat</li></ul><button class="btn" style="width:100%;background:var(--grn);color:#fff;padding:9px">✓ Aktiv</button></div><div class="pc pop"><div class="pc-badge">⭐ EMPFOHLEN</div><div class="pc-name" style="margin-top:14px">Family Plus</div><div class="pc-price">9,99€<sub>/Mo</sub></div><div class="pc-desc">3 Kinder</div><ul><li>Bis 3 Kinder</li><li>Alle Fächer</li><li>Unbegrenzte KI</li><li>Eltern-Dashboard</li></ul><button class="btn btn-pri" style="width:100%;padding:9px" onclick="toast('Zahlung wird in Phase 3 freigeschaltet! 💳')">Upgrade</button></div><div class="pc"><div class="pc-name">Family Pro</div><div class="pc-price">14,99€<sub>/Mo</sub></div><div class="pc-desc">5 Kinder</div><ul><li>Bis 5 Kinder</li><li>Prüfungs-Coach KI</li><li>Jahresbericht</li></ul><button class="btn btn-sec" style="width:100%;padding:9px" onclick="toast('Zahlung wird in Phase 3 freigeschaltet! 💳')">Upgrade</button></div><div class="pc"><div class="pc-name">Teacher</div><div class="pc-price">6,99€<sub>/Mo</sub></div><div class="pc-desc">Lehrer-Dashboard</div><ul><li>Material-Upload</li><li>KI → Quizze</li><li>Klassen-Stats</li></ul><button class="btn btn-sec" style="width:100%;padding:9px" onclick="toast('Lehrer-Portal kommt in Phase 3!')">Anfragen</button></div></div><div class="pay-row" style="margin-top:20px"><div class="pay-b">🅿️ PayPal</div><div class="pay-b">🍎 Apple Pay</div><div class="pay-b">🤖 Google Pay</div><div class="pay-b">💳 Kreditkarte</div><div class="pay-b">🏦 SEPA</div></div>`,
-settings:`<div class="ph"><h1>⚙️ Einstellungen</h1><p>Profil und App-Konfiguration</p></div><div class="ss"><h3>👤 Profil</h3><div class="g2"><div class="field"><label>Name</label><input class="fi" id="s-name" value="${U.name}"></div><div class="field"><label>E-Mail</label><input class="fi" value="${U.email}" readonly style="background:var(--bg)"></div></div>${U.role==='student'?`<div class="g2"><div class="field"><label>Klasse</label><select class="fi" id="s-gr">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}" ${U.grade==g?'selected':''}>${g}. Klasse</option>`).join('')}</select></div><div class="field"><label>Schulform</label><select class="fi" id="s-sc">${['Gymnasium','Realschule','Gesamtschule','Hauptschule'].map(s=>`<option ${U.school===s?'selected':''}>${s}</option>`).join('')}</select></div></div>`:''}<button class="btn btn-pri" onclick="savePro()">Profil speichern</button></div><div class="ss"><h3>🤖 KI-Einstellungen</h3><div class="field"><label>Claude API Key</label><input class="fi" id="s-ak" type="password" value="${U.apiKey||''}" placeholder="sk-ant-..."></div><p style="font-size:12px;color:var(--t3);margin-bottom:10px">Für KI-Tutor und Karteikarten-Generierung. <a href="https://console.anthropic.com" target="_blank" style="color:var(--pri)">API Key holen →</a></p><button class="btn btn-pri" onclick="saveAK()">API Key speichern</button></div><div class="ss" style="border-color:var(--red)"><h3 style="color:var(--red)">⚠️ Gefahrenzone</h3><button class="btn" style="background:var(--red-l);color:var(--red)" onclick="if(confirm('Wirklich alle Lernfortschritte löschen?')){D={cards:{},tasks:[],exams:[],xp:0,streak:0,correct:0,total:0,lastStudy:0};save();toast('Daten gelöscht!');goPage('dashboard')}">Lernfortschritte zurücksetzen</button></div>`,
-teacher:`<div class="ph"><h1>👩‍🏫 Lehrer-Dashboard</h1><p>Klassen und Material verwalten</p></div><div class="card"><div class="card-b" style="text-align:center;padding:36px;color:var(--t3)"><div style="font-size:44px;margin-bottom:14px">🚧</div><h3 style="margin-bottom:7px">Lehrer-Portal kommt in Phase 3</h3><p>Material-Upload, Klassen und KI-Quizze aus eigenen Dokumenten — bald verfügbar.</p></div></div>`
+function addChild() {
+  regData.children.push({ name: '', grade: 5 });
+  renderRegStep();
+}
+
+function removeChild(i) {
+  regData.children.splice(i, 1);
+  renderRegStep();
+}
+
+async function doLogin() {
+  const em = document.getElementById('l-em')?.value.trim();
+  const pw = document.getElementById('l-pw')?.value;
+  if (!em || !pw) return toast('E-Mail und Passwort eingeben!');
+
+  // Demo: weiterleiten zu app.html
+  toast('Wird angemeldet…');
+  sessionStorage.setItem('sb_demo_login', JSON.stringify({ email: em, role: 'student' }));
+  setTimeout(() => { window.location.href = '/app.html'; }, 800);
+}
+
+async function doRegister() {
+  // Kinder-Daten lesen wenn Step 3
+  if (regData.role === 'parent' && regData.children) {
+    regData.children = regData.children.map((_, i) => ({
+      name: document.getElementById('cn-' + i)?.value.trim() || '',
+      grade: Number(document.getElementById('cg-' + i)?.value || 5),
+    })).filter(c => c.name);
+  }
+
+  toast('Konto wird erstellt…');
+  sessionStorage.setItem('sb_demo_login', JSON.stringify({
+    email: regData.em,
+    name: (regData.fn + ' ' + (regData.ln || '')).trim(),
+    role: regData.role,
+    grade: regData.grade,
+    school: regData.school,
+    children: regData.children || [],
+  }));
+  setTimeout(() => { window.location.href = '/app.html'; }, 800);
+}
+
+function showPolicy(type) {
+  const texts = {
+    datenschutz: 'Datenschutzerklärung gemäß DSGVO. Verantwortlicher: StudyBuddy Pro. Daten werden auf EU-Servern gespeichert.',
+    impressum: 'Impressum: StudyBuddy Pro, kontakt@studybuddy.pro',
+    agb: 'Allgemeine Geschäftsbedingungen. Nutzung der App setzt Zustimmung voraus.',
   };
-  return P[n]||`<div class="ph"><h1>Seite nicht gefunden</h1></div>`;
+  toast(texts[type] || '');
 }
 
-function rDash(){
-  const cc=Object.values(D.cards).reduce((s,a)=>s+a.length,0),pct=D.total?Math.round(D.correct/D.total*100):0;
-  document.getElementById('d-stats').innerHTML=`<div class="sc"><div class="si">⚡</div><div class="sv" style="color:var(--amb)">${D.xp}</div><div class="sl">XP gesammelt</div></div><div class="sc"><div class="si">🔥</div><div class="sv" style="color:var(--red)">${D.streak}</div><div class="sl">Tage Streak</div></div><div class="sc"><div class="si">🗂</div><div class="sv" style="color:var(--pri)">${cc}</div><div class="sl">Karteikarten</div></div><div class="sc"><div class="si">🎯</div><div class="sv" style="color:var(--grn)">${pct}%</div><div class="sl">Richtig beantwortet</div></div>`;
-  const tl=document.getElementById('task-list');
-  tl.innerHTML=D.tasks.length?D.tasks.map((t,i)=>`<div class="tr ${t.done?'done':''}"><div class="tck" onclick="toggleTask(${i})">${t.done?'✓':''}</div><div class="tt">${t.text}</div><button onclick="D.tasks.splice(${i},1);save();rDash()" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:15px">×</button></div>`).join(''):'<p style="color:var(--t3);font-size:13px">Keine Aufgaben — super! 🎉</p>';
-  const el=document.getElementById('ex-list');
-  const ue=D.exams.filter(e=>new Date(e.date)>=new Date()).sort((a,b)=>new Date(a.date)-new Date(b.date));
-  el.innerHTML=ue.length?ue.slice(0,5).map(e=>{const diff=Math.ceil((new Date(e.date)-new Date())/864e5);return`<div class="tr"><div style="font-size:18px">${SM[e.subj]?.e||'📝'}</div><div style="flex:1"><div class="tt">${e.subj}</div><div style="font-size:11px;color:var(--t3)">${e.date}${e.note?' · '+e.note:''}</div></div><div style="font-size:11px;font-weight:700;color:${diff<=3?'var(--red)':'var(--grn)'}">${diff===0?'Heute':diff===1?'Morgen':'in '+diff+' T.'}</div></div>`}).join(''):'<p style="color:var(--t3);font-size:13px">Keine Prüfungen eingetragen</p>';
-  const ss=SUBS[U.grade]||SUBS['9'];
-  document.getElementById('quick-s').innerHTML=`<div style="display:flex;gap:9px;flex-wrap:wrap">${ss.slice(0,8).map(s=>`<button class="btn btn-sec" style="font-size:13px;gap:5px" onclick="fc.subj='${s}';goPage('flashcards')">${SM[s]?.e||'📚'} ${s}</button>`).join('')}</div>`;
-}
-function addTask(){const v=document.getElementById('ti').value.trim();if(!v)return;D.tasks.push({text:v,done:false});save();rDash();}
-function toggleTask(i){D.tasks[i].done=!D.tasks[i].done;if(D.tasks[i].done)addXP(10);save();rDash();}
-
-function rSubjects(){
-  const ss=SUBS[U.grade]||SUBS['9'];
-  document.getElementById('subj-grid').innerHTML=ss.map(s=>{const c=D.cards[s]||[],m=Math.round(c.filter(x=>x.lvl>=3).length/Math.max(c.length,1)*100),mt=SM[s]||{e:'📚',c:'#4f46e5'};return`<div class="scard" onclick="fc.subj='${s}';goPage('flashcards')"><div class="sic">${mt.e}</div><div class="sname">${s}</div><div style="font-size:11px;color:var(--t3);margin-bottom:7px">${c.length} Karten</div><div class="pb"><div class="pf" style="width:${m}%;background:${mt.c}"></div></div></div>`;}).join('');
+function toast(msg, dur = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
 }
 
-function initFC(){
-  const ss=SUBS[U.grade]||SUBS['9'];if(!fc.subj)fc.subj=ss[0];
-  document.getElementById('fc-pills').innerHTML=ss.map(s=>{const mt=SM[s]||{e:'📚',c:'#4f46e5'},act=fc.subj===s;return`<button class="fpill" style="background:${act?mt.c:'#fff'};color:${act?'#fff':'var(--t2)'};border-color:${act?mt.c:'var(--bdr)'}" onclick="fc.subj='${s}';fc.idx=0;fc.flip=false;initFC()">${mt.e} ${s}</button>`;}).join('');
-  loadFC();
-}
-function loadFC(){
-  if(!D.cards[fc.subj])D.cards[fc.subj]=[];
-  const cards=D.cards[fc.subj],card=cards[fc.idx],fce=document.getElementById('fc-card');
-  if(!fce)return;fce.classList.remove('flip');fc.flip=false;
-  if(!card){document.getElementById('fct-f').textContent=cards.length?'Alle Karten gelernt! 🎉':'Noch keine Karten — füge unten welche hinzu!';document.getElementById('fct-b').textContent='';document.getElementById('rate-row').style.display='none';document.getElementById('fc-ctr').textContent='';return;}
-  document.getElementById('fct-f').textContent=card.front;document.getElementById('fct-b').textContent=card.back;
-  document.getElementById('rate-row').style.display='none';
-  document.getElementById('fc-ctr').textContent=`${fc.idx+1} / ${cards.length} Karten`;
-}
-function flipFC(){const c=D.cards[fc.subj]||[];if(!c[fc.idx])return;fc.flip=!fc.flip;document.getElementById('fc-card').classList.toggle('flip',fc.flip);if(fc.flip)document.getElementById('rate-row').style.display='flex';}
-function rateFC(r){const c=D.cards[fc.subj]||[],card=c[fc.idx];if(!card)return;const iv=[1,3,7,14,30];card.lvl=Math.max(0,Math.min(4,(card.lvl||0)+(r>=3?1:-1)));card.due=Date.now()+iv[card.lvl]*864e5;D.correct+=(r>=3?1:0);D.total++;addXP(r*2);fc.idx=(fc.idx+1)%c.length;fc.flip=false;save();loadFC();}
-function addFC(){const f=document.getElementById('nf-f').value.trim(),b=document.getElementById('nf-b').value.trim();if(!f||!b){toast('Vorder- und Rückseite ausfüllen!');return;}if(!D.cards[fc.subj])D.cards[fc.subj]=[];D.cards[fc.subj].push({front:f,back:b,due:0,lvl:0});document.getElementById('nf-f').value='';document.getElementById('nf-b').value='';save();toast('Karte hinzugefügt! ✓');initFC();}
-async function genCards(){
-  const text=document.getElementById('gen-t').value.trim(),num=document.getElementById('gen-n').value;
-  if(!text){toast('Text eingeben!');return;}if(!U.apiKey){toast('API Key in Einstellungen eintragen!');return;}
-  toast('KI generiert Karten... ⏳');
-  try{const r=await apiCall([{role:'user',content:text}],`Erstelle ${num} Karteikarten aus diesem Text für Klasse ${U.grade}. NUR JSON: [{"front":"Frage?","back":"Antwort"}]`,1200);const p=JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');if(!p.length)throw 0;if(!D.cards[fc.subj])D.cards[fc.subj]=[];p.forEach(c=>D.cards[fc.subj].push({front:c.front,back:c.back,due:0,lvl:0}));save();toast(`${p.length} Karten erstellt! 🎉`);document.getElementById('gen-t').value='';initFC();}
-  catch(e){toast('❌ '+(e.message||'API Key prüfen!'));}
-}
-
-function initTutor(){
-  if(!msgs.length)msgs=[{r:'bot',t:`Hey ${U.name.split(' ')[0]}! Ich bin dein KI-Tutor. 🎓\n\nIch bin auf Klasse ${U.grade} eingestellt. Ich helfe dir beim Verstehen — ich gebe dir nicht einfach die Antwort, sondern führe dich selbst drauf!\n\nWelches Thema möchtest du angehen?`}];
-  rTutor();
-}
-function rTutor(){const el=document.getElementById('chat-msgs');if(!el)return;el.innerHTML=msgs.map(m=>`<div class="bubble ${m.r}">${m.t}</div>`).join('');el.scrollTop=el.scrollHeight;}
-async function sendMsg(){
-  const i=document.getElementById('ci'),t=i.value.trim();if(!t)return;
-  msgs.push({r:'user',t});i.value='';rTutor();
-  if(!U.apiKey){msgs.push({r:'bot',t:'Bitte trage deinen Claude API Key in den Einstellungen ein! ⚙️'});rTutor();return;}
-  const el=document.getElementById('chat-msgs');const ty=document.createElement('div');ty.className='bubble bot';ty.id='ty';ty.innerHTML='<span class="td"></span><span class="td"></span><span class="td"></span>';el.appendChild(ty);el.scrollTop=el.scrollHeight;
-  const sys=`Du bist ein einfühlsamer Tutor für Klasse ${U.grade} (${U.school}). Sokrates-Methode: stelle Gegenfragen, gib Hinweise, führe den Schüler zur Antwort. Antworte auf Deutsch, freundlich, max. 150 Wörter.`;
-  try{const h=msgs.slice(-8).map(m=>({role:m.r==='user'?'user':'assistant',content:m.t}));const r=await apiCall(h,sys,400);document.getElementById('ty')?.remove();msgs.push({r:'bot',t:r});addXP(5);}
-  catch(e){document.getElementById('ty')?.remove();msgs.push({r:'bot',t:'❌ '+(e.message||'API Key prüfen!')});}
-  rTutor();
-}
-
-let exN=5;
-function setExN(n,el){exN=n;el.closest('.og').querySelectorAll('.ob').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');}
-function initExam(){ex={qs:[],idx:0,secs:0,tmr:null,score:0,numQ:exN||5,subj:'',wrong:[]};}
-async function startExam(){
-  const subj=document.getElementById('ex-subj').value;
-  if(!U.apiKey){toast('API Key eintragen!');return;}
-  ex.subj=subj;ex.numQ=exN||5;ex.qs=[];ex.idx=0;ex.score=0;ex.wrong=[];ex.secs=ex.numQ*30;
-  document.getElementById('ex-setup').style.display='none';document.getElementById('ex-run').style.display='block';
-  document.getElementById('q-text').textContent='KI generiert Fragen... ⏳';document.getElementById('ans-grid').innerHTML='';
-  try{
-    const r=await apiCall([{role:'user',content:`${ex.numQ} ${subj} Klasse ${U.grade} Multiple Choice`}],`Erstelle ${ex.numQ} Multiple-Choice-Fragen zu "${subj}" Klasse ${U.grade}. NUR JSON: [{"q":"Frage?","opts":["A","B","C","D"],"correct":0}] — correct=Index 0-3.`,2000);
-    const p=JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');if(!p.length)throw 0;
-    ex.qs=p;showQ();ex.tmr=setInterval(tickExam,1000);
-  }catch(e){document.getElementById('q-text').textContent='❌ '+(e.message||'API Key prüfen!');}
-}
-function tickExam(){ex.secs--;const pct=ex.secs/(ex.numQ*30)*100;const el=document.getElementById('ex-tmr');if(el)el.textContent=Math.floor(ex.secs/60)+':'+(ex.secs%60+'').padStart(2,'0');const tb=document.getElementById('ex-tb');if(tb){tb.style.width=pct+'%';tb.style.background=pct>40?'var(--grn)':pct>15?'var(--amb)':'var(--red)';}if(ex.secs<=0)endExam();}
-function showQ(){const q=ex.qs[ex.idx];if(!q){endExam();return;}document.getElementById('ex-prog').textContent=`Frage ${ex.idx+1} / ${ex.qs.length}`;document.getElementById('q-text').textContent=q.q;document.getElementById('ans-grid').innerHTML=['A','B','C','D'].map((l,i)=>`<button class="ab" onclick="ansQ(${i})">${l}. ${q.opts[i]}</button>`).join('');}
-function ansQ(i){const q=ex.qs[ex.idx];document.querySelectorAll('.ab').forEach(b=>b.onclick=null);document.querySelectorAll('.ab')[i]?.classList.add(i===q.correct?'correct':'wrong');if(i!==q.correct&&document.querySelectorAll('.ab')[q.correct])document.querySelectorAll('.ab')[q.correct].classList.add('correct');if(i===q.correct){ex.score++;addXP(10);}else ex.wrong.push({q:q.q,yours:q.opts[i],correct:q.opts[q.correct]});setTimeout(()=>{ex.idx++;if(ex.idx>=ex.qs.length)endExam();else showQ();},1200);}
-function endExam(){clearInterval(ex.tmr);document.getElementById('ex-run').style.display='none';document.getElementById('ex-result').style.display='block';const pct=Math.round(ex.score/ex.qs.length*100);document.getElementById('res-emoji').textContent=pct>=90?'🏆':pct>=70?'😊':pct>=50?'😐':'😕';document.getElementById('res-score').textContent=`${ex.score} / ${ex.qs.length} richtig (${pct}%)`;document.getElementById('res-msg').textContent=pct>=90?'Hervorragend!':pct>=70?'Gut gemacht! Weiter üben!':pct>=50?'Nicht schlecht — wiederhole die schwierigen Themen.':'Keine Sorge — Übung macht den Meister!';addXP(pct);save();if(ex.wrong.length){document.getElementById('res-review').innerHTML=`<div class="card" style="margin-top:14px"><div class="card-h"><h3>❌ Falsche Antworten</h3></div><div class="card-b">${ex.wrong.map(w=>`<div style="padding:10px 0;border-bottom:1px solid var(--bdr)"><div style="font-weight:600;font-size:13px;margin-bottom:3px">${w.q}</div><div style="font-size:12px;color:var(--red)">Deine Antwort: ${w.yours}</div><div style="font-size:12px;color:var(--grn)">Richtig: ${w.correct}</div></div>`).join('')}</div></div>`;}}
-function resetExam(){document.getElementById('ex-setup').style.display='block';document.getElementById('ex-run').style.display='none';document.getElementById('ex-result').style.display='none';document.getElementById('res-review').innerHTML='';}
-
-function rPlan(){
-  const today=new Date(),days=['So','Mo','Di','Mi','Do','Fr','Sa'];
-  const mon=new Date(today);mon.setDate(today.getDate()-today.getDay()+1);
-  let wg='';for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const isT=d.toDateString()===today.toDateString(),ds=d.toISOString().split('T')[0],es=D.exams.filter(e=>e.date===ds);wg+=`<div class="db ${isT?'today':''}"><div class="dn">${days[d.getDay()]}</div><div class="dnum">${d.getDate()}</div>${es.map(e=>`<div class="dev">${SM[e.subj]?.e||'📝'}</div>`).join('')}</div>`;}
-  document.getElementById('week-grid').innerHTML=wg;
-  const ee=document.getElementById('ex-entries');
-  ee.innerHTML=D.exams.length?D.exams.sort((a,b)=>new Date(a.date)-new Date(b.date)).map((e,i)=>{const diff=Math.ceil((new Date(e.date)-new Date())/864e5);return`<div class="tr"><div style="font-size:18px">${SM[e.subj]?.e||'📝'}</div><div style="flex:1"><div class="tt">${e.subj}</div><div style="font-size:11px;color:var(--t3)">${e.date}${e.note?' · '+e.note:''}</div></div><div style="font-size:11px;font-weight:700;color:${diff<=3?'var(--red)':diff<=7?'var(--amb)':'var(--grn)'}">${diff<0?'Vorbei':diff===0?'Heute':'in '+diff+' T.'}</div><button onclick="D.exams.splice(${i},1);save();rPlan()" style="background:none;border:none;cursor:pointer;color:var(--t4);font-size:15px">×</button></div>`}).join(''):'<p style="color:var(--t3);font-size:13px">Noch keine Prüfungen eingetragen</p>';
-}
-function addExam(){const s=document.getElementById('nex-s').value,d=document.getElementById('nex-d').value,n=document.getElementById('nex-n').value.trim();if(!d){toast('Datum wählen!');return;}D.exams.push({subj:s,date:d,note:n});save();toast('Prüfung eingetragen! ✓');rPlan();document.getElementById('add-ex-f').style.display='none';}
-
-const PM={focus:{l:'Fokus',m:25,c:'var(--pri)'},short:{l:'Kurze Pause',m:5,c:'var(--grn)'},long:{l:'Lange Pause',m:15,c:'var(--amb)'}};
-function rPomo(){
-  const md=PM[po.mode],mm=String(Math.floor(po.secs/60)).padStart(2,'0'),ss=String(po.secs%60).padStart(2,'0');
-  document.getElementById('po-wrap').innerHTML=`<div class="pm-row">${Object.entries(PM).map(([k,v])=>`<button class="pmb ${po.mode===k?'act':''}" onclick="setPomoMode('${k}')">${v.l} ${v.m}m</button>`).join('')}</div><div class="pc-circ" style="border-color:${md.c}30;box-shadow:0 0 0 5px ${md.c}10"><div class="pt" style="color:${md.c}">${mm}:${ss}</div><div class="pl">${md.l}</div></div><div class="pb-row"><button class="btn ${po.running?'':'btn-pri'}" style="${po.running?'background:var(--red-l);color:var(--red)':''}" onclick="togglePomo()">${po.running?'⏸ Pause':'▶ Starten'}</button><button class="btn btn-sec" onclick="resetPomo()">↺ Reset</button></div><div style="margin-top:20px;font-size:13px;color:var(--t3)">🍅 ${po.sessions} Pomodoro${po.sessions!==1?'s':''} heute</div>`;
-}
-function setPomoMode(k){clearInterval(po.tmr);po.running=false;po.mode=k;po.secs=PM[k].m*60;rPomo();}
-function togglePomo(){if(po.running){clearInterval(po.tmr);po.running=false;}else{po.running=true;po.tmr=setInterval(()=>{po.secs--;if(po.secs<=0){clearInterval(po.tmr);po.running=false;if(po.mode==='focus'){po.sessions++;addXP(20);save();toast('🍅 Pomodoro! +20 XP');}else toast('☕ Pause vorbei!');po.mode=po.mode==='focus'?(po.sessions%4===0?'long':'short'):'focus';po.secs=PM[po.mode].m*60;}rPomo();},1000);}rPomo();}
-function resetPomo(){clearInterval(po.tmr);po.running=false;po.secs=PM[po.mode].m*60;rPomo();}
-
-function rParent(){const ch=U.children||[];document.getElementById('parent-c').innerHTML=ch.length?`<div class="g2">${ch.map(c=>`<div class="ccard"><div class="cname">${c.name}</div><div class="cmeta">Klasse ${c.grade}</div><div class="cstats"><div class="cst"><strong style="color:var(--amb)">${c.xp||0}</strong><span>XP</span></div><div class="cst"><strong style="color:var(--red)">${c.streak||0}</strong><span>Streak</span></div><div class="cst"><strong style="color:var(--grn)">—</strong><span>Letzte Aktivität</span></div></div></div>`).join('')}</div>`:`<div class="card"><div class="card-b" style="text-align:center;padding:32px;color:var(--t3)"><div style="font-size:40px;margin-bottom:12px">👶</div><h3 style="margin-bottom:7px">Noch keine Kinder angelegt</h3><p style="margin-bottom:16px">Lege ein Kind-Profil an um den Lernfortschritt zu sehen.</p><button class="btn btn-pri" onclick="goPage('children')">Kind hinzufügen</button></div></div>`;}
-function rChildren(){const ch=U.children||[];document.getElementById('cl').innerHTML=ch.length?ch.map((c,i)=>`<div class="card" style="margin-bottom:10px"><div class="card-h"><h3>${c.name} — Klasse ${c.grade}</h3><button onclick="U.children.splice(${i},1);save();rChildren()" style="background:var(--red-l);color:var(--red);border:none;padding:4px 9px;border-radius:6px;cursor:pointer;font-size:11px">Entfernen</button></div></div>`).join(''):'<p style="color:var(--t3);font-size:13px;margin-bottom:14px">Noch keine Kinder hinzugefügt</p>';}
-function addChild(){const n=document.getElementById('nc-n').value.trim(),g=document.getElementById('nc-g').value;if(!n){toast('Name eingeben!');return;}if(!U.children)U.children=[];U.children.push({id:'c'+Date.now(),name:n,grade:g,xp:0,streak:0,lastStudy:0});document.getElementById('nc-n').value='';save();toast('Kind hinzugefügt! ✓');rChildren();}
-
-function savePro(){U.name=document.getElementById('s-name').value.trim()||U.name;if(document.getElementById('s-gr'))U.grade=document.getElementById('s-gr').value;if(document.getElementById('s-sc'))U.school=document.getElementById('s-sc').value;save();toast('Gespeichert! ✓');renderSB();}
-function saveAK(){U.apiKey=document.getElementById('s-ak').value.trim();save();toast('API Key gespeichert! ✓');}
-
-function addXP(n){D.xp=(D.xp||0)+n;renderSB();}
-async function apiCall(messages,system,maxTokens=500){
-  const key=(U.apiKey||'').trim();
-  if(!key||!key.startsWith('sk-ant-'))throw new Error('Ungültiger API Key — muss mit sk-ant- beginnen');
-  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:maxTokens,system,messages})});
-  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error('Fehler '+r.status+': '+(e?.error?.message||r.statusText));}
-  return (await r.json()).content[0].text;
-}
-
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
-
-window.addEventListener('DOMContentLoaded',init);
+// Enter-Taste für Login
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('auth-overlay').style.display !== 'none') {
+    if (authMode === 'login') doLogin();
+  }
+});
 </script>
 </body>
 </html>

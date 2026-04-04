@@ -1,0 +1,105 @@
+/* StudyBuddy Pro — Design Tokens
+   Zentrale Stelle für alle Farben, Abstände, Schriften.
+   Änderungen hier wirken sich auf die gesamte App aus. */
+
+:root {
+  /* Primärfarben (Indigo/Violet — Vertrauen, Konzentration) */
+  --pri: #6366f1;
+  --pri-d: #4f46e5;
+  --pri-l: #e0e7ff;
+  --sec: #8b5cf6;
+
+  /* Akzentfarben */
+  --acc-green: #10b981;
+  --acc-yellow: #f59e0b;
+  --acc-red: #ef4444;
+  --acc-blue: #3b82f6;
+
+  /* Semantische Farben */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  /* Hintergründe */
+  --bg: #f8fafc;
+  --bg-2: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-sidebar: #1e1b4b;
+
+  /* Text */
+  --t1: #0f172a;
+  --t2: #475569;
+  --t3: #94a3b8;
+  --t-inv: #ffffff;
+
+  /* Rahmen */
+  --border: #e2e8f0;
+  --border-focus: #6366f1;
+
+  /* Schatten */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,.12);
+
+  /* Abstände */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* Typografie */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Fira Code', 'Cascadia Code', monospace;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 36px;
+
+  /* Radien */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-full: 9999px;
+
+  /* Animationen */
+  --ease: cubic-bezier(.4,0,.2,1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 350ms;
+
+  /* Layout */
+  --sidebar-w: 240px;
+  --header-h: 60px;
+  --content-max: 1100px;
+
+  /* Z-Index Schichten */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+  --z-overlay: 400;
+}
+
+/* Dunkel-Modus (vorbereitet für Phase 3) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a;
+    --bg-2: #1e293b;
+    --bg-card: #1e293b;
+    --border: #334155;
+    --t1: #f1f5f9;
+    --t2: #94a3b8;
+    --t3: #64748b;
+  }
+}
