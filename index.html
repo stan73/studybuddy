@@ -55,6 +55,7 @@ footer a:hover { color: white; }
         <a href="#faq">FAQ</a>
       </div>
       <div style="display:flex;gap:12px;">
+        <button class="btn btn-ghost btn-sm" onclick="openAuth('child')">👧 Kind-Login</button>
         <button class="btn btn-ghost btn-sm" onclick="openAuth('login')">Anmelden</button>
         <button class="btn btn-primary btn-sm" onclick="openAuth('register')">Kostenlos starten</button>
       </div>
@@ -285,18 +286,50 @@ function renderAuth() {
   const title = document.getElementById('auth-title');
   const body = document.getElementById('auth-body');
 
+  // Tab-Leiste oben
+  const tabs = `
+    <div style="display:flex;gap:4px;background:var(--bg-2);padding:4px;border-radius:var(--r-md);margin-bottom:20px;">
+      ${[['login','👤 Eltern/Schüler'],['child','👧 Als Kind'],['register','✏️ Registrieren']].map(([m,l])=>`
+        <button onclick="authMode='${m}';renderAuth()" style="flex:1;padding:8px;border-radius:var(--r-sm);border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
+          background:${authMode===m?'var(--bg-card)':'transparent'};
+          color:${authMode===m?'var(--pri)':'var(--t3)'};
+          box-shadow:${authMode===m?'var(--shadow-sm)':'none'};">${l}</button>`).join('')}
+    </div>`;
+
   if (authMode === 'login') {
-    title.textContent = 'Willkommen zurück 👋';
-    body.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:16px;">
+    title.textContent = 'Anmelden';
+    body.innerHTML = tabs + `
+      <div style="display:flex;flex-direction:column;gap:14px;">
         <div class="field"><label>E-Mail</label><input class="input" id="l-em" type="email" placeholder="deine@email.de" autocomplete="email"></div>
         <div class="field"><label>Passwort</label><input class="input" id="l-pw" type="password" placeholder="••••••••" autocomplete="current-password"></div>
-        <button class="btn btn-primary btn-full" onclick="doLogin()">Anmelden</button>
-        <div class="divider-text">oder</div>
-        <button class="btn btn-secondary btn-full" onclick="authMode='register';regStep=1;renderAuth()">Neues Konto erstellen</button>
-        <p style="text-align:center;font-size:12px;color:var(--t3);">Demo: beliebige E-Mail + Passwort eingeben</p>
+        <button class="btn btn-primary btn-full" onclick="doLogin()">Anmelden →</button>
+        <p style="text-align:center;font-size:12px;color:var(--t3);">Demo: beliebige E-Mail + Passwort</p>
       </div>`;
     setTimeout(() => document.getElementById('l-em')?.focus(), 50);
+
+  } else if (authMode === 'child') {
+    title.textContent = 'Kinder-Login 👧';
+    body.innerHTML = tabs + `
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="background:var(--pri-l);color:var(--pri-d);padding:12px 14px;border-radius:var(--r-md);font-size:13px;">
+          🔑 Dein Elternteil hat dir einen Namen und eine 4-stellige PIN gegeben.
+        </div>
+        <div class="field">
+          <label>E-Mail deines Elternteils</label>
+          <input class="input" id="k-em" type="email" placeholder="mama@email.de" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Dein Name</label>
+          <input class="input" id="k-name" placeholder="z.B. Max" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Deine PIN</label>
+          <input class="input" id="k-pin" type="password" maxlength="4" placeholder="••••" inputmode="numeric" autocomplete="off">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="doChildLogin()">Einloggen →</button>
+      </div>`;
+    setTimeout(() => document.getElementById('k-em')?.focus(), 50);
+
   } else {
     renderRegStep();
   }
@@ -442,6 +475,45 @@ async function doLogin() {
     toast('Demo-Modus wird gestartet…');
     sessionStorage.setItem('sb_demo_login', JSON.stringify({ email: em, role: 'student' }));
     setTimeout(() => { window.location.href = '/app.html'; }, 800);
+  }
+}
+
+async function doChildLogin() {
+  const em   = document.getElementById('k-em')?.value.trim();
+  const name = document.getElementById('k-name')?.value.trim();
+  const pin  = document.getElementById('k-pin')?.value.trim();
+
+  if (!em || !name || !pin) return toast('Alle Felder ausfüllen!');
+  if (!/^\d{4}$/.test(pin))  return toast('PIN muss 4 Ziffern haben!');
+
+  const btn = document.querySelector('#auth-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  if (sb) {
+    // Supabase RPC aufrufen
+    const { data, error } = await sb.rpc('auth_child', {
+      p_parent_email: em.toLowerCase(),
+      p_child_name:   name,
+      p_pin:          pin,
+    });
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Einloggen →'; }
+
+    if (error || !data) return toast('❌ Verbindungsfehler — bitte nochmal versuchen');
+    if (data.error)     return toast('❌ ' + data.error);
+
+    // Erfolg → Kind-Session speichern
+    sessionStorage.setItem('sb_child_session', JSON.stringify(data));
+    toast('👋 Willkommen, ' + data.child_name + '!');
+    setTimeout(() => { window.location.href = '/app.html'; }, 600);
+
+  } else {
+    // Demo-Fallback
+    sessionStorage.setItem('sb_child_session', JSON.stringify({
+      child_id: 'demo_child_' + Date.now(),
+      child_name: name, grade: 7, parent_email: em,
+    }));
+    setTimeout(() => { window.location.href = '/app.html'; }, 600);
   }
 }
 

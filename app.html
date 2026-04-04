@@ -132,21 +132,31 @@ const sb = (typeof window.supabase !== 'undefined')
 // ═══════════════════════════════════════════════════════════════════════════
 // STORAGE (sicher)
 // ═══════════════════════════════════════════════════════════════════════════
+// Datenschlüssel: pro User/Kind getrennt
+function _dataKey() { return 'sb_data_' + (U?.id || 'anon'); }
+
 function save() {
   try {
     localStorage.setItem('sb_user', JSON.stringify(U));
-    // API Key NICHT in localStorage!
-    const { ...dSave } = D;
-    localStorage.setItem('sb_data', JSON.stringify(dSave));
+    localStorage.setItem(_dataKey(), JSON.stringify(D));
   } catch(e) { console.warn('[Storage]', e.message); }
 }
 
 function load() {
   try {
     const u = localStorage.getItem('sb_user');
-    const d = localStorage.getItem('sb_data');
     if (u) U = JSON.parse(u);
+    // Daten erst laden wenn U bekannt (pro-User-Key)
+    const d = localStorage.getItem(_dataKey());
     if (d) D = { ...D, ...JSON.parse(d) };
+  } catch(e) {}
+}
+
+function loadDataForUser(userId) {
+  try {
+    const d = localStorage.getItem('sb_data_' + userId);
+    if (d) D = { ...{cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0}, ...JSON.parse(d) };
+    else   D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
   } catch(e) {}
 }
 
@@ -278,7 +288,32 @@ async function init() {
     }
   }
 
+  // 4. Kind-Session (PIN-Login von Landing-Page)
+  if (!U) {
+    const childSession = sessionStorage.getItem('sb_child_session');
+    if (childSession) {
+      sessionStorage.removeItem('sb_child_session');
+      const c = JSON.parse(childSession);
+      U = {
+        id: c.child_id,
+        email: '',
+        full_name: c.child_name,
+        role: 'student',
+        grade: c.grade || 9,
+        school: 'Gymnasium',
+        subscription: 'free',
+        children: [],
+        isChild: true,
+        parentEmail: c.parent_email,
+      };
+      save();
+    }
+  }
+
   if (!U) { window.location.href = '/'; return; }
+
+  // Daten für aktuellen User laden (pro-User-Key)
+  loadDataForUser(U.id);
 
   // Demo-Daten befüllen
   if (U.isDemo && !Object.keys(D.cards).length) populateDemoData();
@@ -333,7 +368,9 @@ async function doLogout() {
 // ═══════════════════════════════════════════════════════════════════════════
 function renderSidebar() {
   document.getElementById('sb-name').textContent = safe(U.full_name || U.email);
-  document.getElementById('sb-role').textContent = U.role === 'student' ? `Klasse ${U.grade}` : U.role === 'parent' ? 'Elternteil' : 'Lehrer/in';
+  document.getElementById('sb-role').textContent = U.isChild
+    ? `Klasse ${U.grade} · Kind-Account`
+    : U.role === 'student' ? `Klasse ${U.grade}` : U.role === 'parent' ? 'Elternteil' : 'Lehrer/in';
   document.getElementById('sb-avatar').textContent = (U.full_name || U.email || '?')[0].toUpperCase();
   updateXP();
 
@@ -1047,41 +1084,118 @@ function parentDash(el) {
 function childrenPage(el) {
   const children = U.children||[];
   el.innerHTML = `
-    <div class="page-header"><h1>👧 Kinder</h1><p>${children.length} Kinder in deiner Familie</p></div>
+    <div class="page-header">
+      <h1>👧 Kinder</h1>
+      <p>${children.length} Kinder · Jedes Kind meldet sich mit Name + PIN an</p>
+    </div>
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><div class="card-title">➕ Kind hinzufügen</div></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
-          <div class="field"><label>Name</label><input class="input" id="c-name" placeholder="Vorname des Kindes"></div>
-          <div class="field"><label>Klasse</label><select class="input" id="c-grade">${CFG.GRADES.map(g=>`<option value="${g}">${g}. Klasse</option>`).join('')}</select></div>
-          <button class="btn btn-primary btn-sm" onclick="addChild()">Hinzufügen</button>
+          <div class="field"><label>Vorname</label><input class="input" id="c-name" placeholder="z.B. Max"></div>
+          <div class="field"><label>Klasse</label>
+            <select class="input" id="c-grade">${CFG.GRADES.map(g=>`<option value="${g}">${g}. Klasse</option>`).join('')}</select>
+          </div>
+          <div class="field">
+            <label>PIN (4 Stellen) <span style="color:var(--t3);font-weight:400;font-size:11px;">— damit meldet sich das Kind an</span></label>
+            <input class="input" id="c-pin" type="text" maxlength="4" pattern="[0-9]{4}" placeholder="z.B. 1234" inputmode="numeric">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addChildWithPin()">Kind hinzufügen</button>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--pri-l);border-radius:var(--r-md);font-size:12px;color:var(--pri-d);">
+          <strong>So loggt sich das Kind ein:</strong><br>
+          1. Auf der Startseite „Als Kind einloggen" klicken<br>
+          2. Deine E-Mail eingeben: <strong>${safe(U.email)}</strong><br>
+          3. Namen + PIN eingeben → fertig!
         </div>
       </div>
-      <div>
-        ${children.map(c=>`
-          <div class="card" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--sec));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;">${(c.name||'K')[0]}</div>
-              <div><div style="font-weight:600;">${safe(c.name)}</div><div style="font-size:13px;color:var(--t3);">Klasse ${c.grade}</div></div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${children.length ? children.map(c=>{
+          const childData = (() => { try { return JSON.parse(localStorage.getItem('sb_data_'+c.id)||'{}'); } catch{return {};} })();
+          return `
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--sec));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:18px;">${(c.name||'K')[0]}</div>
+                <div>
+                  <div style="font-weight:700;">${safe(c.name)}</div>
+                  <div style="font-size:12px;color:var(--t3);">Klasse ${c.grade} · PIN: ${c.pin ? '••••' : '<span style="color:var(--warning)">nicht gesetzt</span>'}</div>
+                </div>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="removeChild('${c.id}')">✕</button>
             </div>
-            <button class="btn btn-danger btn-sm" onclick="removeChild('${c.id}')">Entfernen</button>
-          </div>`).join('')||'<div class="card" style="text-align:center;padding:24px;color:var(--t3);">Noch keine Kinder</div>'}
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+              <div style="text-align:center;background:var(--bg-2);padding:8px;border-radius:var(--r-md);">
+                <div style="font-size:18px;font-weight:800;color:var(--pri);">${childData.xp||0}</div>
+                <div style="font-size:10px;color:var(--t3);">XP</div>
+              </div>
+              <div style="text-align:center;background:var(--bg-2);padding:8px;border-radius:var(--r-md);">
+                <div style="font-size:18px;font-weight:800;color:var(--acc-yellow);">🔥${childData.streak||0}</div>
+                <div style="font-size:10px;color:var(--t3);">Streak</div>
+              </div>
+              <div style="text-align:center;background:var(--bg-2);padding:8px;border-radius:var(--r-md);">
+                <div style="font-size:18px;font-weight:800;color:var(--acc-green);">${Object.values(childData.cards||{}).flat().length}</div>
+                <div style="font-size:10px;color:var(--t3);">Karten</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input class="input" id="pin-${c.id}" type="text" maxlength="4" placeholder="Neue PIN" inputmode="numeric" style="flex:1;">
+              <button class="btn btn-secondary btn-sm" onclick="updatePin('${c.id}')">PIN ändern</button>
+            </div>
+          </div>`;}).join('')
+        : '<div class="card" style="text-align:center;padding:32px;color:var(--t3);">Noch keine Kinder angelegt</div>'}
       </div>
     </div>`;
 }
 
-function addChild() {
-  const name = document.getElementById('c-name')?.value.trim();
+async function addChildWithPin() {
+  const name  = document.getElementById('c-name')?.value.trim();
   const grade = document.getElementById('c-grade')?.value;
-  if (!name) return toast('Name eingeben!');
-  U.children = [...(U.children||[]), {id:'ch'+Date.now(),name,grade}];
-  save(); toast('Kind hinzugefügt!');
+  const pin   = document.getElementById('c-pin')?.value.trim();
+  if (!name)              return toast('Name eingeben!');
+  if (!/^\d{4}$/.test(pin)) return toast('PIN muss genau 4 Ziffern haben!');
+
+  const child = { id: 'ch' + Date.now(), name, grade, pin };
+
+  // In Supabase speichern
+  if (sb && !U.isDemo) {
+    const { error } = await sb.from('children').insert({
+      parent_id: U.id, name, grade: Number(grade), pin,
+    });
+    if (error) { toast('❌ ' + error.message); return; }
+    // ID von Supabase holen
+    const { data } = await sb.from('children').select('id').eq('parent_id', U.id).eq('name', name).single();
+    if (data) child.id = data.id;
+  }
+
+  U.children = [...(U.children||[]), child];
+  save();
+  toast(`✅ ${name} hinzugefügt! PIN: ${pin}`);
+  document.getElementById('c-name').value='';
+  document.getElementById('c-pin').value='';
+  childrenPage(document.getElementById('content'));
+}
+
+async function updatePin(childId) {
+  const pin = document.getElementById('pin-' + childId)?.value.trim();
+  if (!/^\d{4}$/.test(pin)) return toast('PIN muss 4 Ziffern haben!');
+
+  U.children = (U.children||[]).map(c => c.id === childId ? {...c, pin} : c);
+
+  if (sb && !U.isDemo) {
+    await sb.from('children').update({ pin }).eq('id', childId).eq('parent_id', U.id);
+  }
+  save();
+  toast('✅ PIN aktualisiert!');
   childrenPage(document.getElementById('content'));
 }
 
 function removeChild(id) {
-  if (!confirm('Kind wirklich entfernen?')) return;
-  U.children = (U.children||[]).filter(c=>c.id!==id); save();
+  if (!confirm('Kind wirklich entfernen? Alle Lernfortschritte werden gelöscht.')) return;
+  U.children = (U.children||[]).filter(c=>c.id!==id);
+  localStorage.removeItem('sb_data_' + id);
+  if (sb && !U.isDemo) sb.from('children').delete().eq('id', id).eq('parent_id', U.id);
+  save();
   childrenPage(document.getElementById('content'));
 }
 
