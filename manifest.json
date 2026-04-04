@@ -1,0 +1,43 @@
+{
+  "name": "StudyBuddy Pro",
+  "short_name": "StudyBuddy",
+  "description": "KI-gestützte Lernplattform für Klassen 5–13",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "lang": "de",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "KI-Tutor",
+      "short_name": "Tutor",
+      "description": "Direkt zum KI-Lernassistenten",
+      "url": "/app.html#tutor",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Karteikarten",
+      "short_name": "Karten",
+      "description": "Karteikarten lernen",
+      "url": "/app.html#flashcards",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

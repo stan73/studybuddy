@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6366f1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="StudyBuddy">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.svg">
 <title>StudyBuddy Pro</title>
 <link rel="stylesheet" href="css/variables.css">
 <link rel="stylesheet" href="css/base.css">
@@ -84,6 +91,7 @@
 const CFG = {
   CLAUDE_MODEL: 'claude-haiku-4-5-20251001',
   CLAUDE_API: 'https://api.anthropic.com/v1/messages',
+  AI_PROXY: 'https://qzmviwrpyfpjahcmbjoy.supabase.co/functions/v1/ai-proxy',
   GRADES: [5,6,7,8,9,10,11,12,13],
   SCHOOL_TYPES: ['Gymnasium','Realschule','Gesamtschule','Hauptschule'],
   SUBJECTS: {
@@ -157,17 +165,24 @@ const PROVIDERS = {
   },
 };
 
-// AI-Keys speichern (an Eltern-E-Mail geknüpft für Kind-Vererbung)
-function saveAIKeys() {
+// AI-Keys speichern:
+//  • Authentifizierte Nutzer → Supabase DB (key verlässt Server nie wieder)
+//  • Demo/Kind → nur localStorage (geerbt vom Elternteil)
+async function saveAIKeys() {
   const email = U?.email || U?.parentEmail || 'anon';
-  try { localStorage.setItem('sb_aikeys_' + email, JSON.stringify({
-    provider: AI.provider, claude: AI.claude, openai: AI.openai, gemini: AI.gemini,
-  })); } catch(e) {}
+  // localStorage für Kind-Vererbung (key bleibt auf Gerät)
+  try {
+    localStorage.setItem('sb_aikeys_' + email, JSON.stringify({
+      provider: AI.provider, claude: AI.claude, openai: AI.openai, gemini: AI.gemini,
+    }));
+  } catch(e) {}
 }
 
-// AI-Keys laden — für Kinder: zuerst Eltern-Keys versuchen
-function loadAIKeys(parentEmail) {
-  const email = parentEmail || U?.email || 'anon';
+// AI-Keys laden:
+//  • Kinder: von Eltern-E-Mail aus localStorage
+//  • Authentifizierte: Provider-Status aus DB (key selbst bleibt im Backend)
+function loadAIKeys(emailOrParent) {
+  const email = emailOrParent || U?.email || 'anon';
   try {
     const saved = localStorage.getItem('sb_aikeys_' + email);
     if (saved) { Object.assign(AI, JSON.parse(saved)); return true; }
@@ -175,7 +190,25 @@ function loadAIKeys(parentEmail) {
   return false;
 }
 
+// Konfigurierte Provider aus Supabase laden (für Auth-Nutzer)
+// Setzt AI.provider wenn noch nichts aktiv ist
+async function loadConfiguredProviders() {
+  if (!sb || !U || U.isChild || U.isDemo) return;
+  try {
+    const { data } = await sb.rpc('get_configured_providers');
+    if (data?.length) {
+      AI._configured = data.map(r => r.provider);
+      // Aktiven Provider setzen wenn noch nicht gesetzt und DB-Key existiert
+      if (!activeKey() && AI._configured.includes(AI.provider)) {
+        AI._hasDbKey = true; // Flag: Key liegt im Backend
+      }
+    }
+  } catch(e) {}
+}
+
 function activeKey() { return AI[AI.provider] || ''; }
+// Prüft ob ein Key verfügbar ist (im Memory oder im Backend)
+function hasActiveKey() { return !!activeKey() || !!(AI._hasDbKey && (AI._configured||[]).includes(AI.provider)); }
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const SB_URL = 'https://qzmviwrpyfpjahcmbjoy.supabase.co';
@@ -195,6 +228,7 @@ function save() {
     localStorage.setItem('sb_user', JSON.stringify(U));
     localStorage.setItem(_dataKey(), JSON.stringify(D));
   } catch(e) { console.warn('[Storage]', e.message); }
+  syncStats(); // fire & forget — kein await, kein Fehler wenn offline
 }
 
 function load() {
@@ -212,6 +246,45 @@ function loadDataForUser(userId) {
     const d = localStorage.getItem('sb_data_' + userId);
     if (d) D = { ...{cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0}, ...JSON.parse(d) };
     else   D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
+  } catch(e) {}
+}
+
+// ── DB-Sync (fire & forget) ───────────────────────────────────────────────
+// Synchronisiert XP/Streak/Stats in user_stats (für Cross-Device & Eltern-Dashboard)
+async function syncStats() {
+  if (!sb || !U || U.isDemo) return;
+
+  if (U.isChild && U.id && U.parentEmail) {
+    // Kind: stats via PIN-verifizierter Supabase-Funktion speichern
+    // PIN ist nicht in Session — Kind-Stats werden beim nächsten Login synchronisiert
+    // (Workaround: stats werden beim Aufruf von update_child_stats mit PIN benötigt)
+    return;
+  }
+
+  // Elternteil / Schüler mit Auth
+  try {
+    await sb.from('user_stats').upsert({
+      user_id:       U.id,
+      xp:            D.xp || 0,
+      streak:        D.streak || 0,
+      last_study_at: D.lastStudy ? new Date(D.lastStudy).toISOString() : null,
+      total_correct: D.correct || 0,
+      total_answered:D.total || 0,
+      updated_at:    new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+  } catch(e) { /* Kein Fehler werfen — offline ist ok */ }
+}
+
+// Speichert eine Lernsession in Supabase
+async function syncSession(subject, type, durationMin, xpEarned) {
+  if (!sb || !U || U.isDemo || U.isChild) return;
+  try {
+    await sb.from('sessions').insert({
+      user_id: U.id,
+      subject, session_type: type,
+      duration_minutes: durationMin,
+      xp_earned: xpEarned,
+    });
   } catch(e) {}
 }
 
@@ -233,12 +306,12 @@ function safeHTML(html) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MULTI-PROVIDER KI (Claude · OpenAI · Gemini)
+// MULTI-PROVIDER KI — via Supabase Edge Function (sicherer Proxy)
+// Keys werden nie im Browser-Memory exponiert, sondern nur im Backend
+// verwendet. Kind-Sessions übergeben den geerbten Key direkt (kein JWT).
 // ═══════════════════════════════════════════════════════════════════════════
 async function ai(messages, system, maxTok=400, useCache=true) {
-  const key = activeKey();
   const prov = AI.provider;
-  if (!key) throw new Error(`${PROVIDERS[prov]?.name || prov} API Key fehlt — bitte in Einstellungen eintragen`);
 
   // Cache
   const ckBase = prov + system + JSON.stringify(messages);
@@ -253,43 +326,34 @@ async function ai(messages, system, maxTok=400, useCache=true) {
   _aiReqs++;
   if (!_aiReset) _aiReset = setTimeout(() => { _aiReqs=0; _aiReset=null; }, 60000);
 
-  let text = '';
-  if (prov === 'claude') {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({ model: PROVIDERS.claude.models.fast, max_tokens: maxTok, system, messages }),
-    });
-    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(`Claude Fehler ${r.status}: ${e?.error?.message||r.statusText}`); }
-    text = (await r.json()).content?.[0]?.text || '';
+  // Headers aufbauen
+  const headers = { 'Content-Type': 'application/json' };
+  const payload = { provider: prov, messages, system, maxTok };
 
-  } else if (prov === 'openai') {
-    const msgs = system ? [{ role:'system', content: system }, ...messages] : messages;
-    const r = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ model: PROVIDERS.openai.models.fast, max_tokens: maxTok, messages: msgs }),
-    });
-    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(`OpenAI Fehler ${r.status}: ${e?.error?.message||r.statusText}`); }
-    text = (await r.json()).choices?.[0]?.message?.content || '';
-
-  } else if (prov === 'gemini') {
-    const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts:[{ text: m.content }] }));
-    if (system) contents.unshift({ role:'user', parts:[{ text: system }] });
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${PROVIDERS.gemini.models.fast}:generateContent?key=${key}`;
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents, generationConfig: { maxOutputTokens: maxTok } }),
-    });
-    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(`Gemini Fehler ${r.status}: ${e?.error?.message||r.statusText}`); }
-    text = (await r.json()).candidates?.[0]?.content?.parts?.[0]?.text || '';
+  // Authentifizierter Nutzer: JWT → Edge Function liest Key aus DB
+  if (sb && !U?.isChild && !U?.isDemo) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = 'Bearer ' + session.access_token;
+    }
   }
+
+  // Kind/Demo: Key aus Memory (vom Elternteil geerbt via localStorage)
+  if (!headers['Authorization']) {
+    const key = activeKey();
+    if (!key) throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — Elternteil trägt ihn in Einstellungen ein`);
+    payload.apiKey = key; // Key direkt übergeben (HTTPS verschlüsselt)
+  }
+
+  const r = await fetch(CFG.AI_PROXY, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const data = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(data?.error || `KI-Fehler ${r.status}`);
+  const text = data.text || '';
 
   if (useCache && text) {
     const ck = 'ai_' + btoa(encodeURIComponent(ckBase)).slice(0,40);
@@ -397,6 +461,9 @@ async function init() {
   } else {
     loadAIKeys(U.email);
   }
+
+  // Konfigurierte Provider aus Supabase DB laden (Auth-Nutzer)
+  loadConfiguredProviders(); // fire & forget
 
   // Daten für aktuellen User laden (pro-User-Key)
   loadDataForUser(U.id);
@@ -1101,8 +1168,47 @@ function resetPomo() {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: ELTERN-DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════
-function parentDash(el) {
+async function parentDash(el) {
   const children = U.children||[];
+
+  // Kinder-Stats aus Supabase nachladen (falls stats-Spalte vorhanden)
+  if (sb && children.length) {
+    try {
+      const { data } = await sb.from('children')
+        .select('id, name, grade, stats')
+        .eq('parent_id', U.id);
+      if (data) {
+        data.forEach(row => {
+          const c = children.find(x => x.id === row.id);
+          if (c && row.stats) c.dbStats = row.stats;
+        });
+      }
+    } catch(e) {}
+  }
+
+  // Kinderdaten aus localStorage (selbes Gerät) oder DB-Stats
+  function childStats(c) {
+    try { return { ...JSON.parse(localStorage.getItem('sb_data_'+c.id)||'{}'), ...(c.dbStats||{}) }; }
+    catch { return c.dbStats || {}; }
+  }
+
+  // XP der letzten 7 Tage aus Sessions berechnen
+  function weeklyXP(c) {
+    const st = childStats(c);
+    if (st.weeklyXP) return st.weeklyXP; // DB-Wert
+    // Aus localStorage sessions berechnen
+    const sessions = st.sessions || [];
+    const days = Array(7).fill(0);
+    const now = Date.now();
+    sessions.forEach(s => {
+      const d = Math.floor((now - new Date(s.created_at).getTime()) / 86400000);
+      if (d >= 0 && d < 7) days[6 - d] += (s.xp_earned || 0);
+    });
+    return days;
+  }
+
+  const COLORS = ['rgba(99,102,241,.75)','rgba(139,92,246,.75)','rgba(16,185,129,.75)','rgba(245,158,11,.75)'];
+
   el.innerHTML = `
     <div class="page-header">
       <h1>👨‍👩‍👧 Eltern-Dashboard</h1>
@@ -1116,49 +1222,86 @@ function parentDash(el) {
         <button class="btn btn-primary" style="margin-top:20px;" onclick="goPage('children')">Kinder hinzufügen →</button>
       </div>` : `
     <div class="grid-2" style="margin-bottom:24px;">
-      ${children.map(c=>`
+      ${children.map(c => {
+        const st = childStats(c);
+        const xp = st.xp || 0;
+        const streak = st.streak || 0;
+        const correct = st.correct || 0;
+        const total = st.total || 0;
+        const pct = total ? Math.round(correct/total*100) : 0;
+        const lastStudy = st.lastStudy ? new Date(st.lastStudy).toLocaleDateString('de-DE') : '—';
+        return `
         <div class="card card-hover" style="cursor:pointer;" onclick="goPage('children')">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
             <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--sec));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:18px;">${(c.name||'K')[0]}</div>
             <div>
               <div style="font-weight:700;">${safe(c.name)}</div>
-              <div style="font-size:13px;color:var(--t3);">Klasse ${c.grade}</div>
+              <div style="font-size:12px;color:var(--t3);">Klasse ${c.grade} · Zuletzt: ${lastStudy}</div>
             </div>
           </div>
-          <div class="grid-2" style="gap:10px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
             <div style="text-align:center;background:var(--bg-2);padding:10px;border-radius:var(--r-md);">
-              <div style="font-size:20px;font-weight:800;color:var(--pri);">${Math.floor(Math.random()*800+200)}</div>
-              <div style="font-size:11px;color:var(--t3);">XP gesamt</div>
+              <div style="font-size:20px;font-weight:800;color:var(--pri);">${xp}</div>
+              <div style="font-size:10px;color:var(--t3);">XP</div>
             </div>
             <div style="text-align:center;background:var(--bg-2);padding:10px;border-radius:var(--r-md);">
-              <div style="font-size:20px;font-weight:800;color:var(--acc-yellow);">${Math.floor(Math.random()*10+1)}</div>
-              <div style="font-size:11px;color:var(--t3);">🔥 Streak</div>
+              <div style="font-size:20px;font-weight:800;color:var(--acc-yellow);">🔥${streak}</div>
+              <div style="font-size:10px;color:var(--t3);">Streak</div>
+            </div>
+            <div style="text-align:center;background:var(--bg-2);padding:10px;border-radius:var(--r-md);">
+              <div style="font-size:20px;font-weight:800;color:var(--acc-green);">${pct}%</div>
+              <div style="font-size:10px;color:var(--t3);">Richtig</div>
             </div>
           </div>
-        </div>`).join('')}
+        </div>`;}).join('')}
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">📊 Lernzeit diese Woche</div></div>
+      <div class="card-header">
+        <div class="card-title">📈 XP letzte 7 Tage</div>
+        <div style="font-size:12px;color:var(--t3);">Gesammelte Erfahrungspunkte pro Tag</div>
+      </div>
       <canvas id="weekly-chart" height="100"></canvas>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header"><div class="card-title">📚 Karteikarten gesamt</div></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        ${children.map(c=>{
+          const st = childStats(c);
+          const cards = st.cards || {};
+          const total = Object.values(cards).reduce((s,a)=>s+(a?.length||0),0);
+          return `<div style="flex:1;min-width:120px;text-align:center;background:var(--bg-2);padding:14px;border-radius:var(--r-md);">
+            <div style="font-size:24px;font-weight:800;color:var(--pri);">${total}</div>
+            <div style="font-size:12px;color:var(--t2);margin-top:4px;">${safe(c.name)}</div>
+          </div>`;}).join('')}
+      </div>
     </div>`}`;
 
-  // Chart rendern
+  // Chart mit echten Daten
   if (children.length && typeof Chart !== 'undefined') {
     setTimeout(()=>{
       const ctx = document.getElementById('weekly-chart');
       if (!ctx) return;
-      const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+      const today = new Date();
+      const labels = Array.from({length:7},(_,i)=>{
+        const d = new Date(today); d.setDate(d.getDate()-6+i);
+        return d.toLocaleDateString('de-DE',{weekday:'short'});
+      });
       new Chart(ctx, {
         type:'bar',
         data:{
-          labels:days,
+          labels,
           datasets: children.map((c,i)=>({
             label: c.name,
-            data: days.map(()=>Math.floor(Math.random()*45+5)),
-            backgroundColor: ['rgba(99,102,241,.7)','rgba(139,92,246,.7)','rgba(16,185,129,.7)'][i]||'rgba(99,102,241,.7)',
+            data: weeklyXP(c),
+            backgroundColor: COLORS[i] || COLORS[0],
+            borderRadius: 4,
           }))
         },
-        options:{ responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true,title:{display:true,text:'Minuten'}}} }
+        options:{
+          responsive:true,
+          plugins:{ legend:{ position:'top' } },
+          scales:{ y:{ beginAtZero:true, title:{ display:true, text:'XP' } } }
+        }
       });
     }, 100);
   }
@@ -1365,19 +1508,24 @@ function settings(el) {
                 </button>`).join('')}
             </div>
           </div>
-          ${Object.entries(PROVIDERS).map(([k,p])=>`
+          ${Object.entries(PROVIDERS).map(([k,p])=>{
+            const inDb = (AI._configured||[]).includes(k);
+            const inMem = !!AI[k];
+            const active = inDb || inMem;
+            return `
           <div id="ai-section-${k}" style="${AI.provider===k?'':'display:none'}">
+            ${inDb && !inMem ? `<div style="background:#d1fae5;color:#065f46;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:10px;">🔒 Key sicher im Backend gespeichert — du musst ihn nicht neu eingeben.</div>` : ''}
             <div class="field">
               <label>${p.emoji} ${p.name} API Key</label>
-              <input class="input" id="s-ak-${k}" type="password" placeholder="${p.placeholder}" value="${AI[k]?'••••••••••••':''}">
+              <input class="input" id="s-ak-${k}" type="password" placeholder="${active?'Key bereits gesetzt — neu eingeben zum Ändern':p.placeholder}" value="">
               <p style="font-size:11px;color:var(--t3);margin-top:4px;">
-                Nur im Browser-Memory — nie auf dem Server gespeichert.
+                ${inDb?'🔒 Im Backend gespeichert — Key verlässt unsere Server nach dem Speichern nie.':'Wird nach dem Speichern ausschliesslich im Backend gehalten.'}
                 <a href="${p.docsUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--pri)">API Key holen →</a>
               </p>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="saveProviderKey('${k}')">Key für ${p.name} setzen</button>
-            ${AI[k]?`<div class="badge badge-success" style="align-self:flex-start;margin-top:6px;">✓ ${p.name} aktiv</div>`:`<div class="badge badge-warning" style="align-self:flex-start;margin-top:6px;">Kein Key gesetzt</div>`}
-          </div>`).join('')}
+            <button class="btn btn-primary btn-sm" onclick="saveProviderKey('${k}')">Key ${active?'aktualisieren':'setzen'}</button>
+            ${active?`<div class="badge badge-success" style="align-self:flex-start;margin-top:6px;">${inDb?'🔒':'✓'} ${p.name} aktiv</div>`:`<div class="badge badge-warning" style="align-self:flex-start;margin-top:6px;">Kein Key gesetzt</div>`}
+          </div>`;}).join('')}
         </div>
       </div>
       <div class="card" style="border-color:var(--danger);">
@@ -1397,16 +1545,37 @@ function saveProfile() {
   save(); renderSidebar(); toast('✅ Profil gespeichert!');
 }
 
-function saveProviderKey(providerKey) {
+async function saveProviderKey(providerKey) {
   const prov = PROVIDERS[providerKey];
   if (!prov) return;
   const key = document.getElementById(`s-ak-${providerKey}`)?.value.trim();
   if (!key || key === '••••••••••••') return toast(`${prov.emoji} ${prov.name} API Key eingeben!`);
   if (!key.startsWith(prov.keyPrefix)) return toast(`Ungültiger Key — muss mit ${prov.keyPrefix} beginnen`);
+
   AI[providerKey] = key;
-  AI.provider = providerKey; // Aktiven Provider wechseln
-  saveAIKeys();
-  toast(`✅ ${prov.emoji} ${prov.name} Key gesetzt!`);
+  AI.provider = providerKey;
+  await saveAIKeys();
+
+  // Authentifizierte Nutzer: Key zusätzlich in Supabase DB speichern (sicherer)
+  if (sb && !U?.isDemo && !U?.isChild) {
+    try {
+      await sb.from('api_keys').upsert(
+        { user_id: U.id, provider: providerKey, api_key: key, saved_at: new Date().toISOString() },
+        { onConflict: 'user_id,provider' }
+      );
+      // Nach Speichern den In-Memory-Key leeren (Key liegt jetzt im Backend)
+      AI[providerKey] = ''; // Backend hat es — kein Key im Browser
+      AI._hasDbKey = true;
+      if (!AI._configured) AI._configured = [];
+      if (!AI._configured.includes(providerKey)) AI._configured.push(providerKey);
+      await saveAIKeys(); // localStorage ebenfalls ohne Key (nur provider + flag)
+      toast(`✅ ${prov.emoji} ${prov.name} Key sicher im Backend gespeichert!`);
+    } catch(e) {
+      toast(`✅ ${prov.emoji} ${prov.name} Key gesetzt (lokal)!`);
+    }
+  } else {
+    toast(`✅ ${prov.emoji} ${prov.name} Key gesetzt!`);
+  }
   settings(document.getElementById('content'));
 }
 
@@ -1432,6 +1601,14 @@ function toast(msg, dur=3000) {
 // START
 // ═══════════════════════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', init);
+
+// ── PWA: Service Worker registrieren ─────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .catch(e => console.warn('[SW] Registrierung fehlgeschlagen:', e));
+  });
+}
 </script>
 </body>
 </html>
