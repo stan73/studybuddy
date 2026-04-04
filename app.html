@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="css/layout.css">
 <!-- DOMPurify XSS-Schutz -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" integrity="sha512-tzcDOiFWAHGK9yCLjmCQbJFsAA2oOGULlNqAFl5VgZbdnMkInVqb/n1Ln9OVl3CiQpGjJwRc9jJwOHKd5f8g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Supabase JS Client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <!-- Chart.js für Eltern-Dashboard -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
@@ -120,6 +122,13 @@ let _aiReqs = 0;
 let _aiReset = null;
 const _aiCache = new Map();
 
+// ── Supabase ─────────────────────────────────────────────────────────────────
+const SB_URL = 'https://qzmviwrpyfpjahcmbjoy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXZpd3JweWZwamFoY21iam95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTg5NTcsImV4cCI6MjA5MDg3NDk1N30.BT2iRuWdI33yigziU3kicb-GQT14IHe3WU8JxFlQG0M';
+const sb = (typeof window.supabase !== 'undefined')
+  ? window.supabase.createClient(SB_URL, SB_KEY)
+  : null;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // STORAGE (sicher)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -203,23 +212,65 @@ async function ai(messages, system, maxTok=400, useCache=true) {
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH & INIT
 // ═══════════════════════════════════════════════════════════════════════════
-function init() {
+async function init() {
   load();
 
-  // Session von Landing-Page prüfen
-  const loginData = sessionStorage.getItem('sb_demo_login');
-  if (loginData) {
-    sessionStorage.removeItem('sb_demo_login');
-    const d = JSON.parse(loginData);
-    if (!U) {
+  // 1. Supabase-Session prüfen (echter Login)
+  if (sb) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      // Profil aus DB laden
+      const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+      // Kinder laden falls Elternteil
+      let children = [];
+      if (profile?.role === 'parent') {
+        const { data: ch } = await sb.from('children').select('*').eq('parent_id', session.user.id);
+        children = ch || [];
+      }
       U = {
-        id: 'demo_' + Date.now(),
-        email: d.email,
-        full_name: d.name || (d.role === 'parent' ? 'Demo Elternteil' : d.role === 'teacher' ? 'Demo Lehrer' : 'Demo Schüler'),
-        role: d.role || 'student',
-        grade: d.grade || '9',
-        school: d.school || 'Gymnasium',
-        subscription: 'free',
+        id: session.user.id,
+        email: session.user.email,
+        full_name: profile?.full_name || session.user.email,
+        role: profile?.role || 'student',
+        grade: profile?.grade || 9,
+        school: profile?.school || 'Gymnasium',
+        subscription: profile?.subscription || 'free',
+        children,
+        isDemo: false,
+      };
+      save();
+    }
+  }
+
+  // 2. sessionStorage aus frischem Login (Weiterleitung von index.html)
+  if (!U) {
+    const sbSession = sessionStorage.getItem('sb_session');
+    if (sbSession) {
+      sessionStorage.removeItem('sb_session');
+      const { user, profile } = JSON.parse(sbSession);
+      U = {
+        id: user.id, email: user.email,
+        full_name: profile?.full_name || user.user_metadata?.full_name || user.email,
+        role: profile?.role || user.user_metadata?.role || 'student',
+        grade: profile?.grade || user.user_metadata?.grade || 9,
+        school: profile?.school || user.user_metadata?.school || 'Gymnasium',
+        subscription: 'free', children: [], isDemo: false,
+      };
+      save();
+    }
+  }
+
+  // 3. Demo-Fallback
+  if (!U) {
+    const loginData = sessionStorage.getItem('sb_demo_login');
+    if (loginData) {
+      sessionStorage.removeItem('sb_demo_login');
+      const d = JSON.parse(loginData);
+      U = {
+        id: 'demo_' + Date.now(), email: d.email,
+        full_name: d.name || 'Demo Schüler',
+        role: d.role || 'student', grade: d.grade || 9,
+        school: d.school || 'Gymnasium', subscription: 'free',
         children: d.children || (d.role==='parent' ? [{id:'c1',name:'Max',grade:7},{id:'c2',name:'Lisa',grade:5}] : []),
         isDemo: true,
       };
@@ -268,9 +319,12 @@ function populateDemoData() {
 
 async function doLogout() {
   if (!confirm('Wirklich abmelden?')) return;
-  U = null; D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
+  if (sb) await sb.auth.signOut();
+  U = null;
+  D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
   apiKey = '';
   localStorage.clear();
+  sessionStorage.clear();
   window.location.href = '/';
 }
 

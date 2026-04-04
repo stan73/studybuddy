@@ -12,6 +12,8 @@
 <link rel="stylesheet" href="css/layout.css">
 <!-- DOMPurify für XSS-Schutz -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" integrity="sha512-tzcDOiFWAHGK9yCLjmCQbJFsAA2oOGULlNqAFl5VgZbdnMkInVqb/n1Ln9OVl3CiQpGjJwRc9jJwOHKd5f8g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Supabase JS Client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 /* Landing-spezifische Styles */
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
@@ -398,15 +400,49 @@ function removeChild(i) {
   renderRegStep();
 }
 
+// ── Supabase Client ──────────────────────────────────────────────────────
+const SB_URL  = 'https://qzmviwrpyfpjahcmbjoy.supabase.co';
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXZpd3JweWZwamFoY21iam95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTg5NTcsImV4cCI6MjA5MDg3NDk1N30.BT2iRuWdI33yigziU3kicb-GQT14IHe3WU8JxFlQG0M';
+const sb = (typeof window.supabase !== 'undefined')
+  ? window.supabase.createClient(SB_URL, SB_KEY)
+  : null;
+
 async function doLogin() {
   const em = document.getElementById('l-em')?.value.trim();
   const pw = document.getElementById('l-pw')?.value;
   if (!em || !pw) return toast('E-Mail und Passwort eingeben!');
 
-  // Demo: weiterleiten zu app.html
-  toast('Wird angemeldet…');
-  sessionStorage.setItem('sb_demo_login', JSON.stringify({ email: em, role: 'student' }));
-  setTimeout(() => { window.location.href = '/app.html'; }, 800);
+  // Passwort-Format-Check (nicht leer, min. 1 Zeichen)
+  if (pw.length < 1) return toast('Passwort eingeben!');
+
+  // Supabase Auth
+  if (sb) {
+    toast('Wird angemeldet…');
+    const btn = document.querySelector('#auth-body .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+    const { data, error } = await sb.auth.signInWithPassword({ email: em, password: pw });
+
+    if (error) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Anmelden'; }
+      const msgs = {
+        'Invalid login credentials': 'E-Mail oder Passwort falsch',
+        'Email not confirmed': 'E-Mail noch nicht bestätigt — bitte Postfach prüfen',
+        'Too many requests': 'Zu viele Versuche — bitte kurz warten',
+      };
+      return toast('❌ ' + (msgs[error.message] || error.message));
+    }
+
+    // Profil laden
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
+    sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile }));
+    window.location.href = '/app.html';
+  } else {
+    // Demo-Fallback (wenn Supabase nicht erreichbar)
+    toast('Demo-Modus wird gestartet…');
+    sessionStorage.setItem('sb_demo_login', JSON.stringify({ email: em, role: 'student' }));
+    setTimeout(() => { window.location.href = '/app.html'; }, 800);
+  }
 }
 
 async function doRegister() {
@@ -418,16 +454,50 @@ async function doRegister() {
     })).filter(c => c.name);
   }
 
-  toast('Konto wird erstellt…');
-  sessionStorage.setItem('sb_demo_login', JSON.stringify({
-    email: regData.em,
-    name: (regData.fn + ' ' + (regData.ln || '')).trim(),
-    role: regData.role,
-    grade: regData.grade,
-    school: regData.school,
-    children: regData.children || [],
-  }));
-  setTimeout(() => { window.location.href = '/app.html'; }, 800);
+  if (sb) {
+    toast('Konto wird erstellt…');
+    const fullName = (regData.fn + ' ' + (regData.ln || '')).trim();
+
+    const { data, error } = await sb.auth.signUp({
+      email: regData.em,
+      password: regData.pw,
+      options: { data: { full_name: fullName, role: regData.role, grade: regData.grade, school: regData.school } },
+    });
+
+    if (error) return toast('❌ ' + error.message);
+
+    // Profil anlegen
+    await sb.from('profiles').upsert({
+      id: data.user.id, email: regData.em, full_name: fullName,
+      role: regData.role, grade: Number(regData.grade) || null,
+      school: regData.school || null, subscription: 'free',
+    });
+
+    // Kinder anlegen
+    if (regData.role === 'parent' && regData.children?.length) {
+      await sb.from('children').insert(
+        regData.children.map(c => ({ parent_id: data.user.id, name: c.name, grade: Number(c.grade) }))
+      );
+    }
+
+    // Prüfen ob E-Mail-Bestätigung nötig
+    if (!data.session) {
+      toast('📧 Bestätigungs-E-Mail gesendet — bitte Postfach prüfen!', 5000);
+      setTimeout(closeAuth, 5000);
+    } else {
+      sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile: null }));
+      window.location.href = '/app.html';
+    }
+  } else {
+    // Demo-Fallback
+    toast('Demo-Modus wird gestartet…');
+    sessionStorage.setItem('sb_demo_login', JSON.stringify({
+      email: regData.em, name: (regData.fn + ' ' + (regData.ln || '')).trim(),
+      role: regData.role, grade: regData.grade, school: regData.school,
+      children: regData.children || [],
+    }));
+    setTimeout(() => { window.location.href = '/app.html'; }, 800);
+  }
 }
 
 function showPolicy(type) {

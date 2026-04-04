@@ -9,9 +9,8 @@
 
 export const CONFIG = {
   // ── Supabase ────────────────────────────────────
-  // Nach Projekterstellung auf supabase.com ausfüllen:
-  SUPABASE_URL: 'https://DEIN_PROJEKT.supabase.co',
-  SUPABASE_ANON_KEY: 'DEIN_ANON_KEY',
+  SUPABASE_URL: 'https://qzmviwrpyfpjahcmbjoy.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXZpd3JweWZwamFoY21iam95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTg5NTcsImV4cCI6MjA5MDg3NDk1N30.BT2iRuWdI33yigziU3kicb-GQT14IHe3WU8JxFlQG0M',
 
   // ── Claude API ──────────────────────────────────
   // Modell: Haiku ist am günstigsten (ca. 80% günstiger als Sonnet)
