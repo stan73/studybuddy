@@ -556,7 +556,7 @@ async function genCards(){
   if(!text){toast('Text eingeben!');return;}if(!U.apiKey){toast('API Key in Einstellungen eintragen!');return;}
   toast('KI generiert Karten... ⏳');
   try{const r=await apiCall([{role:'user',content:text}],`Erstelle ${num} Karteikarten aus diesem Text für Klasse ${U.grade}. NUR JSON: [{"front":"Frage?","back":"Antwort"}]`,1200);const p=JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');if(!p.length)throw 0;if(!D.cards[fc.subj])D.cards[fc.subj]=[];p.forEach(c=>D.cards[fc.subj].push({front:c.front,back:c.back,due:0,lvl:0}));save();toast(`${p.length} Karten erstellt! 🎉`);document.getElementById('gen-t').value='';initFC();}
-  catch(e){toast('Fehler — API Key prüfen!');}
+  catch(e){toast('❌ '+(e.message||'API Key prüfen!'));}
 }
 
 function initTutor(){
@@ -571,7 +571,7 @@ async function sendMsg(){
   const el=document.getElementById('chat-msgs');const ty=document.createElement('div');ty.className='bubble bot';ty.id='ty';ty.innerHTML='<span class="td"></span><span class="td"></span><span class="td"></span>';el.appendChild(ty);el.scrollTop=el.scrollHeight;
   const sys=`Du bist ein einfühlsamer Tutor für Klasse ${U.grade} (${U.school}). Sokrates-Methode: stelle Gegenfragen, gib Hinweise, führe den Schüler zur Antwort. Antworte auf Deutsch, freundlich, max. 150 Wörter.`;
   try{const h=msgs.slice(-8).map(m=>({role:m.r==='user'?'user':'assistant',content:m.t}));const r=await apiCall(h,sys,400);document.getElementById('ty')?.remove();msgs.push({r:'bot',t:r});addXP(5);}
-  catch(e){document.getElementById('ty')?.remove();msgs.push({r:'bot',t:'Fehler — API Key prüfen!'});}
+  catch(e){document.getElementById('ty')?.remove();msgs.push({r:'bot',t:'❌ '+(e.message||'API Key prüfen!')});}
   rTutor();
 }
 
@@ -588,7 +588,7 @@ async function startExam(){
     const r=await apiCall([{role:'user',content:`${ex.numQ} ${subj} Klasse ${U.grade} Multiple Choice`}],`Erstelle ${ex.numQ} Multiple-Choice-Fragen zu "${subj}" Klasse ${U.grade}. NUR JSON: [{"q":"Frage?","opts":["A","B","C","D"],"correct":0}] — correct=Index 0-3.`,2000);
     const p=JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');if(!p.length)throw 0;
     ex.qs=p;showQ();ex.tmr=setInterval(tickExam,1000);
-  }catch(e){document.getElementById('q-text').textContent='Fehler — API Key prüfen!';}
+  }catch(e){document.getElementById('q-text').textContent='❌ '+(e.message||'API Key prüfen!');}
 }
 function tickExam(){ex.secs--;const pct=ex.secs/(ex.numQ*30)*100;const el=document.getElementById('ex-tmr');if(el)el.textContent=Math.floor(ex.secs/60)+':'+(ex.secs%60+'').padStart(2,'0');const tb=document.getElementById('ex-tb');if(tb){tb.style.width=pct+'%';tb.style.background=pct>40?'var(--grn)':pct>15?'var(--amb)':'var(--red)';}if(ex.secs<=0)endExam();}
 function showQ(){const q=ex.qs[ex.idx];if(!q){endExam();return;}document.getElementById('ex-prog').textContent=`Frage ${ex.idx+1} / ${ex.qs.length}`;document.getElementById('q-text').textContent=q.q;document.getElementById('ans-grid').innerHTML=['A','B','C','D'].map((l,i)=>`<button class="ab" onclick="ansQ(${i})">${l}. ${q.opts[i]}</button>`).join('');}
@@ -624,8 +624,10 @@ function saveAK(){U.apiKey=document.getElementById('s-ak').value.trim();save();t
 
 function addXP(n){D.xp=(D.xp||0)+n;renderSB();}
 async function apiCall(messages,system,maxTokens=500){
-  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':U.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:maxTokens,system,messages})});
-  if(!r.ok)throw new Error('API '+r.status);
+  const key=(U.apiKey||'').trim();
+  if(!key||!key.startsWith('sk-ant-'))throw new Error('Ungültiger API Key — muss mit sk-ant- beginnen');
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-3-5-haiku-20241022',max_tokens:maxTokens,system,messages})});
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error('Fehler '+r.status+': '+(e?.error?.message||r.statusText));}
   return (await r.json()).content[0].text;
 }
 
