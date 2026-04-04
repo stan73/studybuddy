@@ -116,11 +116,66 @@ const CFG = {
 // ═══════════════════════════════════════════════════════════════════════════
 let U = null; // User-Objekt
 let D = { cards:{}, tasks:[], exams:[], sessions:[], xp:0, streak:0, lastStudy:0, correct:0, total:0 };
-let apiKey = ''; // NIEMALS in localStorage!
 let _page = 'dashboard';
 let _aiReqs = 0;
 let _aiReset = null;
 const _aiCache = new Map();
+
+// ── AI Provider Konfiguration ─────────────────────────────────────────────────
+// Keys nur im Memory — NIEMALS in localStorage!
+let AI = {
+  provider: 'claude',   // aktiver Provider
+  claude:  '',          // sk-ant-...
+  openai:  '',          // sk-...
+  gemini:  '',          // AIza...
+};
+
+const PROVIDERS = {
+  claude: {
+    name: 'Claude (Anthropic)',
+    emoji: '🟣',
+    models: { fast: 'claude-haiku-4-5-20251001', smart: 'claude-sonnet-4-6' },
+    keyPrefix: 'sk-ant-',
+    placeholder: 'sk-ant-api03-…',
+    docsUrl: 'https://console.anthropic.com',
+  },
+  openai: {
+    name: 'OpenAI (GPT)',
+    emoji: '🟢',
+    models: { fast: 'gpt-4o-mini', smart: 'gpt-4o' },
+    keyPrefix: 'sk-',
+    placeholder: 'sk-proj-…',
+    docsUrl: 'https://platform.openai.com/api-keys',
+  },
+  gemini: {
+    name: 'Google Gemini',
+    emoji: '🔵',
+    models: { fast: 'gemini-2.0-flash', smart: 'gemini-1.5-pro' },
+    keyPrefix: 'AIza',
+    placeholder: 'AIzaSy…',
+    docsUrl: 'https://aistudio.google.com/apikey',
+  },
+};
+
+// AI-Keys speichern (an Eltern-E-Mail geknüpft für Kind-Vererbung)
+function saveAIKeys() {
+  const email = U?.email || U?.parentEmail || 'anon';
+  try { localStorage.setItem('sb_aikeys_' + email, JSON.stringify({
+    provider: AI.provider, claude: AI.claude, openai: AI.openai, gemini: AI.gemini,
+  })); } catch(e) {}
+}
+
+// AI-Keys laden — für Kinder: zuerst Eltern-Keys versuchen
+function loadAIKeys(parentEmail) {
+  const email = parentEmail || U?.email || 'anon';
+  try {
+    const saved = localStorage.getItem('sb_aikeys_' + email);
+    if (saved) { Object.assign(AI, JSON.parse(saved)); return true; }
+  } catch(e) {}
+  return false;
+}
+
+function activeKey() { return AI[AI.provider] || ''; }
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const SB_URL = 'https://qzmviwrpyfpjahcmbjoy.supabase.co';
@@ -178,15 +233,17 @@ function safeHTML(html) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CLAUDE API (Budget-bewusst)
+// MULTI-PROVIDER KI (Claude · OpenAI · Gemini)
 // ═══════════════════════════════════════════════════════════════════════════
 async function ai(messages, system, maxTok=400, useCache=true) {
-  if (!apiKey) throw new Error('Claude API Key fehlt — bitte in Einstellungen eintragen');
-  if (!apiKey.startsWith('sk-ant-')) throw new Error('Ungültiger API Key (muss mit sk-ant- beginnen)');
+  const key = activeKey();
+  const prov = AI.provider;
+  if (!key) throw new Error(`${PROVIDERS[prov]?.name || prov} API Key fehlt — bitte in Einstellungen eintragen`);
 
   // Cache
+  const ckBase = prov + system + JSON.stringify(messages);
   if (useCache) {
-    const ck = 'ai_' + btoa(encodeURIComponent(system + JSON.stringify(messages))).slice(0,40);
+    const ck = 'ai_' + btoa(encodeURIComponent(ckBase)).slice(0,40);
     const cached = _aiCache.get(ck);
     if (cached && Date.now() < cached.exp) return cached.val;
   }
@@ -196,25 +253,47 @@ async function ai(messages, system, maxTok=400, useCache=true) {
   _aiReqs++;
   if (!_aiReset) _aiReset = setTimeout(() => { _aiReqs=0; _aiReset=null; }, 60000);
 
-  const r = await fetch(CFG.CLAUDE_API, {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true',
-    },
-    body: JSON.stringify({ model:CFG.CLAUDE_MODEL, max_tokens:maxTok, system, messages }),
-  });
+  let text = '';
+  if (prov === 'claude') {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({ model: PROVIDERS.claude.models.fast, max_tokens: maxTok, system, messages }),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(`Claude Fehler ${r.status}: ${e?.error?.message||r.statusText}`); }
+    text = (await r.json()).content?.[0]?.text || '';
 
-  if (!r.ok) {
-    const e = await r.json().catch(()=>({}));
-    throw new Error(`API Fehler ${r.status}: ${e?.error?.message || r.statusText}`);
+  } else if (prov === 'openai') {
+    const msgs = system ? [{ role:'system', content: system }, ...messages] : messages;
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: PROVIDERS.openai.models.fast, max_tokens: maxTok, messages: msgs }),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(`OpenAI Fehler ${r.status}: ${e?.error?.message||r.statusText}`); }
+    text = (await r.json()).choices?.[0]?.message?.content || '';
+
+  } else if (prov === 'gemini') {
+    const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts:[{ text: m.content }] }));
+    if (system) contents.unshift({ role:'user', parts:[{ text: system }] });
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${PROVIDERS.gemini.models.fast}:generateContent?key=${key}`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents, generationConfig: { maxOutputTokens: maxTok } }),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(`Gemini Fehler ${r.status}: ${e?.error?.message||r.statusText}`); }
+    text = (await r.json()).candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
-  const text = (await r.json()).content?.[0]?.text || '';
+
   if (useCache && text) {
-    const ck = 'ai_' + btoa(encodeURIComponent(system + JSON.stringify(messages))).slice(0,40);
-    _aiCache.set(ck, { val:text, exp: Date.now() + CFG.CACHE_TTL });
+    const ck = 'ai_' + btoa(encodeURIComponent(ckBase)).slice(0,40);
+    _aiCache.set(ck, { val: text, exp: Date.now() + CFG.CACHE_TTL });
   }
   return text;
 }
@@ -312,6 +391,13 @@ async function init() {
 
   if (!U) { window.location.href = '/'; return; }
 
+  // AI-Keys laden: Kind erbt Keys vom Elternteil, sonst eigene Keys
+  if (U.isChild && U.parentEmail) {
+    loadAIKeys(U.parentEmail);
+  } else {
+    loadAIKeys(U.email);
+  }
+
   // Daten für aktuellen User laden (pro-User-Key)
   loadDataForUser(U.id);
 
@@ -357,7 +443,7 @@ async function doLogout() {
   if (sb) await sb.auth.signOut();
   U = null;
   D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
-  apiKey = '';
+  AI = { provider:'claude', claude:'', openai:'', gemini:'' };
   localStorage.clear();
   sessionStorage.clear();
   window.location.href = '/';
@@ -682,7 +768,7 @@ function manualAddCard() {
 async function genCards() {
   const text = document.getElementById('gen-t')?.value.trim();
   if (!text) return toast('Text eingeben!');
-  if (!apiKey) return toast('API Key in Einstellungen eintragen!');
+  if (!activeKey()) return toast('API Key in Einstellungen eintragen!');
   const num = parseInt(document.getElementById('gen-n')?.value||5);
   toast('🤖 KI erstellt Karten…');
   try {
@@ -725,7 +811,7 @@ function tutor(el) {
         <input class="input" id="chat-in" placeholder="Frag mich etwas…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}">
         <button class="btn btn-primary" onclick="sendMsg()">Senden →</button>
       </div>
-      <p style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">${apiKey?'✓ API Key aktiv':'⚠️ Kein API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Einstellungen</a>'}</p>
+      <p style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">${activeKey()?`✓ ${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider} aktiv`:'⚠️ Kein API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Einstellungen</a>'}</p>
     </div>`;
 }
 
@@ -733,7 +819,7 @@ async function sendMsg() {
   const inp = document.getElementById('chat-in');
   const text = inp?.value.trim();
   if (!text) return;
-  if (!apiKey) return toast('API Key in Einstellungen eintragen!');
+  if (!activeKey()) return toast('API Key in Einstellungen eintragen!');
   inp.value = '';
 
   const msgs = document.getElementById('chat-msgs');
@@ -779,7 +865,7 @@ function exam(el) {
             <select class="input" id="ex-num"><option value="5">5 Fragen</option><option value="8">8 Fragen</option><option value="10">10 Fragen</option></select>
           </div>
           <button class="btn btn-primary" onclick="startExam()">🚀 Prüfung starten</button>
-          <p style="font-size:12px;color:var(--t3);">${apiKey?'✓ KI-Modus aktiv':'⚠️ Ohne API Key: Beispielfragen'}</p>
+          <p style="font-size:12px;color:var(--t3);">${activeKey()?`✓ KI-Modus aktiv (${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider})`:'⚠️ Ohne API Key: Beispielfragen'}</p>
         </div>
       </div>
       ${(D.exams||[]).length ? `
@@ -801,7 +887,7 @@ async function startExam() {
   el.innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner" style="width:32px;height:32px;"></div><p style="margin-top:16px;color:var(--t3);">KI generiert Fragen…</p></div>';
 
   let qs = [];
-  if (apiKey) {
+  if (activeKey()) {
     try {
       const sys = `Prüfungsersteller für Klasse ${U.grade}. Nur JSON.`;
       const r = await ai([{role:'user',content:`${num} MC-Fragen zu ${subj} Klasse ${U.grade}. NUR JSON:[{"q":"Frage?","opts":["A","B","C","D"],"correct":0}]`}], sys, 2000);
@@ -1267,14 +1353,31 @@ function settings(el) {
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title">🤖 KI-Einstellungen</div></div>
-        <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          ${U.isChild ? `<div style="background:var(--pri-l);color:var(--pri-d);padding:10px 14px;border-radius:var(--r-md);font-size:13px;">🔑 API Keys werden vom Eltern-Account übernommen.</div>` : ''}
           <div class="field">
-            <label>Claude API Key</label>
-            <input class="input" id="s-ak" type="password" placeholder="sk-ant-…" value="${apiKey?'••••••••••••':''}">
-            <p style="font-size:11px;color:var(--t3);margin-top:4px;">Für KI-Tutor und Karteikarten-Generierung. Wird nicht gespeichert — bei jedem Start neu eingeben. <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style="color:var(--pri)">API Key holen →</a></p>
+            <label>KI-Anbieter</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${Object.entries(PROVIDERS).map(([k,p])=>`
+                <button class="btn btn-sm ${AI.provider===k?'btn-primary':'btn-secondary'}"
+                  onclick="AI.provider='${k}';saveAIKeys();settings(document.getElementById('content'));">
+                  ${p.emoji} ${p.name}${AI[k]?' ✓':''}
+                </button>`).join('')}
+            </div>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="saveApiKey()">API Key setzen</button>
-          ${apiKey?'<div class="badge badge-success" style="align-self:flex-start;">✓ API Key aktiv</div>':'<div class="badge badge-warning" style="align-self:flex-start;">⚠️ Kein API Key gesetzt</div>'}
+          ${Object.entries(PROVIDERS).map(([k,p])=>`
+          <div id="ai-section-${k}" style="${AI.provider===k?'':'display:none'}">
+            <div class="field">
+              <label>${p.emoji} ${p.name} API Key</label>
+              <input class="input" id="s-ak-${k}" type="password" placeholder="${p.placeholder}" value="${AI[k]?'••••••••••••':''}">
+              <p style="font-size:11px;color:var(--t3);margin-top:4px;">
+                Nur im Browser-Memory — nie auf dem Server gespeichert.
+                <a href="${p.docsUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--pri)">API Key holen →</a>
+              </p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveProviderKey('${k}')">Key für ${p.name} setzen</button>
+            ${AI[k]?`<div class="badge badge-success" style="align-self:flex-start;margin-top:6px;">✓ ${p.name} aktiv</div>`:`<div class="badge badge-warning" style="align-self:flex-start;margin-top:6px;">Kein Key gesetzt</div>`}
+          </div>`).join('')}
         </div>
       </div>
       <div class="card" style="border-color:var(--danger);">
@@ -1294,12 +1397,16 @@ function saveProfile() {
   save(); renderSidebar(); toast('✅ Profil gespeichert!');
 }
 
-function saveApiKey() {
-  const key = document.getElementById('s-ak')?.value.trim();
-  if (!key || key === '••••••••••••') return toast('API Key eingeben!');
-  if (!key.startsWith('sk-ant-')) return toast('Ungültiger Key — muss mit sk-ant- beginnen');
-  apiKey = key; // Nur Memory, nie localStorage!
-  toast('✅ API Key gesetzt!');
+function saveProviderKey(providerKey) {
+  const prov = PROVIDERS[providerKey];
+  if (!prov) return;
+  const key = document.getElementById(`s-ak-${providerKey}`)?.value.trim();
+  if (!key || key === '••••••••••••') return toast(`${prov.emoji} ${prov.name} API Key eingeben!`);
+  if (!key.startsWith(prov.keyPrefix)) return toast(`Ungültiger Key — muss mit ${prov.keyPrefix} beginnen`);
+  AI[providerKey] = key;
+  AI.provider = providerKey; // Aktiven Provider wechseln
+  saveAIKeys();
+  toast(`✅ ${prov.emoji} ${prov.name} Key gesetzt!`);
   settings(document.getElementById('content'));
 }
 
