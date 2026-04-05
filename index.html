@@ -17,10 +17,10 @@
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/layout.css">
-<!-- DOMPurify für XSS-Schutz -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" integrity="sha512-tzcDOiFWAHGK9yCLjmCQbJFsAA2oOGULlNqAFl5VgZbdnMkInVqb/n1Ln9OVl3CiQpGjJwRc9jJwOHKd5f8g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<!-- Supabase JS Client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- DOMPurify für XSS-Schutz (lokal gebündelt) -->
+<script src="js/vendor/purify.min.js"></script>
+<!-- Supabase JS Client (lokal gebündelt) -->
+<script src="js/vendor/supabase.js"></script>
 <style>
 /* Landing-spezifische Styles */
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
