@@ -313,6 +313,360 @@ const CFG = {
 /** @type {UserState|null} */
 let U = null;
 
+// ── I18N Übersetzungen ────────────────────────────────────────────────────────
+const I18N = {
+  de: {
+    // Navigation
+    'nav.learn':'Lernen','nav.dashboard':'Dashboard','nav.subjects':'Fächer',
+    'nav.flashcards':'Karteikarten','nav.tutor':'KI-Tutor','nav.exam':'Prüfungsmodus',
+    'nav.organisation':'Organisation','nav.planner':'Lernplan','nav.pomodoro':'Pomodoro',
+    'nav.account':'Konto','nav.subscription':'Abo & Preise','nav.settings':'Einstellungen',
+    'nav.logout':'Abmelden',
+    // Sidebar
+    'role.child':'Klasse {0} · Kind-Account',
+    // Dashboard
+    'dash.greeting':'Guten Tag, {0}! 👋','dash.subtitle':'Dein Lernfortschritt auf einen Blick',
+    'dash.xp':'XP-Punkte','dash.streak':'Tage Streak','dash.due_cards':'Karten fällig',
+    'dash.open_tasks':'Aufgaben offen','dash.tasks':'📋 Aufgaben','dash.all':'Alle →',
+    'dash.no_tasks':'Keine offenen Aufgaben 🎉','dash.due':'fällig',
+    'dash.quickstart':'⚡ Schnellstart','dash.start_exam':'Prüfung starten',
+    'dash.recent_exams':'📊 Letzte Prüfungsergebnisse',
+    // Subjects
+    'subj.title':'📚 Fächer','subj.subtitle':'Klasse {0} · {1} Fächer',
+    'subj.cards':'Karten','subj.due':'fällig',
+    // Flashcards
+    'fc.title':'🃏 Karteikarten','fc.due_total':'{0} fällig · {1} gesamt',
+    'fc.question':'Frage','fc.answer':'Antwort',
+    'fc.flip_reveal':'Aufdecken','fc.flip_back':'zurückdrehen',
+    'fc.tap_hint':'Klicke auf die Karte um die Antwort zu sehen',
+    'fc.wrong':'Falsch','fc.hard':'Schwer','fc.ok':'Ok','fc.easy':'Leicht',
+    'fc.done_title':'Alle Karten für heute gelernt!',
+    'fc.done_sub':'Super Arbeit! Neue Karten werden morgen fällig.',
+    'fc.new_card':'➕ Neue Karte / KI-Generierung',
+    'fc.front':'Vorderseite (Frage)','fc.back':'Rückseite (Antwort)',
+    'fc.front_ph':'Was ist...?','fc.back_ph':'Die Antwort...',
+    'fc.add_card':'Karte hinzufügen','fc.or_ai':'oder mit KI generieren',
+    'fc.ai_label':'Text eingeben (KI erstellt daraus Karten)',
+    'fc.ai_ph':'Lernstoff hier einfügen...','fc.ai_n':'{0} Karten',
+    'fc.ai_btn':'🤖 KI-Karten erstellen',
+    // Tutor
+    'tutor.title':'🤖 KI-Tutor','tutor.subtitle':'Frag mich alles — ich helfe dir beim Lernen!',
+    'tutor.greeting':'👋 Hallo! Ich bin dein KI-Tutor. Stell mir eine Frage zu {0} oder einem anderen Fach — ich helfe dir gerne!',
+    'tutor.placeholder':'Frag mich etwas…','tutor.send':'Senden →',
+    'tutor.typing':'✍️ Tutor tippt…',
+    'tutor.no_key':'⚠️ Kein API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Einstellungen</a>',
+    // Exam
+    'exam.title':'📝 Prüfungsmodus',
+    'exam.subtitle':'Teste dein Wissen mit KI-generierten Fragen',
+    'exam.new':'Neue Prüfung starten','exam.subject':'Fach','exam.num_q':'Anzahl Fragen',
+    'exam.q5':'5 Fragen','exam.q8':'8 Fragen','exam.q10':'10 Fragen',
+    'exam.start':'🚀 Prüfung starten',
+    'exam.ai_active':'✓ KI-Modus aktiv ({0} {1})','exam.fallback':'⚠️ Ohne API Key: Beispielfragen',
+    'exam.recent':'Letzte Ergebnisse','exam.generating':'KI generiert Fragen…',
+    'exam.question':'Frage','exam.excellent':'Ausgezeichnet!','exam.good':'Gut gemacht!',
+    'exam.practice':'Weiter üben!','exam.correct_of':'{0} von {1} Fragen richtig',
+    'exam.retry':'Nochmal','exam.error_back':'Zurück',
+    // Planner
+    'plan.title':'📅 Lernplan','plan.subtitle':'Aufgaben und Prüfungsvorbereitung',
+    'plan.add':'✏️ Aufgabe hinzufügen','plan.title_label':'Titel',
+    'plan.title_ph':'Hausaufgaben, Zusammenfassung…','plan.subject_label':'Fach',
+    'plan.due_label':'Fällig','plan.add_btn':'Hinzufügen',
+    'plan.all_tasks':'📋 Alle Aufgaben','plan.no_tasks':'Noch keine Aufgaben',
+    // Pomodoro
+    'pomo.title':'🍅 Pomodoro-Timer','pomo.subtitle':'Fokussiertes Lernen in Intervallen',
+    'pomo.focus':'🎯 Fokus','pomo.break':'☕ Pause','pomo.session':'Session',
+    'pomo.pause_btn':'⏸ Pause','pomo.start_btn':'▶ Start','pomo.reset':'↺ Reset',
+    'pomo.focus_label':'Fokus','pomo.break_label':'Pause','pomo.sessions':'Sessions',
+    'pomo.done':'🎉 Fokus-Session geschafft! +{0} XP. Pause!',
+    'pomo.break_over':'⏰ Pause vorbei! Neue Fokus-Session.',
+    // Settings
+    'settings.title':'⚙️ Einstellungen','settings.profile':'👤 Profil',
+    'settings.name':'Name','settings.email':'E-Mail',
+    'settings.grade':'Klasse','settings.school_type':'Schulform',
+    'settings.save_profile':'Profil speichern',
+    'settings.my_subjects':'📚 Meine Fächer',
+    'settings.subjects_note':'Du kannst deine Fächer selbst anpassen — dein Elternteil hat das erlaubt.',
+    'settings.add_subject_ph':'— Fach hinzufügen —','settings.add_subject_btn':'+ Hinzufügen',
+    'settings.reset_subjects':'↩ Fächer zurücksetzen',
+    'settings.ai':'🤖 KI-Einstellungen',
+    'settings.key_inherited':'🔑 API Keys werden vom Eltern-Account übernommen.',
+    'settings.provider':'KI-Anbieter','settings.danger':'⚠️ Gefahrenzone',
+    'settings.reset_note':'Lernfortschritte zurücksetzen (DSGVO: Recht auf Löschung)',
+    'settings.reset_btn':'Alle Lernfortschritte löschen',
+    // Page titles
+    'page.dashboard':'Dashboard','page.subjects':'Fächer','page.flashcards':'Karteikarten',
+    'page.tutor':'KI-Tutor','page.exam':'Prüfungsmodus','page.planner':'Lernplan',
+    'page.pomodoro':'Pomodoro','page.subscription':'Abo & Preise','page.settings':'Einstellungen',
+    // Toast messages
+    'toast.task_done':'✅ Aufgabe erledigt!','toast.task_open':'Aufgabe wieder offen',
+    'toast.task_added':'✅ Aufgabe hinzugefügt!','toast.enter_title':'Titel eingeben!',
+    'toast.fill_card':'Vorder- und Rückseite ausfüllen!','toast.card_added':'Karte hinzugefügt! ✓',
+    'toast.enter_text':'Text eingeben!','toast.need_api_key':'API Key in Einstellungen eintragen!',
+    // Common
+    'common.error_loading':'Fehler beim Laden','common.back_dashboard':'Zum Dashboard',
+    'common.all_subjects_present':'Alle Standard-Fächer bereits vorhanden',
+    'toast.profile_saved':'✅ Profil gespeichert!',
+    'settings.grade_option':'{0}. Klasse',
+    'common.days':'Tage',
+  },
+  en: {
+    'nav.learn':'Learning','nav.dashboard':'Dashboard','nav.subjects':'Subjects',
+    'nav.flashcards':'Flashcards','nav.tutor':'AI Tutor','nav.exam':'Exam Mode',
+    'nav.organisation':'Organisation','nav.planner':'Planner','nav.pomodoro':'Pomodoro',
+    'nav.account':'Account','nav.subscription':'Subscription','nav.settings':'Settings',
+    'nav.logout':'Sign out',
+    'role.child':'Year {0} · Student Account',
+    'dash.greeting':'Hello, {0}! 👋','dash.subtitle':'Your learning progress at a glance',
+    'dash.xp':'XP Points','dash.streak':'Day Streak','dash.due_cards':'Cards due',
+    'dash.open_tasks':'Tasks open','dash.tasks':'📋 Tasks','dash.all':'All →',
+    'dash.no_tasks':'No open tasks 🎉','dash.due':'due',
+    'dash.quickstart':'⚡ Quick Start','dash.start_exam':'Start Exam',
+    'dash.recent_exams':'📊 Recent Exam Results',
+    'subj.title':'📚 Subjects','subj.subtitle':'Year {0} · {1} subjects',
+    'subj.cards':'cards','subj.due':'due',
+    'fc.title':'🃏 Flashcards','fc.due_total':'{0} due · {1} total',
+    'fc.question':'Question','fc.answer':'Answer',
+    'fc.flip_reveal':'reveal','fc.flip_back':'flip back',
+    'fc.tap_hint':'Click the card to see the answer',
+    'fc.wrong':'Wrong','fc.hard':'Hard','fc.ok':'Ok','fc.easy':'Easy',
+    'fc.done_title':'All cards studied for today!',
+    'fc.done_sub':'Great work! New cards will be due tomorrow.',
+    'fc.new_card':'➕ New Card / AI Generation',
+    'fc.front':'Front (Question)','fc.back':'Back (Answer)',
+    'fc.front_ph':'What is...?','fc.back_ph':'The answer...',
+    'fc.add_card':'Add card','fc.or_ai':'or generate with AI',
+    'fc.ai_label':'Enter text (AI will create cards from it)',
+    'fc.ai_ph':'Paste learning content here...','fc.ai_n':'{0} cards',
+    'fc.ai_btn':'🤖 Generate AI Cards',
+    'tutor.title':'🤖 AI Tutor','tutor.subtitle':'Ask me anything — I\'ll help you learn!',
+    'tutor.greeting':'👋 Hello! I\'m your AI Tutor. Ask me a question about {0} or any other subject — I\'m happy to help!',
+    'tutor.placeholder':'Ask me something…','tutor.send':'Send →',
+    'tutor.typing':'✍️ Tutor is typing…',
+    'tutor.no_key':'⚠️ No API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Settings</a>',
+    'exam.title':'📝 Exam Mode',
+    'exam.subtitle':'Test your knowledge with AI-generated questions',
+    'exam.new':'Start New Exam','exam.subject':'Subject','exam.num_q':'Number of Questions',
+    'exam.q5':'5 Questions','exam.q8':'8 Questions','exam.q10':'10 Questions',
+    'exam.start':'🚀 Start Exam',
+    'exam.ai_active':'✓ AI mode active ({0} {1})','exam.fallback':'⚠️ No API Key: Sample questions',
+    'exam.recent':'Recent Results','exam.generating':'AI generating questions…',
+    'exam.question':'Question','exam.excellent':'Excellent!','exam.good':'Well done!',
+    'exam.practice':'Keep practicing!','exam.correct_of':'{0} of {1} questions correct',
+    'exam.retry':'Try again','exam.error_back':'Back',
+    'plan.title':'📅 Planner','plan.subtitle':'Tasks and exam preparation',
+    'plan.add':'✏️ Add Task','plan.title_label':'Title',
+    'plan.title_ph':'Homework, summary…','plan.subject_label':'Subject',
+    'plan.due_label':'Due','plan.add_btn':'Add',
+    'plan.all_tasks':'📋 All Tasks','plan.no_tasks':'No tasks yet',
+    'pomo.title':'🍅 Pomodoro Timer','pomo.subtitle':'Focused learning in intervals',
+    'pomo.focus':'🎯 Focus','pomo.break':'☕ Break','pomo.session':'Session',
+    'pomo.pause_btn':'⏸ Pause','pomo.start_btn':'▶ Start','pomo.reset':'↺ Reset',
+    'pomo.focus_label':'Focus','pomo.break_label':'Break','pomo.sessions':'Sessions',
+    'pomo.done':'🎉 Focus session done! +{0} XP. Break time!',
+    'pomo.break_over':'⏰ Break over! New focus session.',
+    'settings.title':'⚙️ Settings','settings.profile':'👤 Profile',
+    'settings.name':'Name','settings.email':'E-Mail',
+    'settings.grade':'Year','settings.school_type':'School type',
+    'settings.save_profile':'Save profile',
+    'settings.my_subjects':'📚 My Subjects',
+    'settings.subjects_note':'You can customise your subjects — your parent has allowed this.',
+    'settings.add_subject_ph':'— Add subject —','settings.add_subject_btn':'+ Add',
+    'settings.reset_subjects':'↩ Reset subjects',
+    'settings.ai':'🤖 AI Settings',
+    'settings.key_inherited':'🔑 API Keys are inherited from the parent account.',
+    'settings.provider':'AI Provider','settings.danger':'⚠️ Danger Zone',
+    'settings.reset_note':'Reset learning progress (GDPR: Right to erasure)',
+    'settings.reset_btn':'Delete all learning progress',
+    'page.dashboard':'Dashboard','page.subjects':'Subjects','page.flashcards':'Flashcards',
+    'page.tutor':'AI Tutor','page.exam':'Exam Mode','page.planner':'Planner',
+    'page.pomodoro':'Pomodoro','page.subscription':'Subscription','page.settings':'Settings',
+    'toast.task_done':'✅ Task completed!','toast.task_open':'Task reopened',
+    'toast.task_added':'✅ Task added!','toast.enter_title':'Enter a title!',
+    'toast.fill_card':'Fill in front and back!','toast.card_added':'Card added! ✓',
+    'toast.enter_text':'Enter some text!','toast.need_api_key':'Add API Key in Settings!',
+    'common.error_loading':'Error loading','common.back_dashboard':'Go to Dashboard',
+    'common.all_subjects_present':'All standard subjects already present',
+    'toast.profile_saved':'✅ Profile saved!',
+    'settings.grade_option':'Year {0}',
+    'common.days':'days',
+  },
+  fr: {
+    'nav.learn':'Apprentissage','nav.dashboard':'Tableau de bord','nav.subjects':'Matières',
+    'nav.flashcards':'Fiches','nav.tutor':'Tuteur IA','nav.exam':'Mode Examen',
+    'nav.organisation':'Organisation','nav.planner':'Planning','nav.pomodoro':'Pomodoro',
+    'nav.account':'Compte','nav.subscription':'Abonnement','nav.settings':'Paramètres',
+    'nav.logout':'Déconnexion',
+    'role.child':'Classe {0} · Compte Élève',
+    'dash.greeting':'Bonjour, {0} ! 👋','dash.subtitle':'Ton progrès scolaire en un coup d\'œil',
+    'dash.xp':'Points XP','dash.streak':'Jours de suite','dash.due_cards':'Fiches à réviser',
+    'dash.open_tasks':'Tâches ouvertes','dash.tasks':'📋 Tâches','dash.all':'Tout →',
+    'dash.no_tasks':'Aucune tâche ouverte 🎉','dash.due':'échéance',
+    'dash.quickstart':'⚡ Démarrage rapide','dash.start_exam':'Commencer l\'examen',
+    'dash.recent_exams':'📊 Derniers résultats',
+    'subj.title':'📚 Matières','subj.subtitle':'Classe {0} · {1} matières',
+    'subj.cards':'fiches','subj.due':'à réviser',
+    'fc.title':'🃏 Fiches','fc.due_total':'{0} à réviser · {1} total',
+    'fc.question':'Question','fc.answer':'Réponse',
+    'fc.flip_reveal':'révéler','fc.flip_back':'retourner',
+    'fc.tap_hint':'Cliquez sur la fiche pour voir la réponse',
+    'fc.wrong':'Faux','fc.hard':'Difficile','fc.ok':'Ok','fc.easy':'Facile',
+    'fc.done_title':'Toutes les fiches du jour apprises !',
+    'fc.done_sub':'Bon travail ! De nouvelles fiches seront disponibles demain.',
+    'fc.new_card':'➕ Nouvelle fiche / Génération IA',
+    'fc.front':'Recto (Question)','fc.back':'Verso (Réponse)',
+    'fc.front_ph':'Qu\'est-ce que...?','fc.back_ph':'La réponse...',
+    'fc.add_card':'Ajouter la fiche','fc.or_ai':'ou générer avec l\'IA',
+    'fc.ai_label':'Entrez un texte (l\'IA créera des fiches)',
+    'fc.ai_ph':'Collez le contenu ici...','fc.ai_n':'{0} fiches',
+    'fc.ai_btn':'🤖 Créer des fiches IA',
+    'tutor.title':'🤖 Tuteur IA','tutor.subtitle':'Pose-moi toutes tes questions — je t\'aide à apprendre !',
+    'tutor.greeting':'👋 Bonjour ! Je suis ton tuteur IA. Pose-moi une question sur {0} ou une autre matière !',
+    'tutor.placeholder':'Pose ta question…','tutor.send':'Envoyer →',
+    'tutor.typing':'✍️ Le tuteur écrit…',
+    'tutor.no_key':'⚠️ Pas de clé API — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Paramètres</a>',
+    'exam.title':'📝 Mode Examen',
+    'exam.subtitle':'Testez vos connaissances avec des questions générées par l\'IA',
+    'exam.new':'Démarrer un nouvel examen','exam.subject':'Matière','exam.num_q':'Nombre de questions',
+    'exam.q5':'5 Questions','exam.q8':'8 Questions','exam.q10':'10 Questions',
+    'exam.start':'🚀 Commencer l\'examen',
+    'exam.ai_active':'✓ Mode IA actif ({0} {1})','exam.fallback':'⚠️ Sans clé API : Questions exemples',
+    'exam.recent':'Derniers résultats','exam.generating':'L\'IA génère des questions…',
+    'exam.question':'Question','exam.excellent':'Excellent !','exam.good':'Bien fait !',
+    'exam.practice':'Continue à t\'entraîner !','exam.correct_of':'{0} sur {1} questions correctes',
+    'exam.retry':'Réessayer','exam.error_back':'Retour',
+    'plan.title':'📅 Planning','plan.subtitle':'Tâches et préparation aux examens',
+    'plan.add':'✏️ Ajouter une tâche','plan.title_label':'Titre',
+    'plan.title_ph':'Devoirs, résumé…','plan.subject_label':'Matière',
+    'plan.due_label':'Échéance','plan.add_btn':'Ajouter',
+    'plan.all_tasks':'📋 Toutes les tâches','plan.no_tasks':'Aucune tâche',
+    'pomo.title':'🍅 Minuteur Pomodoro','pomo.subtitle':'Apprentissage concentré par intervalles',
+    'pomo.focus':'🎯 Focus','pomo.break':'☕ Pause','pomo.session':'Session',
+    'pomo.pause_btn':'⏸ Pause','pomo.start_btn':'▶ Démarrer','pomo.reset':'↺ Réinitialiser',
+    'pomo.focus_label':'Focus','pomo.break_label':'Pause','pomo.sessions':'Sessions',
+    'pomo.done':'🎉 Session de focus terminée ! +{0} XP. Pause !',
+    'pomo.break_over':'⏰ Pause terminée ! Nouvelle session de focus.',
+    'settings.title':'⚙️ Paramètres','settings.profile':'👤 Profil',
+    'settings.name':'Nom','settings.email':'E-Mail',
+    'settings.grade':'Classe','settings.school_type':'Type d\'école',
+    'settings.save_profile':'Sauvegarder le profil',
+    'settings.my_subjects':'📚 Mes matières',
+    'settings.subjects_note':'Tu peux personnaliser tes matières — ton parent l\'a autorisé.',
+    'settings.add_subject_ph':'— Ajouter une matière —','settings.add_subject_btn':'+ Ajouter',
+    'settings.reset_subjects':'↩ Réinitialiser les matières',
+    'settings.ai':'🤖 Paramètres IA',
+    'settings.key_inherited':'🔑 Les clés API sont héritées du compte parent.',
+    'settings.provider':'Fournisseur IA','settings.danger':'⚠️ Zone dangereuse',
+    'settings.reset_note':'Réinitialiser la progression (RGPD : droit à l\'effacement)',
+    'settings.reset_btn':'Supprimer toute la progression',
+    'page.dashboard':'Tableau de bord','page.subjects':'Matières','page.flashcards':'Fiches',
+    'page.tutor':'Tuteur IA','page.exam':'Mode Examen','page.planner':'Planning',
+    'page.pomodoro':'Pomodoro','page.subscription':'Abonnement','page.settings':'Paramètres',
+    'toast.task_done':'✅ Tâche terminée !','toast.task_open':'Tâche rouverte',
+    'toast.task_added':'✅ Tâche ajoutée !','toast.enter_title':'Entrez un titre !',
+    'toast.fill_card':'Remplissez recto et verso !','toast.card_added':'Fiche ajoutée ! ✓',
+    'toast.enter_text':'Entrez un texte !','toast.need_api_key':'Ajoutez une clé API dans les Paramètres !',
+    'common.error_loading':'Erreur de chargement','common.back_dashboard':'Aller au tableau de bord',
+    'common.all_subjects_present':'Toutes les matières standard déjà présentes',
+    'toast.profile_saved':'✅ Profil sauvegardé !',
+    'settings.grade_option':'Classe {0}',
+    'common.days':'jours',
+  },
+  es: {
+    'nav.learn':'Aprendizaje','nav.dashboard':'Panel','nav.subjects':'Asignaturas',
+    'nav.flashcards':'Tarjetas','nav.tutor':'Tutor IA','nav.exam':'Modo Examen',
+    'nav.organisation':'Organización','nav.planner':'Planificador','nav.pomodoro':'Pomodoro',
+    'nav.account':'Cuenta','nav.subscription':'Suscripción','nav.settings':'Ajustes',
+    'nav.logout':'Cerrar sesión',
+    'role.child':'Clase {0} · Cuenta Alumno',
+    'dash.greeting':'¡Hola, {0}! 👋','dash.subtitle':'Tu progreso de aprendizaje de un vistazo',
+    'dash.xp':'Puntos XP','dash.streak':'Racha de días','dash.due_cards':'Tarjetas pendientes',
+    'dash.open_tasks':'Tareas abiertas','dash.tasks':'📋 Tareas','dash.all':'Todo →',
+    'dash.no_tasks':'Sin tareas abiertas 🎉','dash.due':'vence',
+    'dash.quickstart':'⚡ Inicio rápido','dash.start_exam':'Iniciar examen',
+    'dash.recent_exams':'📊 Últimos resultados de examen',
+    'subj.title':'📚 Asignaturas','subj.subtitle':'Clase {0} · {1} asignaturas',
+    'subj.cards':'tarjetas','subj.due':'pendientes',
+    'fc.title':'🃏 Tarjetas','fc.due_total':'{0} pendientes · {1} total',
+    'fc.question':'Pregunta','fc.answer':'Respuesta',
+    'fc.flip_reveal':'revelar','fc.flip_back':'voltear',
+    'fc.tap_hint':'Haz clic en la tarjeta para ver la respuesta',
+    'fc.wrong':'Incorrecto','fc.hard':'Difícil','fc.ok':'Ok','fc.easy':'Fácil',
+    'fc.done_title':'¡Todas las tarjetas de hoy estudiadas!',
+    'fc.done_sub':'¡Buen trabajo! Nuevas tarjetas estarán disponibles mañana.',
+    'fc.new_card':'➕ Nueva tarjeta / Generación IA',
+    'fc.front':'Anverso (Pregunta)','fc.back':'Reverso (Respuesta)',
+    'fc.front_ph':'¿Qué es...?','fc.back_ph':'La respuesta...',
+    'fc.add_card':'Añadir tarjeta','fc.or_ai':'o generar con IA',
+    'fc.ai_label':'Introduce texto (la IA creará tarjetas)',
+    'fc.ai_ph':'Pega el contenido aquí...','fc.ai_n':'{0} tarjetas',
+    'fc.ai_btn':'🤖 Crear tarjetas IA',
+    'tutor.title':'🤖 Tutor IA','tutor.subtitle':'¡Pregúntame lo que quieras — te ayudo a aprender!',
+    'tutor.greeting':'👋 ¡Hola! Soy tu Tutor IA. Hazme una pregunta sobre {0} o cualquier otra asignatura.',
+    'tutor.placeholder':'Hazme una pregunta…','tutor.send':'Enviar →',
+    'tutor.typing':'✍️ El tutor escribe…',
+    'tutor.no_key':'⚠️ Sin clave API — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Ajustes</a>',
+    'exam.title':'📝 Modo Examen',
+    'exam.subtitle':'Pon a prueba tu conocimiento con preguntas generadas por IA',
+    'exam.new':'Iniciar nuevo examen','exam.subject':'Asignatura','exam.num_q':'Número de preguntas',
+    'exam.q5':'5 Preguntas','exam.q8':'8 Preguntas','exam.q10':'10 Preguntas',
+    'exam.start':'🚀 Iniciar examen',
+    'exam.ai_active':'✓ Modo IA activo ({0} {1})','exam.fallback':'⚠️ Sin clave API: Preguntas de ejemplo',
+    'exam.recent':'Últimos resultados','exam.generating':'La IA genera preguntas…',
+    'exam.question':'Pregunta','exam.excellent':'¡Excelente!','exam.good':'¡Bien hecho!',
+    'exam.practice':'¡Sigue practicando!','exam.correct_of':'{0} de {1} preguntas correctas',
+    'exam.retry':'Intentar de nuevo','exam.error_back':'Volver',
+    'plan.title':'📅 Planificador','plan.subtitle':'Tareas y preparación de exámenes',
+    'plan.add':'✏️ Añadir tarea','plan.title_label':'Título',
+    'plan.title_ph':'Deberes, resumen…','plan.subject_label':'Asignatura',
+    'plan.due_label':'Vencimiento','plan.add_btn':'Añadir',
+    'plan.all_tasks':'📋 Todas las tareas','plan.no_tasks':'Sin tareas aún',
+    'pomo.title':'🍅 Temporizador Pomodoro','pomo.subtitle':'Aprendizaje concentrado por intervalos',
+    'pomo.focus':'🎯 Enfoque','pomo.break':'☕ Descanso','pomo.session':'Sesión',
+    'pomo.pause_btn':'⏸ Pausa','pomo.start_btn':'▶ Iniciar','pomo.reset':'↺ Reiniciar',
+    'pomo.focus_label':'Enfoque','pomo.break_label':'Descanso','pomo.sessions':'Sesiones',
+    'pomo.done':'🎉 ¡Sesión de enfoque completada! +{0} XP. ¡Descanso!',
+    'pomo.break_over':'⏰ ¡Descanso terminado! Nueva sesión de enfoque.',
+    'settings.title':'⚙️ Ajustes','settings.profile':'👤 Perfil',
+    'settings.name':'Nombre','settings.email':'Correo',
+    'settings.grade':'Curso','settings.school_type':'Tipo de escuela',
+    'settings.save_profile':'Guardar perfil',
+    'settings.my_subjects':'📚 Mis asignaturas',
+    'settings.subjects_note':'Puedes personalizar tus asignaturas — tus padres lo han permitido.',
+    'settings.add_subject_ph':'— Añadir asignatura —','settings.add_subject_btn':'+ Añadir',
+    'settings.reset_subjects':'↩ Restablecer asignaturas',
+    'settings.ai':'🤖 Ajustes de IA',
+    'settings.key_inherited':'🔑 Las claves API se heredan de la cuenta principal.',
+    'settings.provider':'Proveedor de IA','settings.danger':'⚠️ Zona de peligro',
+    'settings.reset_note':'Restablecer progreso (RGPD: Derecho de supresión)',
+    'settings.reset_btn':'Eliminar todo el progreso',
+    'page.dashboard':'Panel','page.subjects':'Asignaturas','page.flashcards':'Tarjetas',
+    'page.tutor':'Tutor IA','page.exam':'Modo Examen','page.planner':'Planificador',
+    'page.pomodoro':'Pomodoro','page.subscription':'Suscripción','page.settings':'Ajustes',
+    'toast.task_done':'✅ ¡Tarea completada!','toast.task_open':'Tarea reabierta',
+    'toast.task_added':'✅ ¡Tarea añadida!','toast.enter_title':'¡Introduce un título!',
+    'toast.fill_card':'¡Rellena anverso y reverso!','toast.card_added':'¡Tarjeta añadida! ✓',
+    'toast.enter_text':'¡Introduce un texto!','toast.need_api_key':'¡Añade una clave API en Ajustes!',
+    'common.error_loading':'Error al cargar','common.back_dashboard':'Ir al panel',
+    'common.all_subjects_present':'Todas las asignaturas estándar ya presentes',
+    'toast.profile_saved':'✅ ¡Perfil guardado!',
+    'settings.grade_option':'Clase {0}',
+    'common.days':'días',
+  },
+};
+
+/**
+ * Übersetzungs-Helper. Gibt den String für den aktuellen Nutzer zurück.
+ * Platzhalter {0}, {1}, … werden durch die übergebenen Argumente ersetzt.
+ * Fallback: Deutsch, dann der Key selbst.
+ * @param {string} key
+ * @param {...string} args
+ */
+function t(key, ...args) {
+  const lang = getCurrentLang();
+  const str = (I18N[lang] || I18N.de)[key] ?? I18N.de[key] ?? key;
+  return args.reduce((s, a, i) => s.replace(`{${i}}`, a ?? ''), str);
+}
+
 // ── Sprachhelfer ─────────────────────────────────────────────────────────────
 
 /** Aktuelle Unterrichtssprache des Nutzers (Standard: 'de') */
@@ -966,7 +1320,7 @@ async function doLogout() {
 function renderSidebar() {
   document.getElementById('sb-name').textContent = safe(U.full_name || U.email);
   document.getElementById('sb-role').textContent = U.isChild
-    ? `Klasse ${U.grade} · Kind-Account`
+    ? t('role.child', U.grade)
     : U.role === 'student' ? `Klasse ${U.grade}` : U.role === 'parent' ? 'Elternteil' : 'Lehrer/in';
   document.getElementById('sb-avatar').textContent = (U.full_name || U.email || '?')[0].toUpperCase();
   updateXP();
@@ -976,15 +1330,15 @@ function renderSidebar() {
 
   if (U.role === 'student' || !U.role) {
     html += `
-      <span class="sidebar-section-label">Lernen</span>
-      <button class="nav-item" data-page="dashboard" onclick="goPage('dashboard')" role="menuitem"><span class="nav-icon">🏠</span>Dashboard</button>
-      <button class="nav-item" data-page="subjects" onclick="goPage('subjects')" role="menuitem"><span class="nav-icon">📚</span>Fächer</button>
-      <button class="nav-item" data-page="flashcards" onclick="goPage('flashcards')" role="menuitem"><span class="nav-icon">🃏</span>Karteikarten</button>
-      <button class="nav-item" data-page="tutor" onclick="goPage('tutor')" role="menuitem"><span class="nav-icon">🤖</span>KI-Tutor</button>
-      <button class="nav-item" data-page="exam" onclick="goPage('exam')" role="menuitem"><span class="nav-icon">📝</span>Prüfungsmodus</button>
-      <span class="sidebar-section-label">Organisation</span>
-      <button class="nav-item" data-page="planner" onclick="goPage('planner')" role="menuitem"><span class="nav-icon">📅</span>Lernplan</button>
-      <button class="nav-item" data-page="pomodoro" onclick="goPage('pomodoro')" role="menuitem"><span class="nav-icon">🍅</span>Pomodoro</button>
+      <span class="sidebar-section-label">${t('nav.learn')}</span>
+      <button class="nav-item" data-page="dashboard" onclick="goPage('dashboard')" role="menuitem"><span class="nav-icon">🏠</span>${t('nav.dashboard')}</button>
+      <button class="nav-item" data-page="subjects" onclick="goPage('subjects')" role="menuitem"><span class="nav-icon">📚</span>${t('nav.subjects')}</button>
+      <button class="nav-item" data-page="flashcards" onclick="goPage('flashcards')" role="menuitem"><span class="nav-icon">🃏</span>${t('nav.flashcards')}</button>
+      <button class="nav-item" data-page="tutor" onclick="goPage('tutor')" role="menuitem"><span class="nav-icon">🤖</span>${t('nav.tutor')}</button>
+      <button class="nav-item" data-page="exam" onclick="goPage('exam')" role="menuitem"><span class="nav-icon">📝</span>${t('nav.exam')}</button>
+      <span class="sidebar-section-label">${t('nav.organisation')}</span>
+      <button class="nav-item" data-page="planner" onclick="goPage('planner')" role="menuitem"><span class="nav-icon">📅</span>${t('nav.planner')}</button>
+      <button class="nav-item" data-page="pomodoro" onclick="goPage('pomodoro')" role="menuitem"><span class="nav-icon">🍅</span>${t('nav.pomodoro')}</button>
     `;
   } else if (U.role === 'parent') {
     html += `
@@ -1000,12 +1354,16 @@ function renderSidebar() {
   }
 
   html += `
-    <span class="sidebar-section-label">Konto</span>
-    <button class="nav-item" data-page="subscription" onclick="goPage('subscription')" role="menuitem"><span class="nav-icon">💎</span>Abo & Preise</button>
-    <button class="nav-item" data-page="settings" onclick="goPage('settings')" role="menuitem"><span class="nav-icon">⚙️</span>Einstellungen</button>
+    <span class="sidebar-section-label">${t('nav.account')}</span>
+    <button class="nav-item" data-page="subscription" onclick="goPage('subscription')" role="menuitem"><span class="nav-icon">💎</span>${t('nav.subscription')}</button>
+    <button class="nav-item" data-page="settings" onclick="goPage('settings')" role="menuitem"><span class="nav-icon">⚙️</span>${t('nav.settings')}</button>
   `;
 
   nav.innerHTML = html;
+
+  // Logout-Button übersetzen (liegt im statischen HTML-Footer)
+  const logoutBtn = document.querySelector('.sidebar-footer button[onclick="doLogout()"]');
+  if (logoutBtn) logoutBtn.innerHTML = `<span class="nav-icon">🚪</span> ${t('nav.logout')}`;
 }
 
 function updateXP() {
@@ -1014,7 +1372,8 @@ function updateXP() {
   const pct = (xp % 500) / 500 * 100;
   document.getElementById('xp-val').textContent = xp + ' XP · Lv.' + level;
   document.getElementById('xp-fill').style.width = pct + '%';
-  document.getElementById('streak-val').textContent = D.streak || 0;
+  const streakEl = document.getElementById('streak-chip');
+  if (streakEl) streakEl.innerHTML = `🔥 <span id="streak-val">${D.streak||0}</span> ${t('common.days')}`;
 }
 
 function toggleSidebar() {
@@ -1058,23 +1417,30 @@ function goPage(page, params={}) {
   const render = pages[page];
   if (!render) { goPage('dashboard'); return; }
 
+  const pageTitleKeys = {
+    dashboard:'page.dashboard', subjects:'page.subjects', flashcards:'page.flashcards',
+    tutor:'page.tutor', exam:'page.exam', planner:'page.planner', pomodoro:'page.pomodoro',
+    parent:'page.dashboard', children:'Kinder', teacher:'Lehrer-Dashboard',
+    subscription:'page.subscription', settings:'page.settings'
+  };
   const titles = {
     dashboard:'Dashboard', subjects:'Fächer', flashcards:'Karteikarten', tutor:'KI-Tutor',
     exam:'Prüfungsmodus', planner:'Lernplan', pomodoro:'Pomodoro',
     parent:'Eltern-Übersicht', children:'Kinder', teacher:'Lehrer-Dashboard',
     subscription:'Abo & Preise', settings:'Einstellungen'
   };
-  document.getElementById('header-title').textContent = titles[page] || page;
-  document.title = (titles[page] || page) + ' — StudyBuddy Pro';
+  const pageTitle = pageTitleKeys[page] ? t(pageTitleKeys[page]) : (titles[page] || page);
+  document.getElementById('header-title').textContent = pageTitle;
+  document.title = pageTitle + ' — StudyBuddy Pro';
 
   // Fehler-Rendering (synchron + asynchron)
   const _routerError = (e) => {
     console.error('[Router]', e);
     content.innerHTML = `<div style="text-align:center;padding:60px 20px">
       <div style="font-size:48px;margin-bottom:16px">⚠️</div>
-      <h2>Fehler beim Laden</h2>
+      <h2>${t('common.error_loading')}</h2>
       <p style="color:var(--t3);margin-top:8px">${safe(e.message)}</p>
-      <button class="btn btn-primary" style="margin-top:24px" onclick="goPage('dashboard')">Zum Dashboard</button>
+      <button class="btn btn-primary" style="margin-top:24px" onclick="goPage('dashboard')">${t('common.back_dashboard')}</button>
     </div>`;
   };
   try {
@@ -1094,47 +1460,47 @@ function dashboard(el) {
 
   el.innerHTML = `
     <div class="page-header">
-      <h1>Guten Tag, ${safe((U.full_name||U.email||'').split(' ')[0])}! 👋</h1>
-      <p>Dein Lernfortschritt auf einen Blick</p>
+      <h1>${t('dash.greeting', safe((U.full_name||U.email||'').split(' ')[0]))}</h1>
+      <p>${t('dash.subtitle')}</p>
     </div>
     <div class="grid-4" style="margin-bottom:24px;">
       <div class="stat-card">
         <div class="stat-icon">⭐</div>
         <div class="stat-value">${D.xp||0}</div>
-        <div class="stat-label">XP-Punkte</div>
+        <div class="stat-label">${t('dash.xp')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🔥</div>
         <div class="stat-value">${D.streak||0}</div>
-        <div class="stat-label">Tage Streak</div>
+        <div class="stat-label">${t('dash.streak')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🃏</div>
         <div class="stat-value">${dueCards}</div>
-        <div class="stat-label">Karten fällig</div>
+        <div class="stat-label">${t('dash.due_cards')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">✅</div>
         <div class="stat-value">${openTasks}</div>
-        <div class="stat-label">Aufgaben offen</div>
+        <div class="stat-label">${t('dash.open_tasks')}</div>
       </div>
     </div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><div class="card-title">📋 Aufgaben</div><button class="btn btn-primary btn-sm" onclick="goPage('planner')">Alle →</button></div>
-        ${(D.tasks||[]).filter(t=>!t.completed).slice(0,5).map(t=>`
+        <div class="card-header"><div class="card-title">${t('dash.tasks')}</div><button class="btn btn-primary btn-sm" onclick="goPage('planner')">${t('dash.all')}</button></div>
+        ${(D.tasks||[]).filter(tk=>!tk.completed).slice(0,5).map(tk=>`
           <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-            <input type="checkbox" onchange="completeTask('${t.id}',this.checked)" style="cursor:pointer;width:16px;height:16px;">
+            <input type="checkbox" onchange="completeTask('${tk.id}',this.checked)" style="cursor:pointer;width:16px;height:16px;">
             <div style="flex:1;">
-              <div style="font-size:14px;font-weight:500;">${safe(t.title)}</div>
-              <div style="font-size:12px;color:var(--t3);">${t.subject||''} ${t.due?'· fällig '+t.due:''}</div>
+              <div style="font-size:14px;font-weight:500;">${safe(tk.title)}</div>
+              <div style="font-size:12px;color:var(--t3);">${tk.subject||''} ${tk.due?'· '+t('dash.due')+' '+tk.due:''}</div>
             </div>
-          </div>`).join('') || '<p style="color:var(--t3);padding:16px 0;text-align:center;">Keine offenen Aufgaben 🎉</p>'}
+          </div>`).join('') || `<p style="color:var(--t3);padding:16px 0;text-align:center;">${t('dash.no_tasks')}</p>`}
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title">⚡ Schnellstart</div></div>
+        <div class="card-header"><div class="card-title">${t('dash.quickstart')}</div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          ${[['🃏','Karteikarten','flashcards'],['🤖','KI-Tutor','tutor'],['📝','Prüfung starten','exam'],['🍅','Pomodoro','pomodoro']].map(([e,n,p])=>`
+          ${[['🃏',t('nav.flashcards'),'flashcards'],['🤖',t('nav.tutor'),'tutor'],['📝',t('dash.start_exam'),'exam'],['🍅',t('nav.pomodoro'),'pomodoro']].map(([e,n,p])=>`
             <button class="btn btn-secondary" onclick="goPage('${p}')" style="flex-direction:column;height:72px;gap:4px;">
               <span style="font-size:22px;">${e}</span>
               <span style="font-size:12px;">${n}</span>
@@ -1144,7 +1510,7 @@ function dashboard(el) {
     </div>
     ${upcomingExams.length ? `
     <div class="card" style="margin-top:20px;">
-      <div class="card-header"><div class="card-title">📊 Letzte Prüfungsergebnisse</div></div>
+      <div class="card-header"><div class="card-title">${t('dash.recent_exams')}</div></div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${upcomingExams.map(ex=>{
           const pct = Math.round(ex.score/ex.total*100);
@@ -1163,19 +1529,19 @@ function dashboard(el) {
 }
 
 function completeTask(id, done) {
-  const task = D.tasks.find(t=>t.id===id);
-  if (task) { task.completed = done; save(); toast(done ? '✅ Aufgabe erledigt!' : 'Aufgabe wieder offen'); }
+  const task = D.tasks.find(tk=>tk.id===id);
+  if (task) { task.completed = done; save(); toast(done ? t('toast.task_done') : t('toast.task_open')); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: FÄCHER
 // ═══════════════════════════════════════════════════════════════════════════
 function subjects(el) {
-  const subs = CFG.SUBJECTS[U.grade||9] || CFG.SUBJECTS[9];
+  const subs = getChildSubjects();
   el.innerHTML = `
     <div class="page-header">
-      <h1>📚 Fächer</h1>
-      <p>Klasse ${U.grade||9} · ${subs.length} Fächer</p>
+      <h1>${t('subj.title')}</h1>
+      <p>${t('subj.subtitle', U.grade||9, subs.length)}</p>
     </div>
     <div class="grid-auto">
       ${subs.map(s => {
@@ -1185,7 +1551,7 @@ function subjects(el) {
         return `<div class="card card-hover" onclick="goPage('flashcards',{subject:'${s}'})" style="cursor:pointer;border-left:4px solid ${m.c};">
           <div style="font-size:28px;margin-bottom:8px;">${m.e}</div>
           <div style="font-weight:700;font-size:15px;">${safe(s)}</div>
-          <div style="font-size:12px;color:var(--t3);margin-top:4px;">${cards} Karten ${due>0?`· <span style="color:var(--acc-yellow)">${due} fällig</span>`:''}</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:4px;">${cards} ${t('subj.cards')} ${due>0?`· <span style="color:var(--acc-yellow)">${due} ${t('subj.due')}</span>`:''}</div>
         </div>`;}).join('')}
     </div>`;
 }
@@ -1196,7 +1562,7 @@ function subjects(el) {
 let FC = { subj:null, idx:0, flipped:false };
 
 function flashcards(el, params={}) {
-  const subs = CFG.SUBJECTS[U.grade||9]||CFG.SUBJECTS[9];
+  const subs = getChildSubjects();
   FC.subj = params.subject || FC.subj || subs[0];
   renderFC(el);
 }
@@ -1209,8 +1575,8 @@ function renderFC(el) {
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
       <div>
-        <h1>🃏 Karteikarten</h1>
-        <p>${due.length} fällig · ${cards.length} gesamt</p>
+        <h1>${t('fc.title')}</h1>
+        <p>${t('fc.due_total', due.length, cards.length)}</p>
       </div>
       <select class="input" style="width:auto;" onchange="FC.subj=this.value;FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
         ${getChildSubjects().map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
@@ -1221,37 +1587,41 @@ function renderFC(el) {
     <div style="max-width:500px;margin:0 auto;">
       <div onclick="FC.flipped=!FC.flipped;renderFC(document.getElementById('content'))"
            style="background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-xl);padding:48px 32px;text-align:center;cursor:pointer;min-height:200px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;box-shadow:var(--shadow-md);transition:transform .1s;" onmouseover="this.style.transform='scale(1.01)'" onmouseout="this.style.transform='scale(1)'">
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);">${FC.flipped?'Antwort':'Frage'} ${FC.idx+1}/${due.length}</div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);">${FC.flipped?t('fc.answer'):t('fc.question')} ${FC.idx+1}/${due.length}</div>
         <div style="font-size:18px;font-weight:600;line-height:1.5;">${safe(FC.flipped?card.back:card.front)}</div>
-        <div style="font-size:12px;color:var(--t3);">Klicken zum ${FC.flipped?'zurückdrehen':'Aufdecken'}</div>
+        <div style="font-size:12px;color:var(--t3);">${FC.flipped?t('fc.flip_back'):t('fc.flip_reveal')}</div>
       </div>
       ${FC.flipped ? `
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px;">
-        ${[['😕','Falsch',0],['😐','Schwer',1],['🙂','Ok',2],['😄','Leicht',3]].map(([e,l,r])=>`
+        ${[['😕',t('fc.wrong'),0],['😐',t('fc.hard'),1],['🙂',t('fc.ok'),2],['😄',t('fc.easy'),3]].map(([e,l,r])=>`
           <button class="btn btn-secondary" onclick="rateCard('${card.id||FC.idx}','${FC.subj}',${r})" style="flex-direction:column;height:64px;font-size:11px;gap:2px;">
             <span style="font-size:20px;">${e}</span><span>${l}</span>
           </button>`).join('')}
-      </div>` : `<p style="text-align:center;color:var(--t3);margin-top:16px;font-size:13px;">Klicke auf die Karte um die Antwort zu sehen</p>`}
+      </div>` : `<p style="text-align:center;color:var(--t3);margin-top:16px;font-size:13px;">${t('fc.tap_hint')}</p>`}
     </div>` : `
     <div style="text-align:center;padding:60px 20px;">
       <div style="font-size:48px;margin-bottom:16px;">🎉</div>
-      <h2>Alle Karten für heute gelernt!</h2>
-      <p style="color:var(--t3);margin-top:8px;">Super Arbeit! Neue Karten werden morgen fällig.</p>
+      <h2>${t('fc.done_title')}</h2>
+      <p style="color:var(--t3);margin-top:8px;">${t('fc.done_sub')}</p>
     </div>`}
 
     <div class="card" style="margin-top:24px;">
-      <div class="card-header"><div class="card-title">➕ Neue Karte / KI-Generierung</div></div>
+      <div class="card-header"><div class="card-title">${t('fc.new_card')}</div></div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="grid-2">
-          <div class="field"><label>Vorderseite (Frage)</label><input class="input" id="nf" placeholder="Was ist...?"></div>
-          <div class="field"><label>Rückseite (Antwort)</label><input class="input" id="nb" placeholder="Die Antwort..."></div>
+          <div class="field"><label>${t('fc.front')}</label><input class="input" id="nf" placeholder="${t('fc.front_ph')}"></div>
+          <div class="field"><label>${t('fc.back')}</label><input class="input" id="nb" placeholder="${t('fc.back_ph')}"></div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="manualAddCard()" style="align-self:flex-start;">Karte hinzufügen</button>
-        <div class="divider-text">oder mit KI generieren</div>
-        <div class="field"><label>Text eingeben (KI erstellt daraus Karten)</label><textarea class="input" id="gen-t" rows="3" placeholder="Lernstoff hier einfügen..."></textarea></div>
+        <button class="btn btn-primary btn-sm" onclick="manualAddCard()" style="align-self:flex-start;">${t('fc.add_card')}</button>
+        <div class="divider-text">${t('fc.or_ai')}</div>
+        <div class="field"><label>${t('fc.ai_label')}</label><textarea class="input" id="gen-t" rows="3" placeholder="${t('fc.ai_ph')}"></textarea></div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <select class="input" id="gen-n" style="width:100px;"><option value="3">3 Karten</option><option value="5" selected>5 Karten</option><option value="8">8 Karten</option></select>
-          <button class="btn btn-primary btn-sm" onclick="genCards()">🤖 KI-Karten erstellen</button>
+          <select class="input" id="gen-n" style="width:120px;">
+            <option value="3">${t('fc.ai_n',3)}</option>
+            <option value="5" selected>${t('fc.ai_n',5)}</option>
+            <option value="8">${t('fc.ai_n',8)}</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="genCards()">${t('fc.ai_btn')}</button>
         </div>
       </div>
     </div>`;
@@ -1288,10 +1658,10 @@ function rateCard(id, subj, rating) {
 function manualAddCard() {
   const front = document.getElementById('nf')?.value.trim();
   const back = document.getElementById('nb')?.value.trim();
-  if (!front || !back) return toast('Vorder- und Rückseite ausfüllen!');
+  if (!front || !back) return toast(t('toast.fill_card'));
   if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
   D.cards[FC.subj].push({id:'c'+Date.now(),front,back,level:0,due:0});
-  save(); toast('Karte hinzugefügt! ✓');
+  save(); toast(t('toast.card_added'));
   document.getElementById('nf').value=''; document.getElementById('nb').value='';
   renderFC(document.getElementById('content'));
 }
@@ -1304,8 +1674,8 @@ function manualAddCard() {
  */
 async function genCards() {
   const text = document.getElementById('gen-t')?.value.trim();
-  if (!text) return toast('Text eingeben!');
-  if (!hasActiveKey()) return toast('API Key in Einstellungen eintragen!');
+  if (!text) return toast(t('toast.enter_text'));
+  if (!hasActiveKey()) return toast(t('toast.need_api_key'));
   const num = parseInt(document.getElementById('gen-n')?.value||5);
   toast('🤖 KI erstellt Karten…');
   try {
@@ -1332,7 +1702,7 @@ function tutor(el) {
   const subs = getChildSubjects();
   tutorSubj = subs[0]||'Allgemein';
   el.innerHTML = `
-    <div class="page-header"><h1>🤖 KI-Tutor</h1><p>Frag mich alles — ich helfe dir beim Lernen!</p></div>
+    <div class="page-header"><h1>${t('tutor.title')}</h1><p>${t('tutor.subtitle')}</p></div>
     <div style="max-width:720px;margin:0 auto;">
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
         <select class="input" style="width:auto;" onchange="tutorSubj=this.value">
@@ -1341,14 +1711,14 @@ function tutor(el) {
       </div>
       <div id="chat-msgs" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;min-height:360px;max-height:480px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
         <div style="background:var(--pri-l);color:var(--pri-d);padding:12px 16px;border-radius:var(--r-md);max-width:85%;font-size:14px;">
-          👋 Hallo! Ich bin dein KI-Tutor. Stell mir eine Frage zu ${tutorSubj} oder einem anderen Fach — ich helfe dir gerne!
+          ${t('tutor.greeting', tutorSubj)}
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:12px;">
-        <input class="input" id="chat-in" placeholder="Frag mich etwas…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}">
-        <button class="btn btn-primary" onclick="sendMsg()">Senden →</button>
+        <input class="input" id="chat-in" placeholder="${t('tutor.placeholder')}" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}">
+        <button class="btn btn-primary" onclick="sendMsg()">${t('tutor.send')}</button>
       </div>
-      <p style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">${hasActiveKey()?`✓ ${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider} aktiv`:'⚠️ Kein API Key — <a onclick="goPage(\'settings\')" style="cursor:pointer;color:var(--pri)">Einstellungen</a>'}</p>
+      <p style="font-size:11px;color:var(--t3);margin-top:8px;text-align:center;">${hasActiveKey()?`✓ ${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider} aktiv`:t('tutor.no_key')}</p>
     </div>`;
 }
 
@@ -1362,12 +1732,12 @@ async function sendMsg() {
   const inp = document.getElementById('chat-in');
   const text = inp?.value.trim();
   if (!text) return;
-  if (!hasActiveKey()) return toast('API Key in Einstellungen eintragen!');
+  if (!hasActiveKey()) return toast(t('toast.need_api_key'));
   inp.value = '';
 
   const msgs = document.getElementById('chat-msgs');
   msgs.innerHTML += `<div style="background:var(--pri);color:white;padding:12px 16px;border-radius:var(--r-md);max-width:85%;align-self:flex-end;font-size:14px;">${safe(text)}</div>`;
-  msgs.innerHTML += `<div id="typing" style="color:var(--t3);font-size:13px;animation:pulse 1s infinite;">✍️ Tutor tippt…</div>`;
+  msgs.innerHTML += `<div id="typing" style="color:var(--t3);font-size:13px;animation:pulse 1s infinite;">${t('tutor.typing')}</div>`;
   msgs.scrollTop = msgs.scrollHeight;
 
   tutorMsgs.push({role:'user', content:text});
@@ -1479,24 +1849,28 @@ function exam(el) {
   if (EX.active) { renderExam(el); return; }
   const subs = getChildSubjects();
   el.innerHTML = `
-    <div class="page-header"><h1>📝 Prüfungsmodus</h1><p>Teste dein Wissen mit KI-generierten Fragen</p></div>
+    <div class="page-header"><h1>${t('exam.title')}</h1><p>${t('exam.subtitle')}</p></div>
     <div style="max-width:500px;margin:0 auto;">
       <div class="card">
-        <div class="card-header"><div class="card-title">Neue Prüfung starten</div></div>
+        <div class="card-header"><div class="card-title">${t('exam.new')}</div></div>
         <div style="display:flex;flex-direction:column;gap:14px;">
-          <div class="field"><label>Fach</label>
+          <div class="field"><label>${t('exam.subject')}</label>
             <select class="input" id="ex-subj">${subs.map(s=>`<option>${s}</option>`).join('')}</select>
           </div>
-          <div class="field"><label>Anzahl Fragen</label>
-            <select class="input" id="ex-num"><option value="5">5 Fragen</option><option value="8">8 Fragen</option><option value="10">10 Fragen</option></select>
+          <div class="field"><label>${t('exam.num_q')}</label>
+            <select class="input" id="ex-num">
+              <option value="5">${t('exam.q5')}</option>
+              <option value="8">${t('exam.q8')}</option>
+              <option value="10">${t('exam.q10')}</option>
+            </select>
           </div>
-          <button class="btn btn-primary" onclick="startExam()">🚀 Prüfung starten</button>
-          <p style="font-size:12px;color:var(--t3);">${hasActiveKey()?`✓ KI-Modus aktiv (${PROVIDERS[AI.provider]?.emoji||''} ${PROVIDERS[AI.provider]?.name||AI.provider})`:'⚠️ Ohne API Key: Beispielfragen'}</p>
+          <button class="btn btn-primary" onclick="startExam()">${t('exam.start')}</button>
+          <p style="font-size:12px;color:var(--t3);">${hasActiveKey()?t('exam.ai_active', PROVIDERS[AI.provider]?.emoji||'', PROVIDERS[AI.provider]?.name||AI.provider):t('exam.fallback')}</p>
         </div>
       </div>
       ${(D.exams||[]).length ? `
       <div class="card" style="margin-top:20px;">
-        <div class="card-header"><div class="card-title">Letzte Ergebnisse</div></div>
+        <div class="card-header"><div class="card-title">${t('exam.recent')}</div></div>
         ${(D.exams||[]).slice(-5).reverse().map(e=>{
           const pct=Math.round(e.score/e.total*100);
           const c=pct>=70?'var(--acc-green)':pct>=50?'var(--acc-yellow)':'var(--acc-red)';
@@ -1516,7 +1890,7 @@ async function startExam() {
   const subj = document.getElementById('ex-subj')?.value;
   const num = parseInt(document.getElementById('ex-num')?.value||5);
   const el = document.getElementById('content');
-  el.innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner" style="width:32px;height:32px;"></div><p style="margin-top:16px;color:var(--t3);">KI generiert Fragen…</p></div>';
+  el.innerHTML = `<div style="text-align:center;padding:60px"><div class="spinner" style="width:32px;height:32px;"></div><p style="margin-top:16px;color:var(--t3);">${t('exam.generating')}</p></div>`;
 
   let qs = [];
   if (hasActiveKey()) {
@@ -1540,7 +1914,7 @@ async function startExam() {
     renderExam(el);
   } catch(e) {
     console.error('[startExam renderExam]', e);
-    if (el) el.innerHTML = `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--error);">❌ Fehler beim Laden: ${safe(e.message)}</p><button class="btn btn-primary" style="margin-top:16px;" onclick="goPage('exam')">Zurück</button></div>`;
+    if (el) el.innerHTML = `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--error);">❌ ${t('common.error_loading')}: ${safe(e.message)}</p><button class="btn btn-primary" style="margin-top:16px;" onclick="goPage('exam')">${t('exam.error_back')}</button></div>`;
   }
 }
 
@@ -1549,7 +1923,7 @@ function renderExam(el) {
   const q = EX.qs[EX.idx];
   const pct = Math.round((EX.idx)/EX.qs.length*100);
   el.innerHTML = `
-    <div class="page-header"><h1>📝 ${safe(EX.subj)} — Frage ${EX.idx+1}/${EX.qs.length}</h1></div>
+    <div class="page-header"><h1>📝 ${safe(EX.subj)} — ${t('exam.question')} ${EX.idx+1}/${EX.qs.length}</h1></div>
     <div style="max-width:600px;margin:0 auto;">
       <div class="progress" style="margin-bottom:20px;"><div class="progress-bar" style="width:${pct}%"></div></div>
       <div class="card" style="margin-bottom:16px;">
@@ -1596,7 +1970,7 @@ function endExam(el) {
   EX.active = false;
   const pct = Math.round(EX.score/EX.qs.length*100);
   const emoji = pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '💪';
-  const msg = pct >= 80 ? 'Ausgezeichnet!' : pct >= 60 ? 'Gut gemacht!' : 'Weiter üben!';
+  const msg = pct >= 80 ? t('exam.excellent') : pct >= 60 ? t('exam.good') : t('exam.practice');
 
   D.exams = [...(D.exams||[]), {id:'e'+Date.now(),subject:EX.subj,score:EX.score,total:EX.qs.length,date:new Date().toISOString()}];
   D.xp = (D.xp||0) + CFG.XP.EXAM; save(); updateXP();
@@ -1606,11 +1980,11 @@ function endExam(el) {
       <div style="font-size:64px;margin-bottom:16px;">${emoji}</div>
       <h1 style="font-size:28px;">${msg}</h1>
       <div style="font-size:48px;font-weight:800;color:var(--pri);margin:16px 0;">${pct}%</div>
-      <p style="color:var(--t2);">${EX.score} von ${EX.qs.length} Fragen richtig</p>
+      <p style="color:var(--t2);">${t('exam.correct_of', EX.score, EX.qs.length)}</p>
       <div class="progress" style="margin:20px 0;height:10px;"><div class="progress-bar" style="width:${pct}%;background:${pct>=70?'var(--acc-green)':pct>=50?'var(--acc-yellow)':'var(--acc-red)'}"></div></div>
       <div style="display:flex;gap:10px;justify-content:center;margin-top:24px;">
-        <button class="btn btn-primary" onclick="goPage('exam')">Nochmal</button>
-        <button class="btn btn-secondary" onclick="goPage('dashboard')">Dashboard</button>
+        <button class="btn btn-primary" onclick="goPage('exam')">${t('exam.retry')}</button>
+        <button class="btn btn-secondary" onclick="goPage('dashboard')">${t('nav.dashboard')}</button>
       </div>
     </div>`;
 }
@@ -1619,24 +1993,24 @@ function endExam(el) {
 // PAGE: LERNPLAN
 // ═══════════════════════════════════════════════════════════════════════════
 function planner(el) {
-  const subs = CFG.SUBJECTS[U.grade||9]||[];
+  const subs = getChildSubjects();
   const today = new Date().toISOString().split('T')[0];
   el.innerHTML = `
-    <div class="page-header"><h1>📅 Lernplan</h1><p>Aufgaben und Prüfungsvorbereitung</p></div>
+    <div class="page-header"><h1>${t('plan.title')}</h1><p>${t('plan.subtitle')}</p></div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><div class="card-title">✏️ Aufgabe hinzufügen</div></div>
+        <div class="card-header"><div class="card-title">${t('plan.add')}</div></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
-          <div class="field"><label>Titel</label><input class="input" id="t-title" placeholder="Hausaufgaben, Zusammenfassung…"></div>
+          <div class="field"><label>${t('plan.title_label')}</label><input class="input" id="t-title" placeholder="${t('plan.title_ph')}"></div>
           <div class="grid-2">
-            <div class="field"><label>Fach</label><select class="input" id="t-subj">${subs.map(s=>`<option>${s}</option>`).join('')}</select></div>
-            <div class="field"><label>Fällig</label><input class="input" id="t-due" type="date" value="${today}"></div>
+            <div class="field"><label>${t('plan.subject_label')}</label><select class="input" id="t-subj">${subs.map(s=>`<option>${s}</option>`).join('')}</select></div>
+            <div class="field"><label>${t('plan.due_label')}</label><input class="input" id="t-due" type="date" value="${today}"></div>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="addTask()">Hinzufügen</button>
+          <button class="btn btn-primary btn-sm" onclick="addTask()">${t('plan.add_btn')}</button>
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title">📋 Alle Aufgaben</div></div>
+        <div class="card-header"><div class="card-title">${t('plan.all_tasks')}</div></div>
         <div id="task-list" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;">
           ${renderTaskList()}
         </div>
@@ -1646,7 +2020,7 @@ function planner(el) {
 
 function renderTaskList() {
   const tasks = D.tasks||[];
-  if (!tasks.length) return '<p style="color:var(--t3);text-align:center;padding:20px;">Noch keine Aufgaben</p>';
+  if (!tasks.length) return `<p style="color:var(--t3);text-align:center;padding:20px;">${t('plan.no_tasks')}</p>`;
   return tasks.map(t=>`
     <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-2);border-radius:var(--r-md);${t.completed?'opacity:.5':''}">
       <input type="checkbox" ${t.completed?'checked':''} onchange="completeTask('${t.id}',this.checked);document.getElementById('task-list').innerHTML=renderTaskList();" style="cursor:pointer;">
@@ -1662,9 +2036,9 @@ function addTask() {
   const title = document.getElementById('t-title')?.value.trim();
   const subj = document.getElementById('t-subj')?.value;
   const due = document.getElementById('t-due')?.value;
-  if (!title) return toast('Titel eingeben!');
+  if (!title) return toast(t('toast.enter_title'));
   D.tasks = [...(D.tasks||[]), {id:'t'+Date.now(),title,subject:subj,due,completed:false}];
-  save(); toast('✅ Aufgabe hinzugefügt!');
+  save(); toast(t('toast.task_added'));
   document.getElementById('t-title').value='';
   document.getElementById('task-list').innerHTML = renderTaskList();
 }
@@ -1690,28 +2064,28 @@ function renderPomo(el) {
   const sec = (PO.sec%60).toString().padStart(2,'0');
   const progress = PO.isBreak ? (1-(PO.sec/(PO.break*60)))*100 : (1-(PO.sec/(PO.work*60)))*100;
   el.innerHTML = `
-    <div class="page-header"><h1>🍅 Pomodoro-Timer</h1><p>Fokussiertes Lernen in Intervallen</p></div>
+    <div class="page-header"><h1>${t('pomo.title')}</h1><p>${t('pomo.subtitle')}</p></div>
     <div style="max-width:400px;margin:0 auto;text-align:center;">
       <div class="card" style="padding:40px;">
         <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:${PO.isBreak?'var(--acc-green)':'var(--pri)'};margin-bottom:16px;">
-          ${PO.isBreak?'☕ Pause':'🎯 Fokus'} · Session ${PO.sessions+1}
+          ${PO.isBreak?t('pomo.break'):t('pomo.focus')} · ${t('pomo.session')} ${PO.sessions+1}
         </div>
         <div style="font-size:64px;font-weight:800;letter-spacing:-2px;color:var(--t1);font-variant-numeric:tabular-nums;">${min}:${sec}</div>
         <div class="progress" style="margin:20px 0;height:8px;"><div class="progress-bar" style="width:${progress}%;background:${PO.isBreak?'var(--acc-green)':'var(--pri)'}"></div></div>
         <div style="display:flex;gap:10px;justify-content:center;margin-top:8px;">
-          <button class="btn btn-primary btn-lg" onclick="togglePomo()">${PO.running?'⏸ Pause':'▶ Start'}</button>
-          <button class="btn btn-secondary" onclick="resetPomo()">↺ Reset</button>
+          <button class="btn btn-primary btn-lg" onclick="togglePomo()">${PO.running?t('pomo.pause_btn'):t('pomo.start_btn')}</button>
+          <button class="btn btn-secondary" onclick="resetPomo()">${t('pomo.reset')}</button>
         </div>
       </div>
       <div class="card" style="margin-top:16px;">
         <div style="display:flex;justify-content:space-around;">
-          <div><div style="font-size:13px;color:var(--t3);">Fokus</div>
+          <div><div style="font-size:13px;color:var(--t3);">${t('pomo.focus_label')}</div>
             <input type="number" value="${PO.work}" min="5" max="60" class="input" style="width:60px;text-align:center;" onchange="PO.work=parseInt(this.value)||25;if(!PO.running){PO.sec=PO.work*60;renderPomo(document.getElementById('content'));}">
           </div>
-          <div><div style="font-size:13px;color:var(--t3);">Pause</div>
+          <div><div style="font-size:13px;color:var(--t3);">${t('pomo.break_label')}</div>
             <input type="number" value="${PO.break}" min="1" max="30" class="input" style="width:60px;text-align:center;" onchange="PO.break=parseInt(this.value)||5;">
           </div>
-          <div><div style="font-size:13px;color:var(--t3);">Sessions</div>
+          <div><div style="font-size:13px;color:var(--t3);">${t('pomo.sessions')}</div>
             <div style="font-size:24px;font-weight:700;">${PO.sessions}</div>
           </div>
         </div>
@@ -1730,10 +2104,10 @@ function togglePomo() {
         if (!PO.isBreak) {
           PO.sessions++; PO.isBreak=true; PO.sec=PO.break*60;
           D.xp=(D.xp||0)+CFG.XP.POMO; save(); updateXP();
-          toast('🎉 Fokus-Session geschafft! +'+CFG.XP.POMO+' XP. Pause!');
+          toast(t('pomo.done', CFG.XP.POMO));
         } else {
           PO.isBreak=false; PO.sec=PO.work*60;
-          toast('⏰ Pause vorbei! Neue Fokus-Session.');
+          toast(t('pomo.break_over'));
         }
       }
       if (_page === 'pomodoro') renderPomo(document.getElementById('content'));
@@ -2154,20 +2528,20 @@ function subscription(el) {
 // ═══════════════════════════════════════════════════════════════════════════
 function settings(el) {
   el.innerHTML = `
-    <div class="page-header"><h1>⚙️ Einstellungen</h1></div>
+    <div class="page-header"><h1>${t('settings.title')}</h1></div>
     <div style="max-width:600px;display:flex;flex-direction:column;gap:20px;">
       <div class="card">
-        <div class="card-header"><div class="card-title">👤 Profil</div></div>
+        <div class="card-header"><div class="card-title">${t('settings.profile')}</div></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div class="grid-2">
-            <div class="field"><label>Name</label><input class="input" id="s-name" value="${safe(U.full_name||'')}"></div>
-            <div class="field"><label>E-Mail</label><input class="input" value="${safe(U.email||'')}" readonly></div>
+            <div class="field"><label>${t('settings.name')}</label><input class="input" id="s-name" value="${safe(U.full_name||'')}"></div>
+            <div class="field"><label>${t('settings.email')}</label><input class="input" value="${safe(U.email||'')}" readonly></div>
           </div>
           ${U.role==='student'?`<div class="grid-2">
-            <div class="field"><label>Klasse</label><select class="input" id="s-grade">${CFG.GRADES.map(g=>`<option value="${g}" ${U.grade==g?'selected':''}>${g}. Klasse</option>`).join('')}</select></div>
-            <div class="field"><label>Schulform</label><select class="input" id="s-school">${CFG.SCHOOL_TYPES.map(s=>`<option ${U.school===s?'selected':''}>${s}</option>`).join('')}</select></div>
+            <div class="field"><label>${t('settings.grade')}</label><select class="input" id="s-grade">${CFG.GRADES.map(g=>`<option value="${g}" ${U.grade==g?'selected':''}>${t('settings.grade_option',g)}</option>`).join('')}</select></div>
+            <div class="field"><label>${t('settings.school_type')}</label><select class="input" id="s-school">${CFG.SCHOOL_TYPES.map(s=>`<option ${U.school===s?'selected':''}>${s}</option>`).join('')}</select></div>
           </div>`:''}
-          <button class="btn btn-primary btn-sm" onclick="saveProfile()">Profil speichern</button>
+          <button class="btn btn-primary btn-sm" onclick="saveProfile()">${t('settings.save_profile')}</button>
         </div>
       </div>
       ${U.isChild && U.canManageSubjects ? (() => {
@@ -2179,9 +2553,9 @@ function settings(el) {
         const isCustom = !!customSubjs;
         const availableToAdd = gradeSubjs.filter(s => !mySubjs.includes(s));
         return `<div class="card">
-          <div class="card-header"><div class="card-title">📚 Meine Fächer</div></div>
+          <div class="card-header"><div class="card-title">${t('settings.my_subjects')}</div></div>
           <div style="display:flex;flex-direction:column;gap:14px;">
-            <p style="font-size:13px;color:var(--t2);">Du kannst deine Fächer selbst anpassen — dein Elternteil hat das erlaubt.</p>
+            <p style="font-size:13px;color:var(--t2);">${t('settings.subjects_note')}</p>
             <div style="display:flex;flex-wrap:wrap;gap:8px;">
               ${mySubjs.map(s=>`
                 <span style="display:inline-flex;align-items:center;gap:6px;background:var(--pri-l);color:var(--pri-d);padding:4px 10px;border-radius:20px;font-size:13px;font-weight:600;">
@@ -2191,21 +2565,21 @@ function settings(el) {
             </div>
             ${availableToAdd.length > 0 ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <select class="input" id="child-add-subj" style="max-width:220px;">
-                <option value="">— Fach hinzufügen —</option>
+                <option value="">${t('settings.add_subject_ph')}</option>
                 ${availableToAdd.map(s=>`<option value="${safe(s)}">${safe(s)}</option>`).join('')}
               </select>
-              <button class="btn btn-secondary btn-sm" onclick="childToggleSubject(document.getElementById('child-add-subj').value, true)">+ Hinzufügen</button>
+              <button class="btn btn-secondary btn-sm" onclick="childToggleSubject(document.getElementById('child-add-subj').value, true)">${t('settings.add_subject_btn')}</button>
             </div>` : ''}
-            ${isCustom ? `<button class="btn btn-sm" style="background:none;border:1px solid var(--border);color:var(--t2);font-size:12px;align-self:flex-start;" onclick="childResetSubjects()">↩ Fächer zurücksetzen</button>` : ''}
+            ${isCustom ? `<button class="btn btn-sm" style="background:none;border:1px solid var(--border);color:var(--t2);font-size:12px;align-self:flex-start;" onclick="childResetSubjects()">${t('settings.reset_subjects')}</button>` : ''}
           </div>
         </div>`;
       })() : ''}
       <div class="card">
-        <div class="card-header"><div class="card-title">🤖 KI-Einstellungen</div></div>
+        <div class="card-header"><div class="card-title">${t('settings.ai')}</div></div>
         <div style="display:flex;flex-direction:column;gap:14px;">
-          ${U.isChild ? `<div style="background:var(--pri-l);color:var(--pri-d);padding:10px 14px;border-radius:var(--r-md);font-size:13px;">🔑 API Keys werden vom Eltern-Account übernommen.</div>` : ''}
+          ${U.isChild ? `<div style="background:var(--pri-l);color:var(--pri-d);padding:10px 14px;border-radius:var(--r-md);font-size:13px;">${t('settings.key_inherited')}</div>` : ''}
           <div class="field">
-            <label>KI-Anbieter</label>
+            <label>${t('settings.provider')}</label>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               ${Object.entries(PROVIDERS).map(([k,p])=>`
                 <button class="btn btn-sm ${AI.provider===k?'btn-primary':'btn-secondary'}"
@@ -2235,9 +2609,9 @@ function settings(el) {
         </div>
       </div>
       <div class="card" style="border-color:var(--danger);">
-        <div class="card-header"><div class="card-title" style="color:var(--danger);">⚠️ Gefahrenzone</div></div>
-        <p style="font-size:13px;color:var(--t2);margin-bottom:12px;">Lernfortschritte zurücksetzen (DSGVO: Recht auf Löschung)</p>
-        <button class="btn btn-danger btn-sm" onclick="resetData()">Alle Lernfortschritte löschen</button>
+        <div class="card-header"><div class="card-title" style="color:var(--danger);">${t('settings.danger')}</div></div>
+        <p style="font-size:13px;color:var(--t2);margin-bottom:12px;">${t('settings.reset_note')}</p>
+        <button class="btn btn-danger btn-sm" onclick="resetData()">${t('settings.reset_btn')}</button>
       </div>
     </div>`;
 }
@@ -2248,7 +2622,7 @@ function saveProfile() {
     U.grade = document.getElementById('s-grade')?.value || U.grade;
     U.school = document.getElementById('s-school')?.value || U.school;
   }
-  save(); renderSidebar(); toast('✅ Profil gespeichert!');
+  save(); renderSidebar(); toast(t('toast.profile_saved'));
 }
 
 /**
