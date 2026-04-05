@@ -2005,12 +2005,26 @@ async function saveProviderKey(providerKey) {
  */
 async function testKeyConnection(providerKey, key) {
   try {
+    // Supabase-Gateway erfordert entweder JWT oder Anon-Key als Header.
+    // SB_KEY ist der öffentliche Anon-Key (bereits im Frontend, kein Geheimnis).
+    const headers = {
+      'Content-Type': 'application/json',
+      'apikey': SB_KEY,          // Supabase-Gateway-Auth (Anon-Key)
+    };
+    // JWT mitschicken falls Nutzer eingeloggt — erhöht Rate-Limit-Quota
+    if (sb) {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session?.access_token) headers['Authorization'] = 'Bearer ' + session.access_token;
+      } catch {}
+    }
+
     const r = await fetch(CFG.AI_PROXY, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         provider: providerKey,
-        apiKey:   key,   // immer direkt übergeben — testet genau diesen Key
+        apiKey:   key,    // direkt übergeben — Edge Function nutzt diesen Key statt DB-Lookup
         messages: [{ role: 'user', content: 'Reply with just the word OK.' }],
         system:   'You are a connection test. Reply with only the word OK.',
         maxTok:   5,
