@@ -546,26 +546,32 @@ async function ai(messages, system, maxTok=400, useCache=true) {
   const headers = { 'Content-Type': 'application/json' };
   const payload = { provider: prov, messages, system, maxTok };
 
-  // Authentifizierter Nutzer: JWT → Edge Function liest Key aus DB
-  if (sb && !U?.isChild) {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session?.access_token) {
-      headers['Authorization'] = 'Bearer ' + session.access_token;
-    }
-  }
+  // Supabase-Gateway benötigt immer Bearer-Token — SB_KEY (anon JWT)
+  headers['Authorization'] = 'Bearer ' + SB_KEY;
 
-  // Kind/Demo: Key aus Memory (selbes Gerät) oder Proxy-Lookup per childId (geräteübergreifend)
-  if (!headers['Authorization']) {
-    // Supabase-Gateway benötigt immer einen Bearer-Token — SB_KEY (anon JWT) als Fallback
-    headers['Authorization'] = 'Bearer ' + SB_KEY;
-    const key = activeKey();
-    if (key) {
-      payload.apiKey = key; // Selbes Gerät: Key aus localStorage
-    } else if (U?.isChild && U?.id) {
-      payload.childId = U.id; // Anderes Gerät: Proxy holt Parent-Key aus DB anhand childId
+  const ramKey = activeKey();
+
+  if (ramKey) {
+    // Pfad 1: Key im RAM (gerade eingegeben oder noch nicht aus DB gelöscht)
+    payload.apiKey = ramKey;
+  } else if (U?.isChild && U?.id) {
+    // Pfad 2: Kind → Proxy holt Parent-Key aus DB anhand childId
+    payload.childId = U.id;
+  } else if (sb && U?.id && !U?.isChild) {
+    // Pfad 3: Authentifizierter Elternteil → Key aus DB laden und im Body senden
+    // (User-JWT vom Gateway für Edge Functions abgelehnt → Key client-seitig aus DB holen)
+    const { data: keyRow } = await sb.from('api_keys')
+      .select('api_key')
+      .eq('user_id', U.id)
+      .eq('provider', prov)
+      .maybeSingle();
+    if (keyRow?.api_key) {
+      payload.apiKey = keyRow.api_key;
     } else {
-      throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — Elternteil trägt ihn in Einstellungen ein`);
+      throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — bitte in Einstellungen eintragen`);
     }
+  } else {
+    throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — Elternteil trägt ihn in Einstellungen ein`);
   }
 
   const r = await fetch(CFG.AI_PROXY, {

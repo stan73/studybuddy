@@ -109,20 +109,29 @@ serve(async (req: Request) => {
     }
 
     // Pfad 3: Authentifizierter Nutzer → Key via JWT aus DB laden
+    // JWT wird lokal dekodiert (Gateway hat Signatur bereits validiert)
     if (!apiKey && !passedChildId) {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader) return err(401, "Nicht autorisiert — bitte einloggen");
 
-      const {
-        data: { user },
-        error: authErr,
-      } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
-      if (authErr || !user) return err(401, "Ungültiger Session-Token");
+      const token = authHeader.replace("Bearer ", "");
+      let userId: string | null = null;
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        // Nur echte User-JWTs akzeptieren (role=authenticated, sub=UUID)
+        if (payload.role === "authenticated" && payload.sub) {
+          userId = payload.sub;
+        }
+      } catch {
+        return err(401, "Ungültiger Token-Format");
+      }
+
+      if (!userId) return err(401, "Kein authentifizierter Nutzer");
 
       const { data: keyRow } = await supabase
         .from("api_keys")
         .select("api_key")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("provider", provider)
         .maybeSingle();
 
