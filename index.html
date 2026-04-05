@@ -561,6 +561,9 @@ async function doChildLogin() {
   const btn = document.querySelector('#auth-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
+  // Eltern-Session abmelden damit init() die Kind-Session lädt
+  await sb.auth.signOut().catch(() => {});
+
   const { data, error } = await sb.rpc('auth_child', {
     p_parent_email: em.toLowerCase(),
     p_pin:          pin,
