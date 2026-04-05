@@ -2005,9 +2005,16 @@ async function saveProviderKey(providerKey) {
  * @returns {Promise<{ok:boolean, error?:string}>}
  */
 /**
- * Testet einen API Key durch einen direkten Minimal-Aufruf an den Anbieter.
- * Umgeht den Supabase-Proxy komplett — kein Auth-Problem, kein DB-Lookup.
- * Alle drei Anbieter unterstützen CORS aus dem Browser.
+ * Testet einen API Key durch einen Minimal-Aufruf über den Supabase-Proxy.
+ *
+ * Warum Proxy statt direktem Aufruf?
+ *   Anthropic, OpenAI und Gemini blockieren direkte Browser-Anfragen via CORS.
+ *   Der Proxy läuft serverseitig (Deno) und hat keine CORS-Beschränkung.
+ *
+ * Auth-Strategie:
+ *   1. Nutzer ist eingeloggt → User-JWT als Bearer
+ *   2. Kein JWT vorhanden  → SB_KEY (Anon-JWT) als Bearer
+ *   Zusätzlich: apiKey im Body → Proxy liest Key direkt, KEIN DB-Lookup.
  *
  * @async
  * @param {'claude'|'openai'|'gemini'} providerKey
@@ -2016,64 +2023,46 @@ async function saveProviderKey(providerKey) {
  */
 async function testKeyConnection(providerKey, key) {
   try {
-    let r, data;
+    // Schritt 1: Bearer-Token bestimmen (User-JWT > Anon-JWT)
+    const headers = { 'Content-Type': 'application/json' };
+    let bearerToken = SB_KEY; // Anon-JWT als Fallback — gültig für Edge-Function-Gateway
+    if (sb) {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session?.access_token) bearerToken = session.access_token;
+      } catch {}
+    }
+    headers['Authorization'] = 'Bearer ' + bearerToken;
 
-    if (providerKey === 'claude') {
-      r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type':    'application/json',
-          'x-api-key':       key,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model:      PROVIDERS.claude.models.fast,
-          max_tokens: 5,
-          messages:   [{ role: 'user', content: 'Reply with OK.' }],
-        }),
-      });
-      data = await r.json().catch(() => ({}));
-      if (!r.ok) return { ok: false, error: data?.error?.message || `HTTP ${r.status}` };
+    // Schritt 2: Proxy aufrufen — apiKey im Body → kein DB-Lookup im Proxy
+    const r = await fetch(CFG.AI_PROXY, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        provider: providerKey,
+        apiKey:   key,
+        messages: [{ role: 'user', content: 'Reply with OK.' }],
+        system:   'Reply with only the word OK.',
+        maxTok:   5,
+      }),
+    });
 
-    } else if (providerKey === 'openai') {
-      r = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': 'Bearer ' + key,
-        },
-        body: JSON.stringify({
-          model:      PROVIDERS.openai.models.fast,
-          max_tokens: 5,
-          messages:   [{ role: 'user', content: 'Reply with OK.' }],
-        }),
-      });
-      data = await r.json().catch(() => ({}));
-      if (!r.ok) return { ok: false, error: data?.error?.message || `HTTP ${r.status}` };
+    const data = await r.json().catch(() => ({}));
 
-    } else if (providerKey === 'gemini') {
-      r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${PROVIDERS.gemini.models.fast}:generateContent?key=${encodeURIComponent(key)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents:         [{ parts: [{ text: 'Reply with OK.' }] }],
-            generationConfig: { maxOutputTokens: 5 },
-          }),
-        }
-      );
-      data = await r.json().catch(() => ({}));
-      if (!r.ok) return { ok: false, error: data?.error?.message || `HTTP ${r.status}` };
-
-    } else {
-      return { ok: false, error: `Unbekannter Provider: ${providerKey}` };
+    if (!r.ok) {
+      // Fehlermeldung direkt vom Anbieter weiterreichen (z.B. "invalid_api_key")
+      const msg = data?.error || data?.message || '';
+      if (r.status === 401) return { ok: false, error: 'Ungültiger API Key (401 Unauthorized)' };
+      if (r.status === 403) return { ok: false, error: 'API Key hat keine Berechtigung (403 Forbidden)' };
+      if (r.status === 429) return { ok: false, error: 'Rate Limit erreicht — kurz warten und erneut versuchen' };
+      return { ok: false, error: msg || `Fehler ${r.status}` };
     }
 
     return { ok: true };
   } catch(e) {
-    // CORS-Fehler erscheinen als TypeError — gibt klare Meldung
-    if (e instanceof TypeError) return { ok: false, error: 'Netzwerkfehler — bitte Internetverbindung prüfen' };
+    if (e instanceof TypeError) {
+      return { ok: false, error: 'Server nicht erreichbar — bitte Internetverbindung prüfen' };
+    }
     return { ok: false, error: e.message };
   }
 }

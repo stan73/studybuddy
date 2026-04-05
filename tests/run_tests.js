@@ -247,17 +247,17 @@ test('T8.4', 'saveProviderKey: Key wird NICHT gespeichert wenn Test fehlschlägt
   const fn = js.match(/async function saveProviderKey[\s\S]*?(?=\nasync function testKeyConnection)/)?.[0] || '';
   return fn.includes('return; // Key NICHT') || (fn.includes('testOk') && fn.includes('return;')) ? true : 'Abbruch bei Testfehler fehlt';
 });
-test('T8.5', 'testKeyConnection: direkter Claude-API-Aufruf', () => {
+test('T8.5', 'testKeyConnection: nutzt Supabase-Proxy (kein CORS-Problem)', () => {
   const fn = js.match(/async function testKeyConnection[\s\S]*?(?=\nfunction resetData)/)?.[0] || '';
-  return fn.includes('api.anthropic.com') ? true : 'Direkter Anthropic-Call fehlt';
+  return fn.includes('CFG.AI_PROXY') ? true : 'Proxy-Aufruf fehlt';
 });
-test('T8.6', 'testKeyConnection: direkter OpenAI-API-Aufruf', () => {
+test('T8.6', 'testKeyConnection: sendet apiKey im Body (kein DB-Lookup)', () => {
   const fn = js.match(/async function testKeyConnection[\s\S]*?(?=\nfunction resetData)/)?.[0] || '';
-  return fn.includes('api.openai.com') ? true : 'Direkter OpenAI-Call fehlt';
+  return fn.includes("apiKey:   key") || fn.includes("apiKey: key") ? true : 'apiKey-Body-Parameter fehlt';
 });
-test('T8.7', 'testKeyConnection: direkter Gemini-API-Aufruf', () => {
+test('T8.7', 'testKeyConnection: sendet Authorization Bearer (User-JWT oder Anon-JWT)', () => {
   const fn = js.match(/async function testKeyConnection[\s\S]*?(?=\nfunction resetData)/)?.[0] || '';
-  return fn.includes('generativelanguage.googleapis.com') ? true : 'Direkter Gemini-Call fehlt';
+  return fn.includes("'Authorization'") && fn.includes('SB_KEY') ? true : 'Bearer-Token-Logik fehlt';
 });
 test('T8.8', '"Aktiv"-Badge nur nach erfolgreichem Test gesetzt', () => {
   const fn = js.match(/async function saveProviderKey[\s\S]*?(?=\nasync function testKeyConnection)/)?.[0] || '';
