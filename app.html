@@ -637,7 +637,8 @@ async function init() {
   }
 
   // Konfigurierte Provider aus Supabase DB laden (Auth-Nutzer)
-  loadConfiguredProviders(); // fire & forget
+  // Wird geawaitert damit hasActiveKey() sofort korrekt ist (z.B. in Prüfungsmodus)
+  await loadConfiguredProviders();
 
   // Daten für aktuellen User laden (pro-User-Key)
   loadDataForUser(U.id);
@@ -1120,7 +1121,90 @@ async function sendMsg() {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: PRÜFUNGSMODUS
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Prüfungsmodus-State. `answered` verhindert Doppelklick-Bugs.
+ * Wird bei jeder neuen Prüfung vollständig zurückgesetzt.
+ */
 let EX = { active:false, qs:[], idx:0, score:0, subj:'', answered:false };
+
+/**
+ * Offline-Fallback-Fragenbibliothek — echte Lernfragen pro Fach.
+ * Wird genutzt wenn kein API Key verfügbar oder AI-Anfrage fehlschlägt.
+ * Jedes Array kann unbegrenzt erweitert werden; beim Exam werden `num` Fragen
+ * zufällig ausgewählt.
+ * @type {Object.<string, Array<{q:string, opts:string[], correct:number}>>}
+ */
+const FALLBACK_QS = {
+  'Mathematik': [
+    {q:'Was ist 15% von 200?',                         opts:['20','25','30','35'],                                     correct:2},
+    {q:'Wie lautet die Kreisumfangs-Formel?',          opts:['π·r','2·π·r','π·r²','2·r'],                             correct:1},
+    {q:'Was ist die Quadratwurzel von 144?',           opts:['11','12','13','14'],                                     correct:1},
+    {q:'Wie viel Grad haben die Innenwinkel eines Dreiecks?', opts:['90°','180°','270°','360°'],                       correct:1},
+    {q:'Was ist 7 × 8?',                               opts:['54','56','58','63'],                                     correct:1},
+    {q:'Welche Zahl ist eine Primzahl?',               opts:['1','4','9','11'],                                        correct:3},
+    {q:'Was ergibt 2³?',                               opts:['5','6','8','9'],                                         correct:2},
+  ],
+  'Deutsch': [
+    {q:'Was ist ein Substantiv?',                      opts:['Zeitwort','Eigenschaftswort','Namenwort','Umstandswort'],correct:2},
+    {q:'Was kennzeichnet eine Metapher?',              opts:['Reimklang','Vergleich ohne „wie"','Übertreibung','Wiederholung'], correct:1},
+    {q:'Was ist der Nominativ?',                       opts:['Werfall','Wesfall','Wemfall','Wenfall'],                 correct:0},
+    {q:'Was ist ein Synonym?',                         opts:['Gegenwort','Gleichbedeutendes Wort','Fremdwort','Eigenname'], correct:1},
+    {q:'Was ist eine Alliteration?',                   opts:['Reihung von Gleichklängen am Wortanfang','Wiederholung am Satzende','Umkehrung der Wortstellung','Übertreibung'], correct:0},
+  ],
+  'Englisch': [
+    {q:'Past tense of "go"?',                          opts:['goed','gone','went','going'],                            correct:2},
+    {q:'What means "Haus" in English?',                opts:['Horse','House','Mouse','Mouse'],                         correct:1},
+    {q:'Plural of "child"?',                           opts:['childs','childes','children','child'],                   correct:2},
+    {q:'"She ___ to school every day."',               opts:['go','goes','gone','going'],                              correct:1},
+    {q:'What does "therefore" mean?',                  opts:['jedoch','außerdem','deshalb','trotzdem'],                correct:2},
+  ],
+  'Biologie': [
+    {q:'Welches Organ pumpt Blut durch den Körper?',   opts:['Lunge','Leber','Niere','Herz'],                         correct:3},
+    {q:'Was ist die Grundeinheit des Lebens?',         opts:['Organ','Zelle','Atom','Gewebe'],                        correct:1},
+    {q:'Welcher Prozess wandelt Licht in Energie um?', opts:['Atmung','Gärung','Fotosynthese','Verdauung'],            correct:2},
+    {q:'Was enthält der Zellkern?',                    opts:['Mitochondrien','DNA','Ribosomen','Chloroplasten'],       correct:1},
+    {q:'Wie heißt die Erbsubstanz?',                   opts:['RNA','ATP','DNA','ADP'],                                 correct:2},
+  ],
+  'Chemie': [
+    {q:'Chemisches Symbol für Wasser?',                opts:['H₂O','CO₂','NaCl','O₂'],                                correct:0},
+    {q:'Wie viele Elektronen hat Kohlenstoff?',        opts:['4','6','8','12'],                                        correct:1},
+    {q:'Was ist ein Atom?',                            opts:['Kleinste Einheit eines Elements','Verbindung zweier Elemente','Ein Molekül','Eine Verbindung'], correct:0},
+    {q:'Was entsteht bei einer Verbrennung immer?',    opts:['Sauerstoff','Wasser','Kohlendioxid','Stickstoff'],       correct:2},
+    {q:'Wie heißt die negative Ladung im Atom?',       opts:['Proton','Neutron','Elektron','Meson'],                   correct:2},
+  ],
+  'Physik': [
+    {q:'Einheit der Kraft?',                           opts:['Watt','Joule','Newton','Volt'],                          correct:2},
+    {q:'Ohmsches Gesetz?',                             opts:['U = I·R','P = U·I','E = mc²','F = m·a'],                correct:0},
+    {q:'Was ist Licht?',                               opts:['Nur Welle','Nur Teilchen','Weder noch','Welle und Teilchen'], correct:3},
+    {q:'Einheit der Energie?',                         opts:['Newton','Watt','Joule','Pascal'],                        correct:2},
+    {q:'Formel für Geschwindigkeit?',                  opts:['v = a·t','v = s/t','v = F/m','v = P/t'],                 correct:1},
+  ],
+  'Geschichte': [
+    {q:'Wann begann der Erste Weltkrieg?',             opts:['1912','1914','1916','1918'],                             correct:1},
+    {q:'Erster Bundeskanzler der BRD?',                opts:['Willy Brandt','Helmut Schmidt','Konrad Adenauer','Ludwig Erhard'], correct:2},
+    {q:'Wann fiel die Berliner Mauer?',                opts:['1987','1988','1989','1990'],                             correct:2},
+    {q:'Wann endete der Zweite Weltkrieg?',            opts:['1943','1944','1945','1946'],                             correct:2},
+    {q:'Was war die Weimarer Republik?',               opts:['Ein Kaiserreich','Erste deutsche Demokratie','Eine Monarchie','Ein Bundesstaat'], correct:1},
+  ],
+  'Geografie': [
+    {q:'Hauptstadt von Frankreich?',                   opts:['Lyon','Marseille','Paris','Nizza'],                      correct:2},
+    {q:'Welcher Fluss fließt durch Berlin?',           opts:['Elbe','Rhein','Main','Spree'],                           correct:3},
+    {q:'Welcher Kontinent ist am größten?',            opts:['Afrika','Amerika','Europa','Asien'],                     correct:3},
+    {q:'Wie viele Bundesländer hat Deutschland?',      opts:['14','15','16','17'],                                     correct:2},
+  ],
+  'Informatik': [
+    {q:'Was ist ein Algorithmus?',                     opts:['Ein Computer','Eine Schritt-für-Schritt-Anleitung','Ein Programm','Eine Datenbank'], correct:1},
+    {q:'Was bedeutet HTML?',                           opts:['HyperText Markup Language','High Tech Modern Language','Hyper Transfer Mode Language','HyperText Mobile Language'], correct:0},
+    {q:'Was ist binär?',                               opts:['Basis-10-System','Basis-2-System','Basis-8-System','Basis-16-System'], correct:1},
+    {q:'Was ist eine Variable in der Programmierung?', opts:['Ein fester Wert','Ein Speicherplatz für Werte','Ein Algorithmus','Eine Schleife'], correct:1},
+  ],
+  'default': [
+    {q:'Was hilft beim Lernen am meisten?',            opts:['Ohne Pause lernen','Wiederholung und Pausen','Nur lesen','Alles auf einmal'], correct:1},
+    {q:'Was verbessert das Gedächtnis?',               opts:['Wenig Schlaf','Viel Koffein','Bewegung und Schlaf','Multitasking'],           correct:2},
+    {q:'Was ist aktives Erinnern?',                    opts:['Lesen','Abschreiben','Selbst abrufen ohne Vorlage','Markieren'],              correct:2},
+    {q:'Wie lange sollte eine Lerneinheit sein?',      opts:['10 Min','25–50 Min','3 Stunden','8 Stunden'],                               correct:1},
+  ],
+};
 
 function exam(el) {
   if (EX.active) { renderExam(el); return; }
@@ -1170,20 +1254,25 @@ async function startExam() {
     try {
       const sys = `Prüfungsersteller für Klasse ${U.grade}. Nur JSON.`;
       const r = await ai([{role:'user',content:`${num} MC-Fragen zu ${subj} Klasse ${U.grade}. NUR JSON:[{"q":"Frage?","opts":["A","B","C","D"],"correct":0}]`}], sys, 2000);
-      qs = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]').filter(q=>q.q&&q.opts?.length===4);
+      qs = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]')
+        .filter(q => q.q && q.opts?.length === 4)
+        .map(q => ({ ...q, correct: parseInt(q.correct, 10) || 0 })); // normalize to number
     } catch(e) { toast('❌ '+e.message); }
   }
 
-  // Fallback-Fragen wenn keine KI
+  // Fallback: echte Lernfragen aus FALLBACK_QS wenn keine KI oder KI-Fehler
   if (!qs.length) {
-    qs = [
-      {q:`Was ist ein typisches Thema in ${subj}?`,opts:['Option A','Option B','Option C','Option D'],correct:0},
-      {q:`Welche Methode wird in ${subj} häufig genutzt?`,opts:['Methode 1','Methode 2','Methode 3','Methode 4'],correct:1},
-    ];
+    const bank = FALLBACK_QS[subj] || FALLBACK_QS['default'];
+    qs = [...bank].sort(() => Math.random() - .5).slice(0, Math.min(num, bank.length));
   }
 
   EX = { active:true, qs, idx:0, score:0, subj, answered:false };
-  renderExam(el);
+  try {
+    renderExam(el);
+  } catch(e) {
+    console.error('[startExam renderExam]', e);
+    if (el) el.innerHTML = `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--error);">❌ Fehler beim Laden: ${safe(e.message)}</p><button class="btn btn-primary" style="margin-top:16px;" onclick="goPage('exam')">Zurück</button></div>`;
+  }
 }
 
 function renderExam(el) {
@@ -1213,6 +1302,9 @@ function renderExam(el) {
  * @param {number} i — Index der gewählten Option (0–3)
  */
 function answerQ(i) {
+  if (EX.answered) return; // Doppelklick-Schutz
+  EX.answered = true;
+
   const q = EX.qs[EX.idx];
   const correct = i === q.correct;
   if (correct) EX.score++;
@@ -1224,7 +1316,11 @@ function answerQ(i) {
     if (j === i && !correct) { b.style.background = '#fee2e2'; b.style.borderColor = '#ef4444'; }
   });
 
-  setTimeout(() => { EX.idx++; renderExam(document.getElementById('content')); }, 1200);
+  setTimeout(() => {
+    EX.idx++;
+    EX.answered = false; // Guard zurücksetzen für nächste Frage
+    renderExam(document.getElementById('content'));
+  }, 1200);
 }
 
 function endExam(el) {
@@ -1780,8 +1876,44 @@ async function saveProviderKey(providerKey) {
   if (!prov) return;
   const key = document.getElementById(`s-ak-${providerKey}`)?.value.trim();
   if (!key || key === '••••••••••••') return toast(`${prov.emoji} ${prov.name} API Key eingeben!`);
-  if (!key.startsWith(prov.keyPrefix)) return toast(`Ungültiger Key — muss mit ${prov.keyPrefix} beginnen`);
 
+  // ── Strikte Präfix-Prüfung ───────────────────────────────────────────────
+  // Verhindert z.B. dass ein Anthropic-Key (sk-ant-…) als OpenAI-Key (sk-…) akzeptiert wird
+  if (!key.startsWith(prov.keyPrefix)) {
+    // Erkenne ob der Key zu einem anderen Provider gehört und gib einen hilfreichen Hinweis
+    const wrongProv = Object.entries(PROVIDERS).find(([k,p]) => k !== providerKey && key.startsWith(p.keyPrefix));
+    if (wrongProv) {
+      return toast(`❌ Das ist ein ${wrongProv[1].name}-Key! Bitte "${wrongProv[1].name}" als Anbieter wählen.`);
+    }
+    return toast(`❌ Ungültiger Key — muss mit "${prov.keyPrefix}" beginnen`);
+  }
+  // Anthropic-Keys beginnen mit sk-ant- ; OpenAI-Keys mit sk- aber NICHT sk-ant-
+  if (providerKey === 'openai' && key.startsWith('sk-ant-')) {
+    return toast('❌ Das ist ein Anthropic/Claude Key! Bitte "Claude (Anthropic)" als Anbieter wählen.');
+  }
+
+  // ── Verbindungstest ──────────────────────────────────────────────────────
+  const btn = document.querySelector(`button[onclick="saveProviderKey('${providerKey}')"]`);
+  const origText = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Teste Verbindung…'; }
+  toast(`${prov.emoji} Verbindung wird getestet…`);
+
+  let testOk = false;
+  let testError = '';
+  try {
+    const result = await testKeyConnection(providerKey, key);
+    testOk = result.ok;
+    testError = result.error || '';
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origText; }
+  }
+
+  if (!testOk) {
+    toast(`❌ ${prov.emoji} Verbindung fehlgeschlagen: ${testError}`);
+    return; // Key NICHT speichern — "aktiv" wird nicht gesetzt
+  }
+
+  // ── Key speichern (nur nach erfolgreichem Test) ──────────────────────────
   AI[providerKey] = key;
   AI.provider = providerKey;
   await saveAIKeys();
@@ -1800,14 +1932,45 @@ async function saveProviderKey(providerKey) {
       if (!AI._configured) AI._configured = [];
       if (!AI._configured.includes(providerKey)) AI._configured.push(providerKey);
       // KEIN zweites saveAIKeys() — der erste Aufruf (mit dem echten Key) bleibt in localStorage
-      toast(`✅ ${prov.emoji} ${prov.name} Key sicher im Backend gespeichert!`);
+      toast(`✅ ${prov.emoji} ${prov.name} verbunden & sicher im Backend gespeichert!`);
     } catch(e) {
-      toast(`✅ ${prov.emoji} ${prov.name} Key gesetzt (lokal)!`);
+      toast(`✅ ${prov.emoji} ${prov.name} verbunden & lokal gespeichert!`);
     }
   } else {
-    toast(`✅ ${prov.emoji} ${prov.name} Key gesetzt!`);
+    toast(`✅ ${prov.emoji} ${prov.name} verbunden!`);
   }
   settings(document.getElementById('content'));
+}
+
+/**
+ * Testet einen API Key durch einen echten Minimal-Aufruf an den Proxy.
+ * Wird immer mit dem Key direkt aufgerufen (nicht über JWT),
+ * damit exakt dieser Key — unabhängig vom gespeicherten Zustand — geprüft wird.
+ *
+ * @async
+ * @param {string} providerKey — 'claude' | 'openai' | 'gemini'
+ * @param {string} key         — Der zu testende API Key
+ * @returns {Promise<{ok:boolean, error?:string}>}
+ */
+async function testKeyConnection(providerKey, key) {
+  try {
+    const r = await fetch(CFG.AI_PROXY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: providerKey,
+        apiKey:   key,   // immer direkt übergeben — testet genau diesen Key
+        messages: [{ role: 'user', content: 'Reply with just the word OK.' }],
+        system:   'You are a connection test. Reply with only the word OK.',
+        maxTok:   5,
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: data?.error || `HTTP ${r.status}` };
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 function resetData() {
