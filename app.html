@@ -190,13 +190,103 @@ const CFG = {
     13:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Philosophie'],
   },
   SM: {
+    // Deutsch
     'Mathematik':{e:'📐',c:'#6366f1'},'Deutsch':{e:'📖',c:'#8b5cf6'},'Englisch':{e:'🇬🇧',c:'#3b82f6'},
     'Biologie':{e:'🌿',c:'#10b981'},'Chemie':{e:'⚗️',c:'#f59e0b'},'Physik':{e:'⚡',c:'#f97316'},
     'Geschichte':{e:'🏛️',c:'#ef4444'},'Geografie':{e:'🌍',c:'#06b6d4'},'Informatik':{e:'💻',c:'#6366f1'},
     'Latein':{e:'🏺',c:'#a78bfa'},'Französisch':{e:'🥐',c:'#ec4899'},'Kunst':{e:'🎨',c:'#f43f5e'},
     'Musik':{e:'🎵',c:'#8b5cf6'},'Sport':{e:'⚽',c:'#10b981'},'Wirtschaft':{e:'📊',c:'#0ea5e9'},
-    'Philosophie':{e:'🤔',c:'#7c3aed'},default:{e:'📚',c:'#6366f1'}
+    'Philosophie':{e:'🤔',c:'#7c3aed'},'Spanisch':{e:'🇪🇸',c:'#f59e0b'},'Türkisch':{e:'🌙',c:'#ef4444'},
+    // English
+    'Mathematics':{e:'📐',c:'#6366f1'},'English':{e:'📖',c:'#8b5cf6'},'Science':{e:'🔬',c:'#10b981'},
+    'History':{e:'🏛️',c:'#ef4444'},'Geography':{e:'🌍',c:'#06b6d4'},'Art':{e:'🎨',c:'#f43f5e'},
+    'P.E.':{e:'⚽',c:'#10b981'},'Music':{e:'🎵',c:'#8b5cf6'},'French':{e:'🥐',c:'#ec4899'},
+    'German':{e:'📖',c:'#8b5cf6'},'Physics':{e:'⚡',c:'#f97316'},'Chemistry':{e:'⚗️',c:'#f59e0b'},
+    'Biology':{e:'🌿',c:'#10b981'},'Computer Science':{e:'💻',c:'#6366f1'},'Economics':{e:'📊',c:'#0ea5e9'},
+    'Philosophy':{e:'🤔',c:'#7c3aed'},'Spanish':{e:'🇪🇸',c:'#f59e0b'},'Latin':{e:'🏺',c:'#a78bfa'},
+    // Français
+    'Mathématiques':{e:'📐',c:'#6366f1'},'Français':{e:'📖',c:'#8b5cf6'},'Anglais':{e:'🇬🇧',c:'#3b82f6'},
+    'Sciences':{e:'🔬',c:'#10b981'},'Histoire-Géographie':{e:'🏛️',c:'#ef4444'},'Arts plastiques':{e:'🎨',c:'#f43f5e'},
+    'EPS':{e:'⚽',c:'#10b981'},'Musique':{e:'🎵',c:'#8b5cf6'},'Allemand':{e:'📖',c:'#8b5cf6'},
+    'Physique-Chimie':{e:'⚗️',c:'#f59e0b'},'SVT':{e:'🌿',c:'#10b981'},'Informatique':{e:'💻',c:'#6366f1'},
+    'Espagnol':{e:'🇪🇸',c:'#f59e0b'},'Philosophie':{e:'🤔',c:'#7c3aed'},
+    // Español
+    'Matemáticas':{e:'📐',c:'#6366f1'},'Lengua Castellana':{e:'📖',c:'#8b5cf6'},'Inglés':{e:'🇬🇧',c:'#3b82f6'},
+    'Ciencias Naturales':{e:'🔬',c:'#10b981'},'Ciencias Sociales':{e:'🏛️',c:'#ef4444'},
+    'Educación Física':{e:'⚽',c:'#10b981'},'Tecnología':{e:'💻',c:'#6366f1'},'Arte':{e:'🎨',c:'#f43f5e'},
+    'Física y Química':{e:'⚗️',c:'#f59e0b'},'Biología':{e:'🌿',c:'#10b981'},'Historia':{e:'🏛️',c:'#ef4444'},
+    'Economía':{e:'📊',c:'#0ea5e9'},'Informática':{e:'💻',c:'#6366f1'},'Francés':{e:'🥐',c:'#ec4899'},
+    'Alemán':{e:'📖',c:'#8b5cf6'},
+    default:{e:'📚',c:'#6366f1'}
   },
+
+  // Fächer je Unterrichtssprache und Klassenstufe
+  SUBJECTS_BY_LANG: {
+    de: {
+      5: ['Mathematik','Deutsch','Englisch','Biologie','Geschichte','Geografie','Kunst','Sport','Musik'],
+      6: ['Mathematik','Deutsch','Englisch','Biologie','Geschichte','Geografie','Kunst','Sport','Latein'],
+      7: ['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Latein','Französisch'],
+      8: ['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Latein','Französisch'],
+      9: ['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Französisch'],
+      10:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Wirtschaft'],
+      11:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Philosophie'],
+      12:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Philosophie'],
+      13:['Mathematik','Deutsch','Englisch','Biologie','Chemie','Geschichte','Physik','Informatik','Philosophie'],
+    },
+    en: {
+      5: ['Mathematics','English','Science','History','Geography','Art','P.E.','Music','French'],
+      6: ['Mathematics','English','Science','History','Geography','Art','P.E.','Music','French'],
+      7: ['Mathematics','English','Physics','Chemistry','Biology','History','Geography','Computer Science','French'],
+      8: ['Mathematics','English','Physics','Chemistry','Biology','History','Geography','Computer Science','French'],
+      9: ['Mathematics','English','Physics','Chemistry','Biology','History','Geography','Computer Science','German'],
+      10:['Mathematics','English','Physics','Chemistry','Biology','History','Geography','Computer Science','German'],
+      11:['Mathematics','English','Physics','Chemistry','Biology','History','Philosophy','Computer Science','Economics'],
+      12:['Mathematics','English','Physics','Chemistry','Biology','History','Philosophy','Computer Science','Economics'],
+      13:['Mathematics','English','Physics','Chemistry','Biology','History','Philosophy','Computer Science','Economics'],
+    },
+    fr: {
+      5: ['Mathématiques','Français','Anglais','Sciences','Histoire-Géographie','Arts plastiques','EPS','Musique'],
+      6: ['Mathématiques','Français','Anglais','Sciences','Histoire-Géographie','Arts plastiques','EPS','Musique'],
+      7: ['Mathématiques','Français','Anglais','Sciences','Histoire-Géographie','Arts plastiques','EPS','Latin','Allemand'],
+      8: ['Mathématiques','Français','Anglais','Sciences','Histoire-Géographie','Arts plastiques','EPS','Latin','Allemand'],
+      9: ['Mathématiques','Français','Anglais','Physique-Chimie','SVT','Histoire-Géographie','EPS','Informatique','Philosophie'],
+      10:['Mathématiques','Français','Anglais','Physique-Chimie','SVT','Histoire-Géographie','EPS','Informatique','Philosophie'],
+      11:['Mathématiques','Français','Anglais','Physique-Chimie','SVT','Histoire-Géographie','EPS','Informatique','Philosophie'],
+      12:['Mathématiques','Français','Anglais','Physique-Chimie','SVT','Histoire-Géographie','EPS','Informatique','Philosophie'],
+      13:['Mathématiques','Français','Anglais','Physique-Chimie','SVT','Histoire-Géographie','EPS','Informatique','Philosophie'],
+    },
+    es: {
+      5: ['Matemáticas','Lengua Castellana','Inglés','Ciencias Naturales','Ciencias Sociales','Educación Física','Tecnología','Música','Arte'],
+      6: ['Matemáticas','Lengua Castellana','Inglés','Ciencias Naturales','Ciencias Sociales','Educación Física','Tecnología','Música','Arte'],
+      7: ['Matemáticas','Lengua Castellana','Inglés','Ciencias Naturales','Ciencias Sociales','Educación Física','Tecnología','Música','Arte'],
+      8: ['Matemáticas','Lengua Castellana','Inglés','Física y Química','Biología','Ciencias Sociales','Educación Física','Informática','Arte'],
+      9: ['Matemáticas','Lengua Castellana','Inglés','Física y Química','Biología','Historia','Educación Física','Informática','Filosofía'],
+      10:['Matemáticas','Lengua Castellana','Inglés','Física y Química','Biología','Historia','Educación Física','Informática','Filosofía'],
+      11:['Matemáticas','Lengua Castellana','Inglés','Física y Química','Biología','Historia','Economía','Informática','Filosofía'],
+      12:['Matemáticas','Lengua Castellana','Inglés','Física y Química','Biología','Historia','Economía','Informática','Filosofía'],
+      13:['Matemáticas','Lengua Castellana','Inglés','Física y Química','Biología','Historia','Economía','Informática','Filosofía'],
+    },
+  },
+
+  // Welche Fächer sind Sprachfächer und welche Sprache sprechen sie?
+  LANG_SUBJECTS: {
+    'Englisch':'en','Französisch':'fr','Latein':'la','Spanisch':'es','Russisch':'ru','Chinesisch':'zh','Deutsch':'de','Türkisch':'tr',
+    'English':'en','French':'fr','Latin':'la','Spanish':'es','Russian':'ru','Chinese':'zh','German':'de',
+    'Anglais':'en','Français':'fr','Espagnol':'es','Allemand':'de','Russe':'ru',
+    'Inglés':'en','Francés':'fr','Alemán':'de','Español':'es',
+  },
+
+  // Unterstützte Schulsprachen
+  SCHOOL_LANGS: [
+    {code:'de', flag:'🇩🇪', name:'Deutsch'},
+    {code:'en', flag:'🇬🇧', name:'English'},
+    {code:'fr', flag:'🇫🇷', name:'Français'},
+    {code:'es', flag:'🇪🇸', name:'Español'},
+  ],
+
+  // Sprachcode → Anzeigename (auf Deutsch)
+  LANG_NAMES: {de:'Deutsch',en:'Englisch',fr:'Französisch',es:'Spanisch',la:'Latein',ru:'Russisch',zh:'Chinesisch',tr:'Türkisch'},
+
   SR_DAYS: [1,3,7,14,30],
   XP: {CARD:10, CARD_WRONG:2, EXAM:50, TUTOR:5, POMO:30},
   RATE_LIMIT: 3,
@@ -222,6 +312,134 @@ const CFG = {
  */
 /** @type {UserState|null} */
 let U = null;
+
+// ── Sprachhelfer ─────────────────────────────────────────────────────────────
+
+/** Aktuelle Unterrichtssprache des Nutzers (Standard: 'de') */
+function getCurrentLang() { return U?.language || 'de'; }
+
+/**
+ * Gibt die Fächerliste für ein Kind zurück.
+ * Priorität: 1. Individuelle Fächer (DB), 2. Standard nach Sprache+Klasse
+ * @param {object} [child] — Child-Objekt (default: aktueller Nutzer U)
+ */
+function getChildSubjects(child) {
+  const c = child || U;
+  if (Array.isArray(c?.subjects) && c.subjects.length) return c.subjects;
+  const lang  = c?.language || 'de';
+  const grade = Number(c?.grade) || 9;
+  const byLang = CFG.SUBJECTS_BY_LANG[lang] || CFG.SUBJECTS_BY_LANG['de'];
+  const grades = Object.keys(byLang).map(Number).sort((a,b)=>a-b);
+  const g = grades.reduce((prev,curr) => Math.abs(curr-grade)<Math.abs(prev-grade)?curr:prev);
+  return byLang[g] || CFG.SUBJECTS[9];
+}
+
+/**
+ * Baut den KI-Tutor System-Prompt in der richtigen Sprache.
+ * Sprachfächer (Englisch, Français…) werden in der Sprache des Fachs beantwortet.
+ */
+function buildTutorPrompt(subject, grade, lang) {
+  lang = lang || 'de';
+  const subjectLang  = CFG.LANG_SUBJECTS[subject];
+  const isLangSubj   = subjectLang && subjectLang !== lang;
+  const answerLang   = isLangSubj ? (CFG.LANG_NAMES[subjectLang] || subjectLang) : null;
+  const langNote     = isLangSubj ? ` Antworten und Erklärungen auf ${answerLang}.` : '';
+  const langNoteEn   = isLangSubj ? ` Answers and explanations in ${answerLang}.` : '';
+  const langNoteFr   = isLangSubj ? ` Réponses et explications en ${answerLang}.` : '';
+  const langNoteEs   = isLangSubj ? ` Respuestas y explicaciones en ${answerLang}.` : '';
+  const p = {
+    de: `Du bist StudyBuddy, ein freundlicher KI-Lernassistent für Klasse ${grade} im Fach ${subject}. Erkläre verständlich auf Deutsch, max. 3–4 Sätze.${langNote}`,
+    en: `You are StudyBuddy, a friendly AI tutor for Year ${grade} studying ${subject}. Explain clearly in English, max 3–4 sentences.${langNoteEn}`,
+    fr: `Tu es StudyBuddy, un assistant IA pour la classe ${grade} en ${subject}. Explique clairement en français, max 3–4 phrases.${langNoteFr}`,
+    es: `Eres StudyBuddy, un asistente IA para el curso ${grade} en ${subject}. Explica claramente en español, máx. 3-4 frases.${langNoteEs}`,
+  };
+  return p[lang] || p['de'];
+}
+
+/**
+ * Baut Exam System-Prompt + User-Prompt für die KI-Prüfungsgenerierung.
+ */
+function buildExamPrompt(subject, grade, lang, num) {
+  lang = lang || 'de';
+  const subjectLang = CFG.LANG_SUBJECTS[subject];
+  const isLangSubj  = subjectLang && subjectLang !== lang;
+  const qLang       = isLangSubj ? (CFG.LANG_NAMES[subjectLang] || subjectLang) : null;
+  const qNote       = isLangSubj ? ` Questions and options in ${qLang}.` : '';
+  const sys = {
+    de: `Prüfungsersteller für Klasse ${grade}. Nur JSON.${isLangSubj ? ` Fragen und Optionen auf ${qLang}.` : ''}`,
+    en: `Exam creator for Year ${grade}. JSON only.${qNote}`,
+    fr: `Créateur d'examen classe ${grade}. JSON uniquement.${isLangSubj ? ` Questions et options en ${qLang}.` : ''}`,
+    es: `Creador de examen curso ${grade}. Solo JSON.${isLangSubj ? ` Preguntas y opciones en ${qLang}.` : ''}`,
+  };
+  const user = {
+    de: `${num} MC-Fragen zu ${subject} Klasse ${grade}. NUR JSON:[{"q":"Frage?","opts":["A","B","C","D"],"correct":0}]`,
+    en: `${num} MC questions on ${subject} Year ${grade}. JSON ONLY:[{"q":"Question?","opts":["A","B","C","D"],"correct":0}]`,
+    fr: `${num} QCM sur ${subject} classe ${grade}. JSON UNIQUEMENT:[{"q":"Question?","opts":["A","B","C","D"],"correct":0}]`,
+    es: `${num} preguntas MC de ${subject} curso ${grade}. SOLO JSON:[{"q":"¿Pregunta?","opts":["A","B","C","D"],"correct":0}]`,
+  };
+  return { sys: sys[lang]||sys['de'], user: user[lang]||user['de'] };
+}
+
+/**
+ * Speichert eine Einzel-Einstellung eines Kindes in Supabase und in U.children.
+ * @param {string} childId
+ * @param {object} updates — z.B. {language:'en'} oder {school_url:'https://...'}
+ */
+async function updateChildSetting(childId, updates) {
+  U.children = (U.children||[]).map(c => c.id===childId ? {...c, ...updates} : c);
+  save();
+  if (sb) {
+    const { error } = await sb.from('children').update(updates).eq('id', childId).eq('parent_id', U.id);
+    if (error) toast('❌ Fehler beim Speichern: ' + error.message);
+  }
+}
+
+/**
+ * Fügt einem Kind ein Fach hinzu oder entfernt es.
+ */
+async function toggleChildSubject(childId, subject, add) {
+  const child = (U.children||[]).find(c=>c.id===childId);
+  if (!child) return;
+  const current = child.subjects || getChildSubjects(child);
+  const updated  = add
+    ? (current.includes(subject) ? current : [...current, subject])
+    : current.filter(s => s !== subject);
+  await updateChildSetting(childId, { subjects: updated });
+  childrenPage(document.getElementById('content'));
+}
+
+/**
+ * Für Kind-Selbstverwaltung: Fach hinzufügen oder entfernen.
+ * Aktualisiert U.subjects und Supabase, dann Settings neu rendern.
+ * @param {string} subject — Fachname
+ * @param {boolean} add    — true = hinzufügen, false = entfernen
+ */
+async function childToggleSubject(subject, add) {
+  if (!subject || !U?.isChild || !U?.id) return;
+  const current = Array.isArray(U.subjects) ? U.subjects : getChildSubjects(U);
+  const updated  = add
+    ? (current.includes(subject) ? current : [...current, subject])
+    : current.filter(s => s !== subject);
+  U.subjects = updated;
+  save();
+  if (sb) {
+    await sb.from('children').update({ subjects: updated }).eq('id', U.id);
+  }
+  settings(document.getElementById('content'));
+}
+
+/**
+ * Setzt die Fächer des Kindes auf die Standard-Fächer der Schulsprache/Klasse zurück.
+ */
+async function childResetSubjects() {
+  if (!U?.isChild || !U?.id) return;
+  U.subjects = null;
+  save();
+  if (sb) {
+    await sb.from('children').update({ subjects: null }).eq('id', U.id);
+  }
+  settings(document.getElementById('content'));
+}
 
 /**
  * @typedef {Object} DataState
@@ -671,6 +889,10 @@ async function init() {
         children: [],
         isChild: true,
         parentEmail: c.parent_email,
+        language: c.language || 'de',
+        schoolUrl: c.school_url || '',
+        subjects: c.subjects || null,
+        canManageSubjects: c.can_manage_subjects || false,
       };
       save();
     }
@@ -991,7 +1213,7 @@ function renderFC(el) {
         <p>${due.length} fällig · ${cards.length} gesamt</p>
       </div>
       <select class="input" style="width:auto;" onchange="FC.subj=this.value;FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
-        ${(CFG.SUBJECTS[U.grade||9]||[]).map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
+        ${getChildSubjects().map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
       </select>
     </div>
 
@@ -1107,7 +1329,7 @@ let tutorSubj = '';
 
 function tutor(el) {
   tutorMsgs = [];
-  const subs = CFG.SUBJECTS[U.grade||9]||[];
+  const subs = getChildSubjects();
   tutorSubj = subs[0]||'Allgemein';
   el.innerHTML = `
     <div class="page-header"><h1>🤖 KI-Tutor</h1><p>Frag mich alles — ich helfe dir beim Lernen!</p></div>
@@ -1151,7 +1373,7 @@ async function sendMsg() {
   tutorMsgs.push({role:'user', content:text});
 
   try {
-    const sys = `Du bist StudyBuddy, ein freundlicher Lernassistent für Klasse ${U.grade} im Fach ${tutorSubj}. Erkläre verständlich auf Deutsch, max. 3–4 Sätze.`;
+    const sys = buildTutorPrompt(tutorSubj, U.grade, getCurrentLang());
     const history = tutorMsgs.slice(-6).map(m=>({role:m.role,content:m.content.slice(0,400)}));
     const answer = await ai(history, sys, 400, false);
     document.getElementById('typing')?.remove();
@@ -1255,7 +1477,7 @@ const FALLBACK_QS = {
 
 function exam(el) {
   if (EX.active) { renderExam(el); return; }
-  const subs = CFG.SUBJECTS[U.grade||9]||[];
+  const subs = getChildSubjects();
   el.innerHTML = `
     <div class="page-header"><h1>📝 Prüfungsmodus</h1><p>Teste dein Wissen mit KI-generierten Fragen</p></div>
     <div style="max-width:500px;margin:0 auto;">
@@ -1299,8 +1521,8 @@ async function startExam() {
   let qs = [];
   if (hasActiveKey()) {
     try {
-      const sys = `Prüfungsersteller für Klasse ${U.grade}. Nur JSON.`;
-      const r = await ai([{role:'user',content:`${num} MC-Fragen zu ${subj} Klasse ${U.grade}. NUR JSON:[{"q":"Frage?","opts":["A","B","C","D"],"correct":0}]`}], sys, 2000);
+      const { sys, user: userMsg } = buildExamPrompt(subj, U.grade, getCurrentLang(), num);
+      const r = await ai([{role:'user', content: userMsg}], sys, 2000);
       qs = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]')
         .filter(q => q.q && q.opts?.length === 4)
         .map(q => ({ ...q, correct: parseInt(q.correct, 10) || 0 })); // normalize to number
@@ -1672,21 +1894,34 @@ async function parentDash(el) {
 // ═══════════════════════════════════════════════════════════════════════════
 function childrenPage(el) {
   const children = U.children||[];
+  const langOpts = CFG.SCHOOL_LANGS.map(l=>`<option value="${l.code}">${l.flag} ${l.name}</option>`).join('');
+
   el.innerHTML = `
     <div class="page-header">
       <h1>👧 Kinder</h1>
-      <p>${children.length} Kinder · Jedes Kind meldet sich mit Name + PIN an</p>
+      <p>${children.length} Kind${children.length!==1?'er':''} · Jedes Kind meldet sich mit deiner E-Mail + eigenem PIN an</p>
     </div>
     <div class="grid-2">
+
+      <!-- ── Kind hinzufügen ──────────────────────────────── -->
       <div class="card">
         <div class="card-header"><div class="card-title">➕ Kind hinzufügen</div></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
-          <div class="field"><label>Vorname</label><input class="input" id="c-name" placeholder="z.B. Max"></div>
-          <div class="field"><label>Klasse</label>
-            <select class="input" id="c-grade">${CFG.GRADES.map(g=>`<option value="${g}">${g}. Klasse</option>`).join('')}</select>
+          <div class="field"><label>Vorname *</label>
+            <input class="input" id="c-name" placeholder="z.B. Max"></div>
+          <div class="grid-2" style="gap:10px;">
+            <div class="field"><label>Klasse</label>
+              <select class="input" id="c-grade">${CFG.GRADES.map(g=>`<option value="${g}">${g}. Klasse</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Schulsprache</label>
+              <select class="input" id="c-lang">${langOpts}</select>
+            </div>
+          </div>
+          <div class="field"><label>Schulwebseite <span style="color:var(--t3);font-size:11px;">(optional)</span></label>
+            <input class="input" id="c-url" type="url" placeholder="https://schule.de">
           </div>
           <div class="field">
-            <label>PIN <span style="color:var(--t3);font-weight:400;font-size:11px;">mind. 8 Zeichen, Buchstaben+Zahlen</span></label>
+            <label>PIN * <span style="color:var(--t3);font-weight:400;font-size:11px;">mind. 8 Zeichen, Buchstaben+Zahlen</span></label>
             <input class="input" id="c-pin" type="password" placeholder="z.B. Hund2024!" autocomplete="off">
           </div>
           <button class="btn btn-primary btn-sm" onclick="addChildWithPin()">Kind hinzufügen</button>
@@ -1698,22 +1933,38 @@ function childrenPage(el) {
           3. Den persönlichen PIN eingeben → fertig!
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        ${children.length ? children.map(c=>{
+
+      <!-- ── Kinder-Liste ─────────────────────────────────── -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        ${children.length ? children.map(c => {
           const childData = (() => { try { return JSON.parse(localStorage.getItem('sb_data_'+c.id)||'{}'); } catch{return {};} })();
+          const cLang = CFG.SCHOOL_LANGS.find(l=>l.code===(c.language||'de')) || CFG.SCHOOL_LANGS[0];
+          const cSubjects = c.subjects || getChildSubjects(c);
+          // Alle verfügbaren Fächer für diese Sprache+Klasse (zum Hinzufügen)
+          const allSubs = (() => {
+            const byLang = CFG.SUBJECTS_BY_LANG[c.language||'de'] || CFG.SUBJECTS_BY_LANG['de'];
+            const grades = Object.keys(byLang).map(Number).sort((a,b)=>a-b);
+            const g = grades.reduce((prev,curr) => Math.abs(curr-(c.grade||9))<Math.abs(prev-(c.grade||9))?curr:prev);
+            return byLang[g] || [];
+          })();
+          const addableSubs = allSubs.filter(s => !cSubjects.includes(s));
+
           return `
           <div class="card">
+            <!-- Header -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
               <div style="display:flex;align-items:center;gap:12px;">
                 <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--sec));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:18px;">${(c.name||'K')[0]}</div>
                 <div>
                   <div style="font-weight:700;">${safe(c.name)}</div>
-                  <div style="font-size:12px;color:var(--t3);">Klasse ${c.grade} · PIN: ${c.pin ? '••••' : '<span style="color:var(--warning)">nicht gesetzt</span>'}</div>
+                  <div style="font-size:12px;color:var(--t3);">Klasse ${c.grade} · ${cLang.flag} ${cLang.name} · PIN: ${c.pin?'••••':'<span style="color:var(--warning)">fehlt</span>'}</div>
                 </div>
               </div>
               <button class="btn btn-danger btn-sm" onclick="removeChild('${c.id}')">✕</button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+
+            <!-- Statistiken -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
               <div style="text-align:center;background:var(--bg-2);padding:8px;border-radius:var(--r-md);">
                 <div style="font-size:18px;font-weight:800;color:var(--pri);">${childData.xp||0}</div>
                 <div style="font-size:10px;color:var(--t3);">XP</div>
@@ -1727,32 +1978,92 @@ function childrenPage(el) {
                 <div style="font-size:10px;color:var(--t3);">Karten</div>
               </div>
             </div>
-            <div style="display:flex;gap:8px;">
-              <input class="input" id="pin-${c.id}" type="password" placeholder="Neuer PIN (mind. 8 Zeichen)" autocomplete="off" style="flex:1;">
-              <button class="btn btn-secondary btn-sm" onclick="updatePin('${c.id}')">PIN ändern</button>
+
+            <!-- Einstellungen -->
+            <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--border);padding-top:12px;">
+
+              <!-- Schulsprache -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12px;font-weight:600;min-width:100px;">Schulsprache</label>
+                <select class="input" style="flex:1;font-size:13px;"
+                  onchange="updateChildSetting('${c.id}',{language:this.value}).then(()=>childrenPage(document.getElementById('content')))">
+                  ${CFG.SCHOOL_LANGS.map(l=>`<option value="${l.code}" ${(c.language||'de')===l.code?'selected':''}>${l.flag} ${l.name}</option>`).join('')}
+                </select>
+              </div>
+
+              <!-- Schulwebseite -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12px;font-weight:600;min-width:100px;">Schulwebseite</label>
+                <input class="input" id="url-${c.id}" type="url" style="flex:1;font-size:13px;"
+                  placeholder="https://schule.de" value="${safe(c.school_url||'')}">
+                <button class="btn btn-ghost btn-sm" onclick="updateChildSetting('${c.id}',{school_url:document.getElementById('url-${c.id}').value.trim()||null}).then(()=>toast('✅ Gespeichert!'))">💾</button>
+              </div>
+
+              <!-- PIN ändern -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12px;font-weight:600;min-width:100px;">PIN ändern</label>
+                <input class="input" id="pin-${c.id}" type="password" placeholder="Neuer PIN" autocomplete="off" style="flex:1;font-size:13px;">
+                <button class="btn btn-secondary btn-sm" onclick="updatePin('${c.id}')">✓</button>
+              </div>
+
+              <!-- Fächer verwalten -->
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                  <label style="font-size:12px;font-weight:600;">Fächer</label>
+                  <label style="font-size:11px;color:var(--t3);display:flex;align-items:center;gap:6px;cursor:pointer;">
+                    <input type="checkbox" ${c.can_manage_subjects?'checked':''}
+                      onchange="updateChildSetting('${c.id}',{can_manage_subjects:this.checked}).then(()=>toast('✅ Gespeichert!'))">
+                    Kind darf Fächer selbst verwalten
+                  </label>
+                </div>
+                <!-- Aktuelle Fächer als Tags -->
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                  ${cSubjects.map(s => {
+                    const sm = CFG.SM[s]||CFG.SM.default;
+                    return `<span style="display:inline-flex;align-items:center;gap:4px;background:${sm.c}22;color:${sm.c};border:1px solid ${sm.c}44;padding:3px 8px;border-radius:99px;font-size:12px;font-weight:600;">
+                      ${sm.e} ${safe(s)}
+                      <button onclick="toggleChildSubject('${c.id}','${s.replace(/'/g,"\\'")}',false)" style="background:none;border:none;cursor:pointer;color:${sm.c};font-size:11px;padding:0 0 0 2px;opacity:.7;">✕</button>
+                    </span>`;
+                  }).join('')}
+                </div>
+                <!-- Fach hinzufügen -->
+                ${addableSubs.length ? `
+                <div style="display:flex;gap:6px;">
+                  <select class="input" id="addsub-${c.id}" style="flex:1;font-size:12px;">
+                    ${addableSubs.map(s=>`<option>${safe(s)}</option>`).join('')}
+                  </select>
+                  <button class="btn btn-ghost btn-sm" onclick="toggleChildSubject('${c.id}',document.getElementById('addsub-${c.id}').value,true)">+ Hinzufügen</button>
+                </div>` : '<p style="font-size:11px;color:var(--t3);">Alle Standard-Fächer bereits vorhanden</p>'}
+              </div>
             </div>
-          </div>`;}).join('')
+          </div>`;
+        }).join('')
         : '<div class="card" style="text-align:center;padding:32px;color:var(--t3);">Noch keine Kinder angelegt</div>'}
       </div>
     </div>`;
 }
 
 async function addChildWithPin() {
-  const name  = document.getElementById('c-name')?.value.trim();
-  const grade = document.getElementById('c-grade')?.value;
-  const pin   = document.getElementById('c-pin')?.value.trim();
+  const name     = document.getElementById('c-name')?.value.trim();
+  const grade    = document.getElementById('c-grade')?.value;
+  const lang     = document.getElementById('c-lang')?.value || 'de';
+  const schoolUrl= document.getElementById('c-url')?.value.trim() || '';
+  const pin      = document.getElementById('c-pin')?.value.trim();
   if (!name)                 return toast('⚠️ Name eingeben!');
   if (pin.length < 8)        return toast('❌ PIN muss mind. 8 Zeichen haben!');
   if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN muss mind. einen Buchstaben enthalten!');
   if (!/[0-9]/.test(pin))    return toast('❌ PIN muss mind. eine Zahl enthalten!');
 
-  const child = { id: 'ch' + Date.now(), name, grade, pin };
+  const child = { id: 'ch' + Date.now(), name, grade, pin, language: lang, schoolUrl };
 
   // In Supabase speichern
   if (sb) {
-    const { error } = await sb.from('children').insert({
+    const insertData = {
       parent_id: U.id, name, grade: Number(grade), pin,
-    });
+      language: lang,
+    };
+    if (schoolUrl) insertData.school_url = schoolUrl;
+    const { error } = await sb.from('children').insert(insertData);
     if (error) { toast('❌ ' + error.message); return; }
     // ID von Supabase holen
     const { data } = await sb.from('children').select('id').eq('parent_id', U.id).eq('name', name).single();
@@ -1764,6 +2075,7 @@ async function addChildWithPin() {
   toast(`✅ ${name} hinzugefügt! PIN: ${pin}`);
   document.getElementById('c-name').value='';
   document.getElementById('c-pin').value='';
+  document.getElementById('c-url').value='';
   childrenPage(document.getElementById('content'));
 }
 
@@ -1858,6 +2170,36 @@ function settings(el) {
           <button class="btn btn-primary btn-sm" onclick="saveProfile()">Profil speichern</button>
         </div>
       </div>
+      ${U.isChild && U.canManageSubjects ? (() => {
+        const mySubjs = getChildSubjects(U);
+        const lang = U.language || 'de';
+        const byLang = CFG.SUBJECTS_BY_LANG[lang] || CFG.SUBJECTS_BY_LANG['de'];
+        const gradeSubjs = byLang[U.grade||9] || byLang[9] || [];
+        const customSubjs = Array.isArray(U.subjects) ? U.subjects : null;
+        const isCustom = !!customSubjs;
+        const availableToAdd = gradeSubjs.filter(s => !mySubjs.includes(s));
+        return `<div class="card">
+          <div class="card-header"><div class="card-title">📚 Meine Fächer</div></div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <p style="font-size:13px;color:var(--t2);">Du kannst deine Fächer selbst anpassen — dein Elternteil hat das erlaubt.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              ${mySubjs.map(s=>`
+                <span style="display:inline-flex;align-items:center;gap:6px;background:var(--pri-l);color:var(--pri-d);padding:4px 10px;border-radius:20px;font-size:13px;font-weight:600;">
+                  ${safe(s)}
+                  <button onclick="childToggleSubject('${safe(s)}', false)" style="background:none;border:none;cursor:pointer;color:var(--pri-d);font-size:14px;line-height:1;padding:0 2px;">✕</button>
+                </span>`).join('')}
+            </div>
+            ${availableToAdd.length > 0 ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <select class="input" id="child-add-subj" style="max-width:220px;">
+                <option value="">— Fach hinzufügen —</option>
+                ${availableToAdd.map(s=>`<option value="${safe(s)}">${safe(s)}</option>`).join('')}
+              </select>
+              <button class="btn btn-secondary btn-sm" onclick="childToggleSubject(document.getElementById('child-add-subj').value, true)">+ Hinzufügen</button>
+            </div>` : ''}
+            ${isCustom ? `<button class="btn btn-sm" style="background:none;border:1px solid var(--border);color:var(--t2);font-size:12px;align-self:flex-start;" onclick="childResetSubjects()">↩ Fächer zurücksetzen</button>` : ''}
+          </div>
+        </div>`;
+      })() : ''}
       <div class="card">
         <div class="card-header"><div class="card-title">🤖 KI-Einstellungen</div></div>
         <div style="display:flex;flex-direction:column;gap:14px;">
