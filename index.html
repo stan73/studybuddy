@@ -76,7 +76,7 @@ footer a:hover { color: white; }
     <p>StudyBuddy Pro kombiniert bewährte Lernmethoden mit künstlicher Intelligenz — für bessere Noten, stressfreiere Prüfungen und glücklichere Eltern.</p>
     <div class="hero-actions">
       <button class="btn btn-primary btn-lg" onclick="openAuth('register')">Jetzt kostenlos starten →</button>
-      <button class="btn btn-secondary btn-lg" onclick="openAuth('login')">Demo ansehen</button>
+      <button class="btn btn-secondary btn-lg" onclick="openAuth('login')">Anmelden</button>
     </div>
     <div class="hero-stats">
       <div>
@@ -255,19 +255,18 @@ footer a:hover { color: white; }
  *              sessionStorage.
  *
  * @auth_flows
- *   1. E-Mail/Passwort Login   → supabase.auth.signInWithPassword()
- *                               → sessionStorage 'sb_session' → /app.html
- *   2. Registrierung (3 Steps) → supabase.auth.signUp() + profiles.insert()
- *                               → sofortiger Login + Redirect
- *   3. Kind-Login (PIN)        → supabase RPC 'child_login(parent_email, child_name, pin)'
- *                               → sessionStorage 'sb_child_session' → /app.html
- *   4. Demo-Modus              → sessionStorage 'sb_demo_login' → /app.html
- *   5. Passwort-Reset          → supabase.auth.resetPasswordForEmail()
+ *   1. E-Mail/Passwort Login    → supabase.auth.signInWithPassword()
+ *                                → sessionStorage 'sb_session' → /app.html
+ *   2. Registrierung (2 Schritte) → Eltern-Account + Kinder mit PIN
+ *                                → supabase.auth.signUp() + profiles + children insert
+ *   3. Kind-Login (PIN)          → supabase RPC 'auth_child(parent_email, pin)'
+ *                                → sessionStorage 'sb_child_session' → /app.html
+ *   4. Passwort-Reset            → supabase.auth.resetPasswordForEmail()
  *
  * @security
  *   - Alle Nutzereingaben werden via DOMPurify bereinigt (XSS-Schutz)
  *   - Passwort-Validierung: min. 8 Zeichen, 1 Zahl, 1 Großbuchstabe
- *   - Kind-PIN-Validierung: 4-stellig numerisch
+ *   - Kind-PIN-Validierung: alphanumerisch, mind. 8 Zeichen, 1 Buchstabe + 1 Zahl
  *
  * @see /app.html   — Haupt-App (nach Login)
  * @see /supabase/migrations/001_schema.sql — child_login() RPC
@@ -277,7 +276,7 @@ const FAQS = [
   { q: 'Brauche ich einen Claude API Key?', a: 'Der API Key ist optional. Alle Grundfunktionen (Karteikarten, Lernplan, Pomodoro) funktionieren ohne API Key. Der Key wird nur für KI-generierte Inhalte (Tutor, automatische Kartenerstellung, Prüfungsfragen) benötigt.' },
   { q: 'Wo werden meine Daten gespeichert?', a: 'Alle Daten werden DSGVO-konform auf EU-Servern in Frankfurt gespeichert. Passwörter werden verschlüsselt, API Keys nie auf dem Server gespeichert.' },
   { q: 'Kann ich mehrere Kinder anlegen?', a: 'Mit Family Plus bis zu 3 Kinder, mit Family Pro bis zu 6 Kinder — alle mit eigenem Schüler-Account und Lernprofil.' },
-  { q: 'Wie funktioniert der Demo-Modus?', a: 'Einfach mit beliebiger E-Mail und Passwort anmelden — die App lädt automatisch Beispieldaten. Kein Account erforderlich.' },
+  { q: 'Wie melden sich Kinder an?', a: 'Eltern richten den Account ein und vergeben für jedes Kind einen persönlichen alphanumerischen PIN (mind. 8 Zeichen). Kinder loggen sich dann mit der E-Mail des Elternteils und ihrem PIN ein — ganz einfach, ohne eigene E-Mail-Adresse.' },
 ];
 
 document.getElementById('faq-list').innerHTML = FAQS.map((f, i) => `
@@ -321,7 +320,7 @@ function renderAuth() {
   // Tab-Leiste oben
   const tabs = `
     <div style="display:flex;gap:4px;background:var(--bg-2);padding:4px;border-radius:var(--r-md);margin-bottom:20px;">
-      ${[['login','👤 Eltern/Schüler'],['child','👧 Als Kind'],['register','✏️ Registrieren']].map(([m,l])=>`
+      ${[['login','👤 Eltern-Login'],['child','👧 Kind-Login'],['register','✏️ Registrieren']].map(([m,l])=>`
         <button onclick="authMode='${m}';renderAuth()" style="flex:1;padding:8px;border-radius:var(--r-sm);border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
           background:${authMode===m?'var(--bg-card)':'transparent'};
           color:${authMode===m?'var(--pri)':'var(--t3)'};
@@ -329,14 +328,13 @@ function renderAuth() {
     </div>`;
 
   if (authMode === 'login') {
-    title.textContent = 'Anmelden';
+    title.textContent = 'Eltern-Login';
     body.innerHTML = tabs + `
       <div style="display:flex;flex-direction:column;gap:14px;">
         <div class="field"><label>E-Mail</label><input class="input" id="l-em" type="email" placeholder="deine@email.de" autocomplete="email"></div>
         <div class="field"><label>Passwort</label><input class="input" id="l-pw" type="password" placeholder="••••••••" autocomplete="current-password"></div>
         <button class="btn btn-primary btn-full" onclick="doLogin()">Anmelden →</button>
         <p style="text-align:center;font-size:12px;color:var(--t3);">
-          Demo: beliebige E-Mail + Passwort &nbsp;·&nbsp;
           <a style="color:var(--pri);cursor:pointer;" onclick="showForgotPassword()">Passwort vergessen?</a>
         </p>
       </div>
@@ -349,23 +347,20 @@ function renderAuth() {
     setTimeout(() => document.getElementById('l-em')?.focus(), 50);
 
   } else if (authMode === 'child') {
-    title.textContent = 'Kinder-Login 👧';
+    title.textContent = 'Kind-Login 👧';
     body.innerHTML = tabs + `
       <div style="display:flex;flex-direction:column;gap:14px;">
-        <div style="background:var(--pri-l);color:var(--pri-d);padding:12px 14px;border-radius:var(--r-md);font-size:13px;">
-          🔑 Dein Elternteil hat dir einen Namen und eine 4-stellige PIN gegeben.
+        <div style="background:var(--pri-l);color:var(--pri-d);padding:12px 14px;border-radius:var(--r-md);font-size:13px;line-height:1.5;">
+          🔑 Dein Elternteil hat für dich einen PIN eingerichtet.<br>
+          Gib die E-Mail deiner Eltern und deinen persönlichen PIN ein.
         </div>
         <div class="field">
           <label>E-Mail deines Elternteils</label>
           <input class="input" id="k-em" type="email" placeholder="mama@email.de" autocomplete="off">
         </div>
         <div class="field">
-          <label>Dein Name</label>
-          <input class="input" id="k-name" placeholder="z.B. Max" autocomplete="off">
-        </div>
-        <div class="field">
-          <label>Deine PIN</label>
-          <input class="input" id="k-pin" type="password" maxlength="4" placeholder="••••" inputmode="numeric" autocomplete="off">
+          <label>Dein PIN <span style="color:var(--t3);font-size:11px;font-weight:400;">(den dein Elternteil festgelegt hat)</span></label>
+          <input class="input" id="k-pin" type="password" placeholder="PIN eingeben…" autocomplete="off">
         </div>
         <button class="btn btn-primary btn-full" onclick="doChildLogin()">Einloggen →</button>
       </div>`;
@@ -379,97 +374,104 @@ function renderAuth() {
 function renderRegStep() {
   const title = document.getElementById('auth-title');
   const body = document.getElementById('auth-body');
-  const steps = ['Rolle wählen', 'Deine Daten', 'Kinder hinzufügen'];
-  const maxStep = regData.role === 'parent' ? 3 : 2;
+  // Nur 2 Schritte: 1. Eltern-Daten, 2. Kinder + PINs
+  const maxStep = 2;
+  regData.role = 'parent'; // Immer Elternteil
 
   const progress = `
-    <div style="display:flex;gap:8px;margin-bottom:24px;">
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
       ${Array.from({length: maxStep}, (_, i) => `
-        <div style="flex:1;height:4px;border-radius:99px;background:${i < regStep ? 'var(--pri)' : 'var(--border)'}"></div>
+        <div style="flex:1;height:5px;border-radius:99px;background:${i < regStep ? 'var(--pri)' : 'var(--border)'}"></div>
       `).join('')}
     </div>
-    <p style="font-size:12px;color:var(--t3);margin-bottom:16px;">Schritt ${regStep} von ${maxStep}</p>`;
+    <p style="font-size:12px;color:var(--t3);margin-bottom:16px;">Schritt ${regStep} von ${maxStep} — ${regStep===1?'Ihr Eltern-Account':'Ihre Kinder'}</p>`;
 
   if (regStep === 1) {
-    title.textContent = 'Konto erstellen';
-    body.innerHTML = progress + `
-      <p style="font-weight:600;margin-bottom:16px;">Ich bin…</p>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        ${[['student','🎓','Schüler/in','Klasse 5–13'],['parent','👨‍👩‍👧','Elternteil','Kinder begleiten'],['teacher','👩‍🏫','Lehrer/in','Klassen verwalten']].map(([r,em,n,d]) => `
-          <button onclick="regData.role='${r}';regStep=2;renderRegStep()" style="text-align:left;padding:16px;border:2px solid var(--border);border-radius:var(--r-md);background:var(--bg-card);cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--pri)'" onmouseout="this.style.borderColor='var(--border)'">
-            <span style="font-size:20px;">${em}</span> <strong style="margin-left:8px;">${n}</strong> <span style="color:var(--t3);font-size:13px;margin-left:8px;">${d}</span>
-          </button>`).join('')}
-      </div>
-      <button class="btn btn-ghost btn-full" style="margin-top:12px;" onclick="authMode='login';renderAuth()">← Zurück zum Login</button>`;
-  } else if (regStep === 2) {
-    title.textContent = regData.role === 'student' ? 'Schüler-Profil' : regData.role === 'parent' ? 'Eltern-Profil' : 'Lehrer-Profil';
+    title.textContent = 'Eltern-Account erstellen';
     body.innerHTML = progress + `
       <div style="display:flex;flex-direction:column;gap:14px;">
         <div class="grid-2">
-          <div class="field"><label>Vorname</label><input class="input" id="r-fn" placeholder="Max" value="${regData.fn||''}"></div>
-          <div class="field"><label>Nachname</label><input class="input" id="r-ln" placeholder="Müller" value="${regData.ln||''}"></div>
+          <div class="field"><label>Vorname *</label><input class="input" id="r-fn" placeholder="Max" value="${regData.fn||''}" autocomplete="given-name"></div>
+          <div class="field"><label>Nachname</label><input class="input" id="r-ln" placeholder="Müller" value="${regData.ln||''}" autocomplete="family-name"></div>
         </div>
-        <div class="field"><label>E-Mail</label><input class="input" id="r-em" type="email" placeholder="max@email.de" value="${regData.em||''}"></div>
-        <div class="field"><label>Passwort <span style="color:var(--t3);font-weight:400;font-size:12px;">(min. 8 Zeichen, 1 Zahl, 1 Großbuchstabe)</span></label><input class="input" id="r-pw" type="password" placeholder="Sicheres Passwort" autocomplete="new-password"></div>
-        ${regData.role === 'student' ? `<div class="grid-2">
-          <div class="field"><label>Klasse</label><select class="input" id="r-gr">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}" ${regData.grade==g?'selected':''}>${g}. Klasse</option>`).join('')}</select></div>
-          <div class="field"><label>Schulform</label><select class="input" id="r-sc"><option>Gymnasium</option><option>Realschule</option><option>Gesamtschule</option><option>Hauptschule</option></select></div>
-        </div>` : ''}
-        <button class="btn btn-primary btn-full" onclick="regStep2Next()">Weiter →</button>
-        <button class="btn btn-ghost btn-full" onclick="regStep=1;renderRegStep()">← Zurück</button>
+        <div class="field"><label>E-Mail *</label><input class="input" id="r-em" type="email" placeholder="ihre@email.de" value="${regData.em||''}" autocomplete="email"></div>
+        <div class="field">
+          <label>Passwort * <span style="color:var(--t3);font-weight:400;font-size:11px;">(min. 8 Zeichen, 1 Zahl, 1 Großbuchstabe)</span></label>
+          <input class="input" id="r-pw" type="password" placeholder="Sicheres Passwort" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="regStep1Next()">Weiter: Kinder anlegen →</button>
+        <button class="btn btn-ghost btn-full" onclick="authMode='login';renderAuth()">← Zurück zum Login</button>
       </div>`;
-  } else if (regStep === 3) {
-    title.textContent = 'Kinder hinzufügen';
-    if (!regData.children) regData.children = [{ name: '', grade: 5 }];
+    setTimeout(() => document.getElementById('r-fn')?.focus(), 50);
+
+  } else if (regStep === 2) {
+    title.textContent = 'Kinder anlegen';
+    if (!regData.children) regData.children = [{ name: '', grade: 5, pin: '', pin2: '' }];
     body.innerHTML = progress + `
-      <div style="display:flex;flex-direction:column;gap:14px;">
-        <p style="color:var(--t2);font-size:14px;">Lege Profile für deine Kinder an (kann später ergänzt werden):</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <p style="color:var(--t2);font-size:13px;margin-bottom:8px;">
+          Jedes Kind erhält einen persönlichen PIN (mind. 8 Zeichen, Buchstaben + Zahlen).<br>
+          Kinder können sich damit auf jedem Gerät einloggen.
+        </p>
         <div id="children-list">
           ${regData.children.map((c, i) => `
-            <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;">
-              <div class="field" style="flex:1"><label>Name</label><input class="input" id="cn-${i}" value="${c.name}" placeholder="Kind ${i+1}"></div>
-              <div class="field" style="width:110px"><label>Klasse</label><select class="input" id="cg-${i}">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}" ${c.grade==g?'selected':''}>${g}.</option>`).join('')}</select></div>
-              ${i > 0 ? `<button class="btn btn-ghost btn-sm" style="margin-bottom:2px;" onclick="removeChild(${i})">✕</button>` : ''}
+            <div style="background:var(--bg-2);border-radius:var(--r-md);padding:14px;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <strong style="font-size:13px;">Kind ${i+1}</strong>
+                ${i > 0 ? `<button class="btn btn-ghost btn-sm" onclick="removeRegChild(${i})">✕ Entfernen</button>` : ''}
+              </div>
+              <div class="grid-2" style="margin-bottom:10px;">
+                <div class="field"><label>Name *</label><input class="input" id="cn-${i}" value="${c.name}" placeholder="z.B. Max"></div>
+                <div class="field"><label>Klasse</label><select class="input" id="cg-${i}">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}" ${c.grade==g?'selected':''}>${g}. Klasse</option>`).join('')}</select></div>
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label>PIN * <span style="color:var(--t3);font-size:10px;">mind. 8 Zeichen, Buchstaben+Zahlen</span></label>
+                  <input class="input" id="cp-${i}" type="password" placeholder="z.B. Hund2024!" autocomplete="off">
+                </div>
+                <div class="field">
+                  <label>PIN bestätigen *</label>
+                  <input class="input" id="cp2-${i}" type="password" placeholder="PIN wiederholen" autocomplete="off">
+                </div>
+              </div>
             </div>`).join('')}
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="addChild()" style="align-self:flex-start;">+ Kind hinzufügen</button>
+        <button class="btn btn-ghost btn-sm" onclick="addRegChild()" style="align-self:flex-start;margin-bottom:8px;">+ Weiteres Kind</button>
         <button class="btn btn-primary btn-full" onclick="doRegister()">Konto erstellen 🎉</button>
-        <button class="btn btn-ghost btn-full" onclick="regStep=2;renderRegStep()">← Zurück</button>
+        <button class="btn btn-ghost btn-full" onclick="regStep=1;renderRegStep()">← Zurück</button>
       </div>`;
   }
 }
 
-function regStep2Next() {
+function regStep1Next() {
   const fn = document.getElementById('r-fn')?.value.trim();
   const ln = document.getElementById('r-ln')?.value.trim();
   const em = document.getElementById('r-em')?.value.trim();
   const pw = document.getElementById('r-pw')?.value;
-  const grade = document.getElementById('r-gr')?.value;
-  const school = document.getElementById('r-sc')?.value;
 
-  if (!fn || !em || !pw) return toast('Bitte alle Pflichtfelder ausfüllen!');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return toast('Ungültige E-Mail-Adresse!');
-  if (pw.length < 8) return toast('Passwort zu kurz (min. 8 Zeichen)!');
-  if (!/[0-9]/.test(pw)) return toast('Passwort braucht mindestens eine Zahl!');
-  if (!/[A-Z]/.test(pw)) return toast('Passwort braucht mindestens einen Großbuchstaben!');
+  if (!fn || !em || !pw) return toast('⚠️ Bitte alle Pflichtfelder ausfüllen!');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return toast('❌ Ungültige E-Mail-Adresse!');
+  if (pw.length < 8) return toast('❌ Passwort zu kurz (min. 8 Zeichen)!');
+  if (!/[0-9]/.test(pw)) return toast('❌ Passwort braucht mindestens eine Zahl!');
+  if (!/[A-Z]/.test(pw)) return toast('❌ Passwort braucht mindestens einen Großbuchstaben!');
 
-  Object.assign(regData, { fn, ln, em, pw, grade, school });
-
-  if (regData.role === 'parent') {
-    regStep = 3;
-  } else {
-    doRegister();
-    return;
-  }
+  Object.assign(regData, { fn, ln, em, pw });
+  regStep = 2;
   renderRegStep();
 }
 
-function addChild() {
-  regData.children.push({ name: '', grade: 5 });
+function addRegChild() {
+  if (!regData.children) regData.children = [];
+  // Aktuelle Werte aus dem DOM retten
+  regData.children = regData.children.map((_, i) => ({
+    name: document.getElementById('cn-' + i)?.value.trim() || '',
+    grade: Number(document.getElementById('cg-' + i)?.value || 5),
+  }));
+  regData.children.push({ name: '', grade: 5, pin: '', pin2: '' });
   renderRegStep();
 }
 
-function removeChild(i) {
+function removeRegChild(i) {
   regData.children.splice(i, 1);
   renderRegStep();
 }
@@ -520,132 +522,114 @@ async function doResetPassword() {
 async function doLogin() {
   const em = document.getElementById('l-em')?.value.trim();
   const pw = document.getElementById('l-pw')?.value;
-  if (!em || !pw) return toast('E-Mail und Passwort eingeben!');
+  if (!em || !pw) return toast('⚠️ E-Mail und Passwort eingeben!');
 
-  // Passwort-Format-Check (nicht leer, min. 1 Zeichen)
-  if (pw.length < 1) return toast('Passwort eingeben!');
+  if (!sb) return toast('❌ Keine Verbindung zur Datenbank — bitte Seite neu laden');
 
-  // Supabase Auth
-  if (sb) {
-    toast('Wird angemeldet…');
-    const btn = document.querySelector('#auth-body .btn-primary');
-    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  toast('Wird angemeldet…');
+  const btn = document.querySelector('#auth-body .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
-    const { data, error } = await sb.auth.signInWithPassword({ email: em, password: pw });
+  const { data, error } = await sb.auth.signInWithPassword({ email: em, password: pw });
 
-    if (error) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Anmelden'; }
-      const msgs = {
-        'Invalid login credentials': 'E-Mail oder Passwort falsch',
-        'Email not confirmed': 'E-Mail noch nicht bestätigt — bitte Postfach prüfen',
-        'Too many requests': 'Zu viele Versuche — bitte kurz warten',
-      };
-      return toast('❌ ' + (msgs[error.message] || error.message));
-    }
-
-    // Profil laden
-    const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
-    sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile }));
-    window.location.href = '/app.html';
-  } else {
-    // Demo-Fallback (wenn Supabase nicht erreichbar)
-    toast('Demo-Modus wird gestartet…');
-    sessionStorage.setItem('sb_demo_login', JSON.stringify({ email: em, role: 'student' }));
-    setTimeout(() => { window.location.href = '/app.html'; }, 800);
+  if (error) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Anmelden →'; }
+    const msgs = {
+      'Invalid login credentials': 'E-Mail oder Passwort falsch',
+      'Email not confirmed': 'E-Mail noch nicht bestätigt — bitte Postfach prüfen',
+      'Too many requests': 'Zu viele Versuche — bitte kurz warten',
+    };
+    return toast('❌ ' + (msgs[error.message] || error.message));
   }
+
+  // Profil laden
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
+  sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile }));
+  window.location.href = '/app.html';
 }
 
 async function doChildLogin() {
-  const em   = document.getElementById('k-em')?.value.trim();
-  const name = document.getElementById('k-name')?.value.trim();
-  const pin  = document.getElementById('k-pin')?.value.trim();
+  const em  = document.getElementById('k-em')?.value.trim();
+  const pin = document.getElementById('k-pin')?.value.trim();
 
-  if (!em || !name || !pin) return toast('Alle Felder ausfüllen!');
-  if (!/^\d{4}$/.test(pin))  return toast('PIN muss 4 Ziffern haben!');
+  if (!em || !pin) return toast('⚠️ E-Mail und PIN eingeben!');
+  if (pin.length < 8) return toast('❌ PIN muss mindestens 8 Zeichen haben!');
+  if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN muss mindestens einen Buchstaben enthalten!');
+  if (!/[0-9]/.test(pin))    return toast('❌ PIN muss mindestens eine Zahl enthalten!');
+
+  if (!sb) return toast('❌ Keine Verbindung zur Datenbank — bitte Seite neu laden');
 
   const btn = document.querySelector('#auth-body .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
-  if (sb) {
-    // Supabase RPC aufrufen
-    const { data, error } = await sb.rpc('auth_child', {
-      p_parent_email: em.toLowerCase(),
-      p_child_name:   name,
-      p_pin:          pin,
-    });
+  const { data, error } = await sb.rpc('auth_child', {
+    p_parent_email: em.toLowerCase(),
+    p_pin:          pin,
+  });
 
-    if (btn) { btn.disabled = false; btn.textContent = 'Einloggen →'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Einloggen →'; }
 
-    if (error || !data) return toast('❌ Verbindungsfehler — bitte nochmal versuchen');
-    if (data.error)     return toast('❌ ' + data.error);
+  if (error || !data) return toast('❌ Verbindungsfehler — bitte nochmal versuchen');
+  if (data.error)     return toast('❌ ' + data.error);
 
-    // Erfolg → Kind-Session speichern
-    sessionStorage.setItem('sb_child_session', JSON.stringify(data));
-    toast('👋 Willkommen, ' + data.child_name + '!');
-    setTimeout(() => { window.location.href = '/app.html'; }, 600);
-
-  } else {
-    // Demo-Fallback
-    sessionStorage.setItem('sb_child_session', JSON.stringify({
-      child_id: 'demo_child_' + Date.now(),
-      child_name: name, grade: 7, parent_email: em,
-    }));
-    setTimeout(() => { window.location.href = '/app.html'; }, 600);
-  }
+  // Erfolg → Kind-Session speichern
+  sessionStorage.setItem('sb_child_session', JSON.stringify(data));
+  toast('✅ Willkommen, ' + data.child_name + '!');
+  setTimeout(() => { window.location.href = '/app.html'; }, 600);
 }
 
 async function doRegister() {
-  // Kinder-Daten lesen wenn Step 3
-  if (regData.role === 'parent' && regData.children) {
-    regData.children = regData.children.map((_, i) => ({
-      name: document.getElementById('cn-' + i)?.value.trim() || '',
-      grade: Number(document.getElementById('cg-' + i)?.value || 5),
-    })).filter(c => c.name);
+  if (!sb) return toast('❌ Keine Verbindung zur Datenbank — bitte Seite neu laden');
+
+  // Kinder-Daten lesen und validieren
+  const count = regData.children?.length || 0;
+  const children = [];
+  for (let i = 0; i < count; i++) {
+    const name  = document.getElementById('cn-' + i)?.value.trim() || '';
+    const grade = Number(document.getElementById('cg-' + i)?.value || 5);
+    const pin   = document.getElementById('cp-' + i)?.value || '';
+    const pin2  = document.getElementById('cp2-' + i)?.value || '';
+
+    if (!name) return toast('⚠️ Bitte Name für Kind ' + (i+1) + ' eingeben!');
+    if (pin.length < 8) return toast('❌ PIN für ' + name + ' muss mind. 8 Zeichen haben!');
+    if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN für ' + name + ' braucht mind. einen Buchstaben!');
+    if (!/[0-9]/.test(pin))    return toast('❌ PIN für ' + name + ' braucht mind. eine Zahl!');
+    if (pin !== pin2)          return toast('❌ PINs für ' + name + ' stimmen nicht überein!');
+
+    children.push({ name, grade, pin });
   }
 
-  if (sb) {
-    toast('Konto wird erstellt…');
-    const fullName = (regData.fn + ' ' + (regData.ln || '')).trim();
+  if (children.length === 0) return toast('⚠️ Bitte mindestens ein Kind anlegen!');
 
-    const { data, error } = await sb.auth.signUp({
-      email: regData.em,
-      password: regData.pw,
-      options: { data: { full_name: fullName, role: regData.role, grade: regData.grade, school: regData.school } },
-    });
+  toast('Konto wird erstellt…');
+  const fullName = (regData.fn + ' ' + (regData.ln || '')).trim();
 
-    if (error) return toast('❌ ' + error.message);
+  const { data, error } = await sb.auth.signUp({
+    email: regData.em,
+    password: regData.pw,
+    options: { data: { full_name: fullName, role: 'parent' } },
+  });
 
-    // Profil anlegen
-    await sb.from('profiles').upsert({
-      id: data.user.id, email: regData.em, full_name: fullName,
-      role: regData.role, grade: Number(regData.grade) || null,
-      school: regData.school || null, subscription: 'free',
-    });
+  if (error) return toast('❌ ' + error.message);
 
-    // Kinder anlegen
-    if (regData.role === 'parent' && regData.children?.length) {
-      await sb.from('children').insert(
-        regData.children.map(c => ({ parent_id: data.user.id, name: c.name, grade: Number(c.grade) }))
-      );
-    }
+  // Profil anlegen
+  await sb.from('profiles').upsert({
+    id: data.user.id, email: regData.em, full_name: fullName,
+    role: 'parent', subscription: 'free',
+  });
 
-    // Prüfen ob E-Mail-Bestätigung nötig
-    if (!data.session) {
-      toast('📧 Bestätigungs-E-Mail gesendet — bitte Postfach prüfen!', 5000);
-      setTimeout(closeAuth, 5000);
-    } else {
-      sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile: null }));
-      window.location.href = '/app.html';
-    }
+  // Kinder mit PIN anlegen
+  await sb.from('children').insert(
+    children.map(c => ({ parent_id: data.user.id, name: c.name, grade: c.grade, pin: c.pin }))
+  );
+
+  // Prüfen ob E-Mail-Bestätigung nötig
+  if (!data.session) {
+    toast('✅ Konto erstellt! Bestätigungs-E-Mail gesendet — bitte Postfach prüfen!', 6000);
+    setTimeout(closeAuth, 6000);
   } else {
-    // Demo-Fallback
-    toast('Demo-Modus wird gestartet…');
-    sessionStorage.setItem('sb_demo_login', JSON.stringify({
-      email: regData.em, name: (regData.fn + ' ' + (regData.ln || '')).trim(),
-      role: regData.role, grade: regData.grade, school: regData.school,
-      children: regData.children || [],
-    }));
-    setTimeout(() => { window.location.href = '/app.html'; }, 800);
+    sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile: null }));
+    window.location.href = '/app.html';
   }
 }
 
@@ -658,11 +642,17 @@ function showPolicy(type) {
   toast(texts[type] || '');
 }
 
-function toast(msg, dur = 3000) {
+function toast(msg, dur = 3500) {
   const t = document.getElementById('toast');
   t.textContent = msg;
+  // Farbe anhand Emoji-Präfix
+  t.classList.remove('toast-error', 'toast-success', 'toast-warn');
+  if (msg.startsWith('❌')) t.classList.add('toast-error');
+  else if (msg.startsWith('✅') || msg.startsWith('👋') || msg.startsWith('📧')) t.classList.add('toast-success');
+  else if (msg.startsWith('⚠️')) t.classList.add('toast-warn');
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), dur);
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), dur);
 }
 
 // Enter-Taste für Login

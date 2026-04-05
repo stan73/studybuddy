@@ -340,7 +340,7 @@ function loadAIKeys(emailOrParent) {
  * @returns {Promise<void>}
  */
 async function loadConfiguredProviders() {
-  if (!sb || !U || U.isChild || U.isDemo) return;
+  if (!sb || !U || U.isChild) return;
   try {
     const { data } = await sb.rpc('get_configured_providers');
     if (data?.length) {
@@ -428,7 +428,7 @@ function loadDataForUser(userId) {
  * @returns {Promise<void>}
  */
 async function syncStats() {
-  if (!sb || !U || U.isDemo) return;
+  if (!sb || !U) return;
 
   if (U.isChild && U.id && U.parentEmail) {
     // Kind: stats via PIN-verifizierter Supabase-Funktion speichern
@@ -462,7 +462,7 @@ async function syncStats() {
  * @returns {Promise<void>}
  */
 async function syncSession(subject, type, durationMin, xpEarned) {
-  if (!sb || !U || U.isDemo || U.isChild) return;
+  if (!sb || !U || U.isChild) return;
   try {
     await sb.from('sessions').insert({
       user_id: U.id,
@@ -547,7 +547,7 @@ async function ai(messages, system, maxTok=400, useCache=true) {
   const payload = { provider: prov, messages, system, maxTok };
 
   // Authentifizierter Nutzer: JWT → Edge Function liest Key aus DB
-  if (sb && !U?.isChild && !U?.isDemo) {
+  if (sb && !U?.isChild) {
     const { data: { session } } = await sb.auth.getSession();
     if (session?.access_token) {
       headers['Authorization'] = 'Bearer ' + session.access_token;
@@ -625,7 +625,6 @@ async function init() {
         school: profile?.school || 'Gymnasium',
         subscription: profile?.subscription || 'free',
         children,
-        isDemo: false,
       };
       save();
     }
@@ -643,31 +642,13 @@ async function init() {
         role: profile?.role || user.user_metadata?.role || 'student',
         grade: profile?.grade || user.user_metadata?.grade || 9,
         school: profile?.school || user.user_metadata?.school || 'Gymnasium',
-        subscription: 'free', children: [], isDemo: false,
+        subscription: 'free', children: [],
       };
       save();
     }
   }
 
-  // 3. Demo-Fallback
-  if (!U) {
-    const loginData = sessionStorage.getItem('sb_demo_login');
-    if (loginData) {
-      sessionStorage.removeItem('sb_demo_login');
-      const d = JSON.parse(loginData);
-      U = {
-        id: 'demo_' + Date.now(), email: d.email,
-        full_name: d.name || 'Demo Schüler',
-        role: d.role || 'student', grade: d.grade || 9,
-        school: d.school || 'Gymnasium', subscription: 'free',
-        children: d.children || (d.role==='parent' ? [{id:'c1',name:'Max',grade:7},{id:'c2',name:'Lisa',grade:5}] : []),
-        isDemo: true,
-      };
-      save();
-    }
-  }
-
-  // 4. Kind-Session (PIN-Login von Landing-Page)
+  // 3. Kind-Session (PIN-Login von Landing-Page)
   if (!U) {
     const childSession = sessionStorage.getItem('sb_child_session');
     if (childSession) {
@@ -704,9 +685,6 @@ async function init() {
 
   // Daten für aktuellen User laden (pro-User-Key)
   loadDataForUser(U.id);
-
-  // Demo-Daten befüllen
-  if (U.isDemo && !Object.keys(D.cards).length) populateDemoData();
 
   document.getElementById('app').style.display = 'flex';
   renderSidebar();
@@ -1702,16 +1680,16 @@ function childrenPage(el) {
             <select class="input" id="c-grade">${CFG.GRADES.map(g=>`<option value="${g}">${g}. Klasse</option>`).join('')}</select>
           </div>
           <div class="field">
-            <label>PIN (4 Stellen) <span style="color:var(--t3);font-weight:400;font-size:11px;">— damit meldet sich das Kind an</span></label>
-            <input class="input" id="c-pin" type="text" maxlength="4" pattern="[0-9]{4}" placeholder="z.B. 1234" inputmode="numeric">
+            <label>PIN <span style="color:var(--t3);font-weight:400;font-size:11px;">mind. 8 Zeichen, Buchstaben+Zahlen</span></label>
+            <input class="input" id="c-pin" type="password" placeholder="z.B. Hund2024!" autocomplete="off">
           </div>
           <button class="btn btn-primary btn-sm" onclick="addChildWithPin()">Kind hinzufügen</button>
         </div>
         <div style="margin-top:16px;padding:12px;background:var(--pri-l);border-radius:var(--r-md);font-size:12px;color:var(--pri-d);">
           <strong>So loggt sich das Kind ein:</strong><br>
-          1. Auf der Startseite „Als Kind einloggen" klicken<br>
+          1. Auf der Startseite „👧 Kind-Login" klicken<br>
           2. Deine E-Mail eingeben: <strong>${safe(U.email)}</strong><br>
-          3. Namen + PIN eingeben → fertig!
+          3. Den persönlichen PIN eingeben → fertig!
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
@@ -1744,7 +1722,7 @@ function childrenPage(el) {
               </div>
             </div>
             <div style="display:flex;gap:8px;">
-              <input class="input" id="pin-${c.id}" type="text" maxlength="4" placeholder="Neue PIN" inputmode="numeric" style="flex:1;">
+              <input class="input" id="pin-${c.id}" type="password" placeholder="Neuer PIN (mind. 8 Zeichen)" autocomplete="off" style="flex:1;">
               <button class="btn btn-secondary btn-sm" onclick="updatePin('${c.id}')">PIN ändern</button>
             </div>
           </div>`;}).join('')
@@ -1757,13 +1735,15 @@ async function addChildWithPin() {
   const name  = document.getElementById('c-name')?.value.trim();
   const grade = document.getElementById('c-grade')?.value;
   const pin   = document.getElementById('c-pin')?.value.trim();
-  if (!name)              return toast('Name eingeben!');
-  if (!/^\d{4}$/.test(pin)) return toast('PIN muss genau 4 Ziffern haben!');
+  if (!name)                 return toast('⚠️ Name eingeben!');
+  if (pin.length < 8)        return toast('❌ PIN muss mind. 8 Zeichen haben!');
+  if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN muss mind. einen Buchstaben enthalten!');
+  if (!/[0-9]/.test(pin))    return toast('❌ PIN muss mind. eine Zahl enthalten!');
 
   const child = { id: 'ch' + Date.now(), name, grade, pin };
 
   // In Supabase speichern
-  if (sb && !U.isDemo) {
+  if (sb) {
     const { error } = await sb.from('children').insert({
       parent_id: U.id, name, grade: Number(grade), pin,
     });
@@ -1783,11 +1763,13 @@ async function addChildWithPin() {
 
 async function updatePin(childId) {
   const pin = document.getElementById('pin-' + childId)?.value.trim();
-  if (!/^\d{4}$/.test(pin)) return toast('PIN muss 4 Ziffern haben!');
+  if (pin.length < 8)        return toast('❌ PIN muss mind. 8 Zeichen haben!');
+  if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN muss mind. einen Buchstaben enthalten!');
+  if (!/[0-9]/.test(pin))    return toast('❌ PIN muss mind. eine Zahl enthalten!');
 
   U.children = (U.children||[]).map(c => c.id === childId ? {...c, pin} : c);
 
-  if (sb && !U.isDemo) {
+  if (sb) {
     await sb.from('children').update({ pin }).eq('id', childId).eq('parent_id', U.id);
   }
   save();
@@ -1799,7 +1781,7 @@ function removeChild(id) {
   if (!confirm('Kind wirklich entfernen? Alle Lernfortschritte werden gelöscht.')) return;
   U.children = (U.children||[]).filter(c=>c.id!==id);
   localStorage.removeItem('sb_data_' + id);
-  if (sb && !U.isDemo) sb.from('children').delete().eq('id', id).eq('parent_id', U.id);
+  if (sb) sb.from('children').delete().eq('id', id).eq('parent_id', U.id);
   save();
   childrenPage(document.getElementById('content'));
 }
@@ -1982,7 +1964,7 @@ async function saveProviderKey(providerKey) {
   await saveAIKeys();
 
   // Authentifizierte Nutzer: Key zusätzlich in Supabase DB speichern (sicherer)
-  if (sb && !U?.isDemo && !U?.isChild) {
+  if (sb && !U?.isChild) {
     try {
       await sb.from('api_keys').upsert(
         { user_id: U.id, provider: providerKey, api_key: key, saved_at: new Date().toISOString() },

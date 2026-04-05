@@ -136,25 +136,34 @@ select.input { cursor: pointer; }
 /* ── Toast ───────────────────────────────────── */
 #toast {
   position: fixed;
-  bottom: var(--sp-8);
+  bottom: 28px;
   left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: var(--t1);
-  color: var(--t-inv);
-  padding: var(--sp-3) var(--sp-6);
-  border-radius: var(--r-full);
-  font-size: var(--text-sm);
-  font-weight: 500;
+  transform: translateX(-50%) translateY(24px);
+  background: #1e293b;
+  color: #ffffff;
+  padding: 14px 22px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  min-width: 220px;
+  max-width: min(520px, calc(100vw - 32px));
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  box-shadow: 0 8px 32px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.2);
   z-index: var(--z-toast);
   opacity: 0;
-  transition: opacity var(--dur-base) var(--ease), transform var(--dur-base) var(--ease);
+  transition: opacity .2s ease, transform .2s ease;
   pointer-events: none;
-  white-space: nowrap;
 }
 #toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+#toast.toast-error   { background: #dc2626; }
+#toast.toast-success { background: #16a34a; }
+#toast.toast-warn    { background: #d97706; }
 
 /* ── Modal ───────────────────────────────────── */
 .modal-overlay {
