@@ -75,8 +75,10 @@ serve(async (req: Request) => {
       messages,
       system,
       maxTok = 400,
-      // Nur für Kind-Sessions (kein Supabase-JWT): Key direkt übergeben
+      // Pfad 1: Key direkt im Body (selbes Gerät, localStorage-Vererbung)
       apiKey: passedKey,
+      // Pfad 2: Kind-ID → Proxy holt Parent-Key aus DB (geräteübergreifend)
+      childId: passedChildId,
     } = body;
 
     if (!provider || !messages) return err(400, "provider und messages erforderlich");
@@ -85,8 +87,29 @@ serve(async (req: Request) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     let apiKey: string | null = passedKey || null;
 
-    // Authentifizierter Nutzer: Key aus der Datenbank laden
-    if (!apiKey) {
+    // Pfad 2: Kind-Anfrage ohne lokalen Key → Parent-Key via childId aus DB laden
+    // Sicherheit: childId ist UUID (nicht erratbar); Key verlässt den Server nicht
+    if (!apiKey && passedChildId) {
+      const { data: childRow } = await supabase
+        .from("children")
+        .select("parent_id")
+        .eq("id", passedChildId)
+        .maybeSingle();
+
+      if (childRow?.parent_id) {
+        const { data: keyRow } = await supabase
+          .from("api_keys")
+          .select("api_key")
+          .eq("user_id", childRow.parent_id)
+          .eq("provider", provider)
+          .maybeSingle();
+
+        apiKey = keyRow?.api_key ?? null;
+      }
+    }
+
+    // Pfad 3: Authentifizierter Nutzer → Key via JWT aus DB laden
+    if (!apiKey && !passedChildId) {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader) return err(401, "Nicht autorisiert — bitte einloggen");
 
@@ -109,7 +132,7 @@ serve(async (req: Request) => {
     if (!apiKey) {
       return err(
         400,
-        `Kein ${provider}-API-Key konfiguriert — bitte in Einstellungen eintragen`
+        `Kein ${provider}-API-Key konfiguriert — Elternteil muss Key in den Einstellungen hinterlegen`
       );
     }
 

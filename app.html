@@ -364,7 +364,11 @@ function activeKey() { return AI[AI.provider] || ''; }
  * Verwende diese Funktion für alle UI-Checks und Guards in AI-Aufrufen.
  * @returns {boolean}
  */
-function hasActiveKey() { return !!activeKey() || !!(AI._hasDbKey && (AI._configured||[]).includes(AI.provider)); }
+function hasActiveKey() {
+  return !!activeKey()                                                    // Key im RAM (Demo/Kind selbes Gerät)
+    || !!(AI._hasDbKey && (AI._configured||[]).includes(AI.provider))   // Auth-Nutzer: Key im Backend
+    || !!(U?.isChild && U?.id);                                          // Kind: Proxy holt Parent-Key aus DB
+}
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const SB_URL = 'https://qzmviwrpyfpjahcmbjoy.supabase.co';
@@ -550,11 +554,16 @@ async function ai(messages, system, maxTok=400, useCache=true) {
     }
   }
 
-  // Kind/Demo: Key aus Memory (vom Elternteil geerbt via localStorage)
+  // Kind/Demo: Key aus Memory (selbes Gerät) oder Proxy-Lookup per childId (geräteübergreifend)
   if (!headers['Authorization']) {
     const key = activeKey();
-    if (!key) throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — Elternteil trägt ihn in Einstellungen ein`);
-    payload.apiKey = key; // Key direkt übergeben (HTTPS verschlüsselt)
+    if (key) {
+      payload.apiKey = key; // Selbes Gerät: Key aus localStorage
+    } else if (U?.isChild && U?.id) {
+      payload.childId = U.id; // Anderes Gerät: Proxy holt Parent-Key aus DB anhand childId
+    } else {
+      throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — Elternteil trägt ihn in Einstellungen ein`);
+    }
   }
 
   const r = await fetch(CFG.AI_PROXY, {

@@ -219,10 +219,10 @@ test('T7.4', 'doLogout: Redirect zur Startseite', () => has("window.location.hre
 test('T7.5', 'init: await loadConfiguredProviders', () => has('await loadConfiguredProviders'));
 test('T7.6', 'Demo-Modus vorhanden', () => has('isDemo'));
 test('T7.7', 'Kind-Login (PIN) vorhanden', () => has('sb_child_session'));
-test('T7.8', 'hasActiveKey prüft RAM + DB (_hasDbKey)', () => {
-  // Funktion ist einzeilig — direkt im JS suchen
-  const line = js.split('\n').find(l => l.includes('function hasActiveKey'));
-  return line && line.includes('_hasDbKey') && line.includes('activeKey()') ? true : 'Unvollständige Prüfung';
+test('T7.8', 'hasActiveKey prüft RAM + DB (_hasDbKey) + Kind-Pfad', () => {
+  const fn = js.match(/function hasActiveKey\(\)[\s\S]*?(?=\n\/\/|\/\*\*|\nconst sb )/)?.[0] || '';
+  const ok = fn.includes('_hasDbKey') && fn.includes('activeKey()') && fn.includes('isChild');
+  return ok ? true : 'Unvollständige Prüfung (fehlt: _hasDbKey, activeKey oder isChild)';
 });
 
 // ══════════════════════════════════════════════════════════════════════════
