@@ -556,6 +556,8 @@ async function ai(messages, system, maxTok=400, useCache=true) {
 
   // Kind/Demo: Key aus Memory (selbes Gerät) oder Proxy-Lookup per childId (geräteübergreifend)
   if (!headers['Authorization']) {
+    // Supabase-Gateway benötigt immer einen Bearer-Token — SB_KEY (anon JWT) als Fallback
+    headers['Authorization'] = 'Bearer ' + SB_KEY;
     const key = activeKey();
     if (key) {
       payload.apiKey = key; // Selbes Gerät: Key aus localStorage
