@@ -68,6 +68,19 @@
       </div>
       <div class="header-right">
         <div class="streak-chip" id="streak-chip" aria-label="Lernstreak">🔥 <span id="streak-val">0</span> Tage</div>
+        <button id="log-btn" onclick="openLog()" title="Aktivitäts-Log öffnen" aria-label="Log öffnen" style="
+          background:none;border:1px solid var(--border);border-radius:var(--r-md);
+          padding:6px 10px;cursor:pointer;font-size:14px;color:var(--t2);
+          display:flex;align-items:center;gap:5px;position:relative;
+          transition:background .15s;
+        " onmouseover="this.style.background='var(--bg-2)'" onmouseout="this.style.background='none'">
+          📋 <span id="log-badge" style="
+            display:none;position:absolute;top:-5px;right:-5px;
+            background:var(--danger,#ef4444);color:white;
+            border-radius:99px;font-size:10px;font-weight:700;
+            padding:1px 5px;min-width:16px;text-align:center;
+          ">0</span>
+        </button>
       </div>
     </header>
     <div id="content" role="region" aria-label="Seiteninhalt" aria-live="polite">
@@ -81,6 +94,43 @@
 
 <!-- Toast -->
 <div id="toast" role="alert" aria-live="assertive"></div>
+
+<!-- Log-Drawer -->
+<div id="log-drawer" role="dialog" aria-modal="true" aria-label="Aktivitäts-Log" style="
+  position:fixed;inset:0;z-index:9000;display:none;
+">
+  <!-- Backdrop -->
+  <div onclick="closeLog()" style="position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);"></div>
+  <!-- Panel -->
+  <div id="log-panel" style="
+    position:absolute;top:0;right:0;bottom:0;width:min(480px,100vw);
+    background:var(--bg-card);border-left:1px solid var(--border);
+    display:flex;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,.18);
+    transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+  ">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div>
+        <div style="font-weight:700;font-size:16px;">📋 Aktivitäts-Log</div>
+        <div id="log-count" style="font-size:12px;color:var(--t3);margin-top:2px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="clearLog()" title="Log löschen">🗑 Löschen</button>
+        <button onclick="closeLog()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);line-height:1;padding:4px;">✕</button>
+      </div>
+    </div>
+    <!-- Filter-Chips -->
+    <div style="display:flex;gap:6px;padding:12px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;">
+      <button class="btn btn-sm btn-primary" id="lf-all"     onclick="filterLog('all')"    >Alle</button>
+      <button class="btn btn-sm btn-secondary" id="lf-error"   onclick="filterLog('error')"  >❌ Fehler</button>
+      <button class="btn btn-sm btn-secondary" id="lf-success" onclick="filterLog('success')" >✅ Erfolg</button>
+      <button class="btn btn-sm btn-secondary" id="lf-warning" onclick="filterLog('warning')" >⚠️ Warnung</button>
+      <button class="btn btn-sm btn-secondary" id="lf-info"    onclick="filterLog('info')"   >ℹ️ Info</button>
+    </div>
+    <!-- Entries -->
+    <div id="log-entries" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
+  </div>
+</div>
 
 <script>
 /**
@@ -648,6 +698,7 @@ async function init() {
 
   document.getElementById('app').style.display = 'flex';
   renderSidebar();
+  _updateLogBadge(); // Fehler-Badge aus vorherigen Sessions anzeigen
   goPage('dashboard');
 }
 
@@ -1981,15 +2032,165 @@ function resetData() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// AKTIVITÄTS-LOG  (Ringpuffer, max. 100 Einträge, persistent in localStorage)
+// ═══════════════════════════════════════════════════════════════════════════
+const LOG_KEY = 'sb_applog';
+const LOG_MAX = 100;
+
+/** Erkennt den Log-Typ anhand von Emoji-Präfixen in der Meldung */
+function _logType(msg) {
+  if (/^✅|^\bOK\b|verbunden|gespeichert|hinzugefügt|erledigt|erstellt|gelöscht|aktualisiert/i.test(msg)) return 'success';
+  if (/^❌|Fehler|fehlgeschlagen|ungültig|error/i.test(msg))  return 'error';
+  if (/^⚠️|warnung|achtung|kein key|kein api/i.test(msg))    return 'warning';
+  return 'info';
+}
+
+/**
+ * Schreibt einen Eintrag in den persistenten Aktivitäts-Log.
+ * Ältester Eintrag wird automatisch gelöscht wenn > LOG_MAX.
+ * @param {string} msg — Nachrichtentext
+ */
+function appLog(msg) {
+  const type = _logType(msg);
+  let entries = [];
+  try { entries = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch {}
+  entries.unshift({ ts: Date.now(), msg, type }); // neuester vorne
+  if (entries.length > LOG_MAX) entries.length = LOG_MAX;
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(entries)); } catch {}
+
+  // Badge aktualisieren (Anzahl Fehler seit letztem Öffnen)
+  _updateLogBadge();
+}
+
+/** Liest alle Log-Einträge aus localStorage */
+function _readLog() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch { return []; }
+}
+
+/** Aktualisiert den roten Fehler-Badge am Log-Button */
+function _updateLogBadge() {
+  const badge = document.getElementById('log-badge');
+  if (!badge) return;
+  const unseen = _readLog().filter(e => e.type === 'error' && !e.seen).length;
+  if (unseen > 0) {
+    badge.textContent = unseen > 99 ? '99+' : unseen;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+let _logFilter = 'all'; // aktiver Filter
+
+/** Rendert den Log-Inhalt (gefiltert) */
+function _renderLogEntries() {
+  const entries = _readLog().filter(e => _logFilter === 'all' || e.type === _logFilter);
+  const el = document.getElementById('log-entries');
+  const count = document.getElementById('log-count');
+  const total = _readLog().length;
+  if (count) count.textContent = `${total} Einträge gespeichert · max. ${LOG_MAX}`;
+
+  const colors = {
+    success: { bg: '#d1fae5', border: '#10b981', dot: '#059669' },
+    error:   { bg: '#fee2e2', border: '#ef4444', dot: '#dc2626' },
+    warning: { bg: '#fef3c7', border: '#f59e0b', dot: '#d97706' },
+    info:    { bg: 'var(--bg-2)', border: 'var(--border)', dot: 'var(--t3)' },
+  };
+  const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' };
+
+  if (!entries.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--t3);">
+      <div style="font-size:40px;margin-bottom:12px;">📭</div>
+      <div style="font-size:14px;">${_logFilter === 'all' ? 'Noch keine Einträge' : 'Keine Einträge in dieser Kategorie'}</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = entries.map(e => {
+    const c = colors[e.type] || colors.info;
+    const d = new Date(e.ts);
+    const dateStr = d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const timeStr = d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    return `<div style="
+      display:flex;gap:12px;align-items:flex-start;
+      padding:12px 20px;border-bottom:1px solid var(--border);
+      transition:background .1s;
+    " onmouseover="this.style.background='var(--bg-2)'" onmouseout="this.style.background=''">
+      <div style="
+        width:8px;height:8px;border-radius:50%;background:${c.dot};
+        flex-shrink:0;margin-top:5px;
+      "></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;color:var(--t1);line-height:1.5;word-break:break-word;">${safe(e.msg)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:3px;">${dateStr} · ${timeStr}</div>
+      </div>
+      <div style="font-size:16px;flex-shrink:0;">${icons[e.type]||'ℹ️'}</div>
+    </div>`;
+  }).join('');
+}
+
+/** Öffnet den Log-Drawer */
+function openLog() {
+  // Alle Fehler als gesehen markieren
+  try {
+    const entries = _readLog().map(e => ({ ...e, seen: true }));
+    localStorage.setItem(LOG_KEY, JSON.stringify(entries));
+  } catch {}
+  _updateLogBadge();
+  _logFilter = 'all';
+  // Filter-Buttons zurücksetzen
+  ['all','error','success','warning','info'].forEach(f => {
+    const btn = document.getElementById('lf-' + f);
+    if (btn) { btn.className = f === 'all' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary'; }
+  });
+
+  const drawer = document.getElementById('log-drawer');
+  const panel  = document.getElementById('log-panel');
+  drawer.style.display = 'block';
+  requestAnimationFrame(() => { panel.style.transform = 'translateX(0)'; });
+  _renderLogEntries();
+  document.addEventListener('keydown', _logEscHandler);
+}
+
+/** Schließt den Log-Drawer */
+function closeLog() {
+  const panel = document.getElementById('log-panel');
+  panel.style.transform = 'translateX(100%)';
+  setTimeout(() => { document.getElementById('log-drawer').style.display = 'none'; }, 260);
+  document.removeEventListener('keydown', _logEscHandler);
+}
+
+function _logEscHandler(e) { if (e.key === 'Escape') closeLog(); }
+
+/** Setzt Filter und rendert neu */
+function filterLog(type) {
+  _logFilter = type;
+  ['all','error','success','warning','info'].forEach(f => {
+    const btn = document.getElementById('lf-' + f);
+    if (btn) btn.className = f === type ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary';
+  });
+  _renderLogEntries();
+}
+
+/** Löscht alle Log-Einträge nach Bestätigung */
+function clearLog() {
+  if (!confirm('Alle Log-Einträge löschen?')) return;
+  try { localStorage.removeItem(LOG_KEY); } catch {}
+  _updateLogBadge();
+  _renderLogEntries();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TOAST
 // ═══════════════════════════════════════════════════════════════════════════
 /**
  * Zeigt eine temporäre Benachrichtigung am unteren Bildschirmrand.
- * Mehrere Aufrufe in kurzer Folge setzen den Timer zurück (nur eine Toast gleichzeitig).
+ * Schreibt die Meldung gleichzeitig in den persistenten Aktivitäts-Log.
  * @param {string} msg     — Nachrichtentext (darf Emojis enthalten)
  * @param {number} [dur=3000] — Anzeigedauer in Millisekunden
  */
 function toast(msg, dur=3000) {
+  appLog(msg); // ← immer loggen, auch wenn Toast schnell verschwindet
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
