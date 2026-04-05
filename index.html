@@ -396,7 +396,7 @@ function renderRegStep() {
         </div>
         <div class="field"><label>E-Mail *</label><input class="input" id="r-em" type="email" placeholder="ihre@email.de" value="${regData.em||''}" autocomplete="email"></div>
         <div class="field">
-          <label>Passwort * <span style="color:var(--t3);font-weight:400;font-size:11px;">(min. 8 Zeichen, 1 Zahl, 1 Großbuchstabe)</span></label>
+          <label>Passwort * <span style="color:var(--t3);font-weight:400;font-size:11px;">(min. 8 Zeichen, mind. 1 Zahl)</span></label>
           <input class="input" id="r-pw" type="password" placeholder="Sicheres Passwort" autocomplete="new-password">
         </div>
         <button class="btn btn-primary btn-full" onclick="regStep1Next()">Weiter: Kinder anlegen →</button>
@@ -453,7 +453,6 @@ function regStep1Next() {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return toast('❌ Ungültige E-Mail-Adresse!');
   if (pw.length < 8) return toast('❌ Passwort zu kurz (min. 8 Zeichen)!');
   if (!/[0-9]/.test(pw)) return toast('❌ Passwort braucht mindestens eine Zahl!');
-  if (!/[A-Z]/.test(pw)) return toast('❌ Passwort braucht mindestens einen Großbuchstaben!');
 
   Object.assign(regData, { fn, ln, em, pw });
   regStep = 2;
