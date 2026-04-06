@@ -2675,7 +2675,7 @@ function saveProfile() {
 }
 
 /**
- * Live-Vorschau der gewählten Sprache — aktualisiert Sidebar sofort ohne zu speichern.
+ * Live-Vorschau der gewählten Sprache — aktualisiert Sidebar und aktuelle Seite sofort.
  * Wird durch onchange am Sprach-Dropdown ausgelöst.
  * @param {string} lang — de | en | fr | es
  */
@@ -2683,6 +2683,8 @@ function applyLangPreview(lang) {
   if (!U) return;
   U.language = lang;
   renderSidebar();
+  // Aktuelle Seite neu rendern damit auch Seiteninhalt sofort die neue Sprache zeigt
+  goPage(_page);
 }
 
 /**
