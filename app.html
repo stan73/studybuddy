@@ -408,6 +408,14 @@ const I18N = {
     'toast.profile_saved':'✅ Profil gespeichert!',
     'settings.grade_option':'{0}. Klasse',
     'common.days':'Tage',
+    // Rollen-Labels
+    'role.student':'Klasse {0}','role.parent':'Elternteil','role.teacher':'Lehrer/in',
+    // Eltern-/Lehrer-Navigation
+    'nav.parent':'Übersicht','nav.children':'Kinder',
+    'nav.family':'Familie','nav.class':'Klasse',
+    // Sprach-Einstellungen
+    'settings.language':'🌐 Sprache','settings.language_label':'App-Sprache',
+    'settings.language_hint':'Wird nach dem Speichern sofort übernommen.',
   },
   en: {
     'nav.learn':'Learning','nav.dashboard':'Dashboard','nav.subjects':'Subjects',
@@ -489,6 +497,11 @@ const I18N = {
     'toast.profile_saved':'✅ Profile saved!',
     'settings.grade_option':'Year {0}',
     'common.days':'days',
+    'role.student':'Grade {0}','role.parent':'Parent','role.teacher':'Teacher',
+    'nav.parent':'Overview','nav.children':'Children',
+    'nav.family':'Family','nav.class':'Class',
+    'settings.language':'🌐 Language','settings.language_label':'App language',
+    'settings.language_hint':'Applied immediately after saving.',
   },
   fr: {
     'nav.learn':'Apprentissage','nav.dashboard':'Tableau de bord','nav.subjects':'Matières',
@@ -570,6 +583,11 @@ const I18N = {
     'toast.profile_saved':'✅ Profil sauvegardé !',
     'settings.grade_option':'Classe {0}',
     'common.days':'jours',
+    'role.student':'Classe {0}','role.parent':'Parent','role.teacher':'Enseignant(e)',
+    'nav.parent':"Vue d'ensemble",'nav.children':'Enfants',
+    'nav.family':'Famille','nav.class':'Classe',
+    'settings.language':'🌐 Langue','settings.language_label':"Langue de l'application",
+    'settings.language_hint':'Appliqué immédiatement après la sauvegarde.',
   },
   es: {
     'nav.learn':'Aprendizaje','nav.dashboard':'Panel','nav.subjects':'Asignaturas',
@@ -651,6 +669,11 @@ const I18N = {
     'toast.profile_saved':'✅ ¡Perfil guardado!',
     'settings.grade_option':'Clase {0}',
     'common.days':'días',
+    'role.student':'Curso {0}','role.parent':'Padre/Madre','role.teacher':'Profesor/a',
+    'nav.parent':'Resumen','nav.children':'Hijos',
+    'nav.family':'Familia','nav.class':'Clase',
+    'settings.language':'🌐 Idioma','settings.language_label':'Idioma de la aplicación',
+    'settings.language_hint':'Se aplica inmediatamente al guardar.',
   },
 };
 
@@ -1202,6 +1225,7 @@ async function init() {
         grade: profile?.grade || 9,
         school: profile?.school || 'Gymnasium',
         subscription: profile?.subscription || 'free',
+        language: profile?.language || 'de',
         children,
       };
       save();
@@ -1321,7 +1345,7 @@ function renderSidebar() {
   document.getElementById('sb-name').textContent = safe(U.full_name || U.email);
   document.getElementById('sb-role').textContent = U.isChild
     ? t('role.child', U.grade)
-    : U.role === 'student' ? `Klasse ${U.grade}` : U.role === 'parent' ? 'Elternteil' : 'Lehrer/in';
+    : U.role === 'student' ? t('role.student', U.grade) : U.role === 'parent' ? t('role.parent') : t('role.teacher');
   document.getElementById('sb-avatar').textContent = (U.full_name || U.email || '?')[0].toUpperCase();
   updateXP();
 
@@ -1342,14 +1366,14 @@ function renderSidebar() {
     `;
   } else if (U.role === 'parent') {
     html += `
-      <span class="sidebar-section-label">Familie</span>
-      <button class="nav-item" data-page="parent" onclick="goPage('parent')" role="menuitem"><span class="nav-icon">🏠</span>Übersicht</button>
-      <button class="nav-item" data-page="children" onclick="goPage('children')" role="menuitem"><span class="nav-icon">👧</span>Kinder</button>
+      <span class="sidebar-section-label">${t('nav.family')}</span>
+      <button class="nav-item" data-page="parent" onclick="goPage('parent')" role="menuitem"><span class="nav-icon">🏠</span>${t('nav.parent')}</button>
+      <button class="nav-item" data-page="children" onclick="goPage('children')" role="menuitem"><span class="nav-icon">👧</span>${t('nav.children')}</button>
     `;
   } else if (U.role === 'teacher') {
     html += `
-      <span class="sidebar-section-label">Klasse</span>
-      <button class="nav-item" data-page="teacher" onclick="goPage('teacher')" role="menuitem"><span class="nav-icon">🏠</span>Dashboard</button>
+      <span class="sidebar-section-label">${t('nav.class')}</span>
+      <button class="nav-item" data-page="teacher" onclick="goPage('teacher')" role="menuitem"><span class="nav-icon">🏠</span>${t('nav.dashboard')}</button>
     `;
   }
 
@@ -2575,6 +2599,22 @@ function settings(el) {
         </div>`;
       })() : ''}
       <div class="card">
+        <div class="card-header"><div class="card-title">${t('settings.language')}</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="field">
+            <label>${t('settings.language_label')}</label>
+            <select class="input" id="s-lang" onchange="applyLangPreview(this.value)">
+              <option value="de" ${(U.language||'de')==='de'?'selected':''}>🇩🇪 Deutsch</option>
+              <option value="en" ${(U.language||'de')==='en'?'selected':''}>🇬🇧 English</option>
+              <option value="fr" ${(U.language||'de')==='fr'?'selected':''}>🇫🇷 Français</option>
+              <option value="es" ${(U.language||'de')==='es'?'selected':''}>🇪🇸 Español</option>
+            </select>
+            <p style="font-size:12px;color:var(--t3);margin-top:4px;">${t('settings.language_hint')}</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveProfile()">${t('settings.save_profile')}</button>
+        </div>
+      </div>
+      <div class="card">
         <div class="card-header"><div class="card-title">${t('settings.ai')}</div></div>
         <div style="display:flex;flex-direction:column;gap:14px;">
           ${U.isChild ? `<div style="background:var(--pri-l);color:var(--pri-d);padding:10px 14px;border-radius:var(--r-md);font-size:13px;">${t('settings.key_inherited')}</div>` : ''}
@@ -2618,11 +2658,31 @@ function settings(el) {
 
 function saveProfile() {
   U.full_name = document.getElementById('s-name')?.value.trim() || U.full_name;
-  if (U.role==='student') {
+  // Sprache speichern (gilt für alle Rollen: Eltern, Schüler, Lehrer)
+  const newLang = document.getElementById('s-lang')?.value;
+  if (newLang) U.language = newLang;
+  if (U.role === 'student') {
     U.grade = document.getElementById('s-grade')?.value || U.grade;
     U.school = document.getElementById('s-school')?.value || U.school;
   }
-  save(); renderSidebar(); toast(t('toast.profile_saved'));
+  save();
+  // Sprache optional in Supabase profiles speichern (non-blocking)
+  if (sb && !U.isDemo && U.id && newLang) {
+    sb.from('profiles').update({ language: newLang }).eq('id', U.id).then(() => {});
+  }
+  renderSidebar();
+  toast(t('toast.profile_saved'));
+}
+
+/**
+ * Live-Vorschau der gewählten Sprache — aktualisiert Sidebar sofort ohne zu speichern.
+ * Wird durch onchange am Sprach-Dropdown ausgelöst.
+ * @param {string} lang — de | en | fr | es
+ */
+function applyLangPreview(lang) {
+  if (!U) return;
+  U.language = lang;
+  renderSidebar();
 }
 
 /**
