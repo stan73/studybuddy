@@ -2427,7 +2427,7 @@ function childrenPage(el) {
               <div style="display:flex;align-items:center;gap:8px;">
                 <label style="font-size:12px;font-weight:600;min-width:100px;">Schulsprache</label>
                 <select class="input" style="flex:1;font-size:13px;"
-                  onchange="updateChildSetting('${c.id}',{language:this.value}).then(()=>childrenPage(document.getElementById('content')))">
+                  onchange="changeChildLang('${c.id}',this.value,${c.grade||9},${Array.isArray(c.subjects)&&c.subjects.length?'true':'false'})">
                   ${CFG.SCHOOL_LANGS.map(l=>`<option value="${l.code}" ${(c.language||'de')===l.code?'selected':''}>${l.flag} ${l.name}</option>`).join('')}
                 </select>
               </div>
@@ -2480,14 +2480,20 @@ function childrenPage(el) {
                     </span>`;
                   }).join('')}
                 </div>
-                <!-- Fach hinzufügen -->
+                <!-- Fach aus Liste hinzufügen -->
                 ${addableSubs.length ? `
                 <div style="display:flex;gap:6px;">
                   <select class="input" id="addsub-${c.id}" style="flex:1;font-size:12px;">
                     ${addableSubs.map(s=>`<option>${safe(s)}</option>`).join('')}
                   </select>
                   <button class="btn btn-ghost btn-sm" onclick="toggleChildSubject('${c.id}',document.getElementById('addsub-${c.id}').value,true)">+ Hinzufügen</button>
-                </div>` : '<p style="font-size:11px;color:var(--t3);">Alle Standard-Fächer bereits vorhanden</p>'}
+                </div>` : '<p style="font-size:11px;color:var(--t3);margin-bottom:4px;">Alle Standard-Fächer bereits vorhanden</p>'}
+                <!-- Eigenes Fach (Freitext) -->
+                <div style="display:flex;gap:6px;margin-top:6px;">
+                  <input class="input" id="customsub-${c.id}" style="flex:1;font-size:12px;" placeholder="Eigenes Fach, z.B. Latein …"
+                    onkeydown="if(event.key==='Enter'){addCustomSubject('${c.id}');event.preventDefault();}">
+                  <button class="btn btn-ghost btn-sm" onclick="addCustomSubject('${c.id}')">+ Eigenes</button>
+                </div>
               </div>
             </div>
           </div>`;
@@ -2614,6 +2620,43 @@ async function saveChildSchoolInfo(childId) {
     : c);
   save();
   toast('✅ Gespeichert!');
+}
+
+/**
+ * Schulsprache eines Kindes ändern.
+ * Wenn noch keine eigenen Fächer gesetzt sind, werden die Standard-Fächer
+ * der neuen Sprache+Klasse eingefroren, damit sie nicht beim nächsten
+ * Rendern wieder wechseln.
+ */
+async function changeChildLang(childId, newLang, grade, hasCustomSubjects) {
+  const updates = { language: newLang };
+  if (!hasCustomSubjects) {
+    const byLang = CFG.SUBJECTS_BY_LANG[newLang] || CFG.SUBJECTS_BY_LANG['de'];
+    const grades = Object.keys(byLang).map(Number).sort((a, b) => a - b);
+    const g = grades.reduce((prev, curr) =>
+      Math.abs(curr - grade) < Math.abs(prev - grade) ? curr : prev);
+    updates.subjects = byLang[g] || [];
+  }
+  await updateChildSetting(childId, updates);
+  childrenPage(document.getElementById('content'));
+}
+
+/**
+ * Eigenes Fach (Freitext) zu einem Kind hinzufügen.
+ */
+async function addCustomSubject(childId) {
+  const input = document.getElementById('customsub-' + childId);
+  const subject = input?.value.trim();
+  if (!subject) return toast('⚠️ Fachname eingeben!');
+  const child = (U.children || []).find(c => c.id === childId);
+  if (!child) return;
+  const current = Array.isArray(child.subjects) && child.subjects.length
+    ? child.subjects : getChildSubjects(child);
+  if (current.includes(subject)) return toast('⚠️ Fach bereits vorhanden!');
+  const updated = [...current, subject];
+  await updateChildSetting(childId, { subjects: updated });
+  if (input) input.value = '';
+  childrenPage(document.getElementById('content'));
 }
 
 async function updatePin(childId) {
