@@ -383,6 +383,9 @@ const I18N = {
     'settings.title':'⚙️ Einstellungen','settings.profile':'👤 Profil',
     'settings.name':'Name','settings.email':'E-Mail',
     'settings.grade':'Klasse','settings.school_type':'Schulform',
+    'settings.school_search':'Schule','settings.school_search_ph':'Schulname oder Stadt suchen …',
+    'settings.school_not_found':'Meine Schule fehlt in der Liste',
+    'settings.class_name':'Klasse / Kurs','settings.class_name_ph':'z. B. 10b oder Q1',
     'settings.save_profile':'Profil speichern',
     'settings.my_subjects':'📚 Meine Fächer',
     'settings.subjects_note':'Du kannst deine Fächer selbst anpassen — dein Elternteil hat das erlaubt.',
@@ -475,6 +478,9 @@ const I18N = {
     'settings.title':'⚙️ Settings','settings.profile':'👤 Profile',
     'settings.name':'Name','settings.email':'E-Mail',
     'settings.grade':'Year','settings.school_type':'School type',
+    'settings.school_search':'School','settings.school_search_ph':'Search by school name or city …',
+    'settings.school_not_found':'My school is not in the list',
+    'settings.class_name':'Class / Course','settings.class_name_ph':'e.g. 10b or Year 11',
     'settings.save_profile':'Save profile',
     'settings.my_subjects':'📚 My Subjects',
     'settings.subjects_note':'You can customise your subjects — your parent has allowed this.',
@@ -561,6 +567,9 @@ const I18N = {
     'settings.title':'⚙️ Paramètres','settings.profile':'👤 Profil',
     'settings.name':'Nom','settings.email':'E-Mail',
     'settings.grade':'Classe','settings.school_type':'Type d\'école',
+    'settings.school_search':'École','settings.school_search_ph':'Rechercher par nom ou ville …',
+    'settings.school_not_found':'Mon école ne figure pas dans la liste',
+    'settings.class_name':'Classe / Cours','settings.class_name_ph':'ex. 10b ou Terminale',
     'settings.save_profile':'Sauvegarder le profil',
     'settings.my_subjects':'📚 Mes matières',
     'settings.subjects_note':'Tu peux personnaliser tes matières — ton parent l\'a autorisé.',
@@ -647,6 +656,9 @@ const I18N = {
     'settings.title':'⚙️ Ajustes','settings.profile':'👤 Perfil',
     'settings.name':'Nombre','settings.email':'Correo',
     'settings.grade':'Curso','settings.school_type':'Tipo de escuela',
+    'settings.school_search':'Escuela','settings.school_search_ph':'Buscar por nombre o ciudad …',
+    'settings.school_not_found':'Mi escuela no está en la lista',
+    'settings.class_name':'Clase / Curso','settings.class_name_ph':'ej. 10b o 1.º Bach',
     'settings.save_profile':'Guardar perfil',
     'settings.my_subjects':'📚 Mis asignaturas',
     'settings.subjects_note':'Puedes personalizar tus asignaturas — tus padres lo han permitido.',
@@ -1224,6 +1236,8 @@ async function init() {
         role: profile?.role || 'student',
         grade: profile?.grade || 9,
         school: profile?.school || 'Gymnasium',
+        school_id:   profile?.school_id   || null,
+        class_name:  profile?.class_name  || '',
         subscription: profile?.subscription || 'free',
         language: profile?.language || 'de',
         children,
@@ -1244,6 +1258,8 @@ async function init() {
         role: profile?.role || user.user_metadata?.role || 'student',
         grade: profile?.grade || user.user_metadata?.grade || 9,
         school: profile?.school || user.user_metadata?.school || 'Gymnasium',
+        school_id:  profile?.school_id  || null,
+        class_name: profile?.class_name || '',
         subscription: 'free', children: [],
       };
       save();
@@ -2561,9 +2577,20 @@ function settings(el) {
             <div class="field"><label>${t('settings.name')}</label><input class="input" id="s-name" value="${safe(U.full_name||'')}"></div>
             <div class="field"><label>${t('settings.email')}</label><input class="input" value="${safe(U.email||'')}" readonly></div>
           </div>
-          ${U.role==='student'?`<div class="grid-2">
+          ${U.role==='student'?`
+          <div class="grid-2">
             <div class="field"><label>${t('settings.grade')}</label><select class="input" id="s-grade">${CFG.GRADES.map(g=>`<option value="${g}" ${U.grade==g?'selected':''}>${t('settings.grade_option',g)}</option>`).join('')}</select></div>
-            <div class="field"><label>${t('settings.school_type')}</label><select class="input" id="s-school">${CFG.SCHOOL_TYPES.map(s=>`<option ${U.school===s?'selected':''}>${s}</option>`).join('')}</select></div>
+            <div class="field"><label>${t('settings.class_name')}</label><input class="input" id="s-class" value="${safe(U.class_name||'')}" placeholder="${t('settings.class_name_ph')}"></div>
+          </div>
+          <div class="field" style="position:relative;">
+            <label>${t('settings.school_search')}</label>
+            <input class="input" id="s-school-q" autocomplete="off"
+              value="${safe(U.school_name||U.school||'')}"
+              placeholder="${t('settings.school_search_ph')}"
+              oninput="schoolAutocomplete(this.value)">
+            <input type="hidden" id="s-school-id" value="${safe(U.school_id||'')}">
+            <div id="s-school-results" style="display:none;position:absolute;z-index:200;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
+            <p style="font-size:12px;color:var(--t3);margin-top:4px;">${t('settings.school_not_found')}? <a href="mailto:hello@studybuddy.app?subject=Fehlende Schule&body=Schulname%3A%0AStadt%3A%0ABundesland%3A" style="color:var(--pri)">Melden →</a></p>
           </div>`:''}
           <button class="btn btn-primary btn-sm" onclick="saveProfile()">${t('settings.save_profile')}</button>
         </div>
@@ -2661,14 +2688,22 @@ function saveProfile() {
   // Sprache speichern (gilt für alle Rollen: Eltern, Schüler, Lehrer)
   const newLang = document.getElementById('s-lang')?.value;
   if (newLang) U.language = newLang;
+  // Schul-Update für Schüler
+  const dbUpdates = {};
+  if (newLang) dbUpdates.language = newLang;
   if (U.role === 'student') {
-    U.grade = document.getElementById('s-grade')?.value || U.grade;
-    U.school = document.getElementById('s-school')?.value || U.school;
+    U.grade      = document.getElementById('s-grade')?.value    || U.grade;
+    U.class_name = document.getElementById('s-class')?.value.trim() ?? U.class_name;
+    const newSchoolId   = document.getElementById('s-school-id')?.value || null;
+    const newSchoolName = document.getElementById('s-school-q')?.value.trim() || null;
+    if (newSchoolId) { U.school_id = newSchoolId; dbUpdates.school_id = newSchoolId; }
+    if (newSchoolName) U.school_name = newSchoolName;
+    if (U.class_name !== undefined) dbUpdates.class_name = U.class_name;
   }
   save();
-  // Sprache optional in Supabase profiles speichern (non-blocking)
-  if (sb && !U.isDemo && U.id && newLang) {
-    sb.from('profiles').update({ language: newLang }).eq('id', U.id).then(() => {});
+  // Supabase-Update (non-blocking) — nur für Auth-Nutzer
+  if (sb && !U.isDemo && U.id && Object.keys(dbUpdates).length) {
+    sb.from('profiles').update(dbUpdates).eq('id', U.id).then(() => {});
   }
   renderSidebar();
   toast(t('toast.profile_saved'));
@@ -2685,6 +2720,58 @@ function applyLangPreview(lang) {
   renderSidebar();
   // Aktuelle Seite neu rendern damit auch Seiteninhalt sofort die neue Sprache zeigt
   goPage(_page);
+}
+
+// ── Schulsuche Autocomplete ───────────────────────────────────────────────────
+let _schoolTimer = null;
+
+/**
+ * Debounced Autocomplete für die Schulsuche.
+ * Ruft search_schools() in Supabase auf (Postgres Volltext-Funktion).
+ * @param {string} val — Eingabe des Nutzers
+ */
+function schoolAutocomplete(val) {
+  const box = document.getElementById('s-school-results');
+  if (!box) return;
+  clearTimeout(_schoolTimer);
+  const q = val.trim();
+  if (q.length < 2) { box.style.display = 'none'; return; }
+  _schoolTimer = setTimeout(async () => {
+    box.innerHTML = '<div style="padding:10px 14px;color:var(--t3);font-size:13px;">Suche …</div>';
+    box.style.display = 'block';
+    try {
+      let results = [];
+      if (sb && !U?.isDemo) {
+        const { data, error } = await sb.rpc('search_schools', { query: q, p_limit: 10 });
+        if (!error) results = data || [];
+      }
+      if (!results.length) {
+        box.innerHTML = `<div style="padding:10px 14px;color:var(--t3);font-size:13px;">Keine Treffer für „${safe(q)}"</div>`;
+        return;
+      }
+      box.innerHTML = results.map(s => `
+        <div onclick="selectSchool('${safe(s.id)}','${safe(s.name)}','${safe(s.city)}')"
+          style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;transition:background .1s;"
+          onmouseover="this.style.background='var(--pri-l)'" onmouseout="this.style.background=''">
+          <div style="font-weight:600;color:var(--t1);">${safe(s.name)}</div>
+          <div style="color:var(--t3);font-size:11px;">${safe(s.zip||'')} ${safe(s.city)} · ${safe(s.school_type||'')} · ${safe(s.state)}</div>
+        </div>`).join('');
+    } catch(e) {
+      box.innerHTML = `<div style="padding:10px 14px;color:var(--danger);font-size:13px;">Fehler bei der Suche</div>`;
+    }
+  }, 300);
+}
+
+/**
+ * Setzt die gewählte Schule in den versteckten school-id Input und zeigt den Namen an.
+ */
+function selectSchool(id, name, city) {
+  const q  = document.getElementById('s-school-q');
+  const hid = document.getElementById('s-school-id');
+  const box = document.getElementById('s-school-results');
+  if (q)   q.value   = `${name}, ${city}`;
+  if (hid) hid.value = id;
+  if (box) box.style.display = 'none';
 }
 
 /**

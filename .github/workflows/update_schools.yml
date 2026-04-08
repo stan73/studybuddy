@@ -1,0 +1,37 @@
+name: 🏫 Schulen-Datenbank aktualisieren
+
+# Läuft jeden Sonntag um 03:00 UTC (kostenlos, keine externe Infrastruktur nötig)
+on:
+  schedule:
+    - cron: "0 3 * * 0"   # jeden Sonntag 03:00 UTC
+  workflow_dispatch:       # manuell auslösbar über GitHub → Actions → Run workflow
+
+jobs:
+  update-schools:
+    name: Import schools from jedeschule API
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run school import
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python scripts/import_schools.py
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Schulen-Import fehlgeschlagen. Bitte import_schools.py und jedeschule API prüfen."
