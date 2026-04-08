@@ -2,180 +2,190 @@
 """
 StudyBuddy Pro — Schul-Import aus jedeschule.codefor.de API
 ============================================================
-Lädt alle deutschen Schulen aus der jedeschule API und schreibt
-sie per Upsert in die Supabase-Tabelle `schools`.
-
-Umgebungsvariablen (als GitHub Secrets hinterlegen):
+Umgebungsvariablen (GitHub Secrets):
   SUPABASE_URL          z.B. https://xyz.supabase.co
-  SUPABASE_SERVICE_KEY  service_role key (nicht der anon key!)
-
-Lokaler Test:
-  export SUPABASE_URL=...
-  export SUPABASE_SERVICE_KEY=...
-  python3 scripts/import_schools.py
+  SUPABASE_SERVICE_KEY  service_role / secret key
 """
 
 import os
 import sys
-import json
 import time
+import json
 import requests
 
-# ── Konfiguration ──────────────────────────────────────────────
-JEDESCHULE_API  = "https://jedeschule.codefor.de/schools/"
-PAGE_SIZE       = 500          # Max items pro Anfrage
-MAX_RETRIES     = 3
-RETRY_DELAY     = 5            # Sekunden zwischen Retries
-UPSERT_BATCH    = 200          # Rows pro Supabase-Upsert
+# ── Konfiguration ──────────────────────────────────────────────────────────────
+JEDESCHULE_API = "https://jedeschule.codefor.de/schools/"
+PAGE_SIZE      = 200
+MAX_RETRIES    = 3
+UPSERT_BATCH   = 100
 
-SUPABASE_URL     = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY     = os.environ.get("SUPABASE_SERVICE_KEY", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    print("❌ SUPABASE_URL und SUPABASE_SERVICE_KEY müssen gesetzt sein.")
+print("=" * 60)
+print("StudyBuddy — Schulen-Import")
+print("=" * 60)
+
+# ── Secrets prüfen ─────────────────────────────────────────────────────────────
+if not SUPABASE_URL:
+    print("❌ SUPABASE_URL fehlt!")
+    sys.exit(1)
+if not SUPABASE_KEY:
+    print("❌ SUPABASE_SERVICE_KEY fehlt!")
     sys.exit(1)
 
-SUPABASE_HEADERS = {
+print(f"✅ SUPABASE_URL:         {SUPABASE_URL}")
+print(f"✅ SUPABASE_SERVICE_KEY: {SUPABASE_KEY[:12]}... (gesetzt)")
+print()
+
+# ── Supabase Headers ───────────────────────────────────────────────────────────
+HEADERS = {
     "apikey":        SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type":  "application/json",
-    "Prefer":        "resolution=merge-duplicates",  # Upsert
+    "Prefer":        "resolution=merge-duplicates",
 }
 
-# ── Bundesland-Mapping (jedeschule state codes → Kürzel) ───────
-STATE_MAP = {
-    "berlin":              "BE",
-    "brandenburg":         "BB",
-    "sachsen":             "SN",
-    "thueringen":          "TH",
-    "hamburg":             "HH",
-    "bremen":              "HB",
-    "mecklenburg-vorpommern": "MV",
-    "sachsen-anhalt":      "ST",
-    "niedersachsen":       "NI",
-    "nordrhein-westfalen": "NW",
-    "hessen":              "HE",
-    "rheinland-pfalz":     "RP",
-    "saarland":            "SL",
-    "bayern":              "BY",
-    "schleswig-holstein":  "SH",
-    "baden-wuerttemberg":  "BW",
-}
+# ── Schritt 1: Supabase-Verbindung testen ─────────────────────────────────────
+print("🔌 Teste Supabase-Verbindung ...")
+test_url = f"{SUPABASE_URL}/rest/v1/schools?select=id&limit=1"
+try:
+    r = requests.get(test_url, headers=HEADERS, timeout=15)
+    print(f"   Status: {r.status_code}")
+    if r.status_code == 200:
+        print("   ✅ Supabase 'schools'-Tabelle erreichbar")
+    elif r.status_code == 404:
+        print("   ❌ Tabelle 'schools' existiert nicht!")
+        print("   → Bitte zuerst Migration 006 im Supabase SQL Editor ausführen.")
+        sys.exit(1)
+    elif r.status_code in (401, 403):
+        print(f"   ❌ Authentifizierungsfehler: {r.text}")
+        print("   → Bitte SUPABASE_SERVICE_KEY prüfen (service_role / secret key benötigt).")
+        sys.exit(1)
+    else:
+        print(f"   ⚠️  Unerwarteter Status: {r.status_code} — {r.text[:200]}")
+        sys.exit(1)
+except Exception as e:
+    print(f"   ❌ Verbindung fehlgeschlagen: {e}")
+    sys.exit(1)
 
+print()
 
-def normalize_state(raw: str) -> str:
-    """Konvertiert Bundesland-String in zweistelliges Kürzel."""
-    key = raw.lower().replace("ü", "ue").replace("ä", "ae").replace("ö", "oe").strip()
-    return STATE_MAP.get(key, raw.upper()[:2])
+# ── Schritt 2: jedeschule API abrufen ─────────────────────────────────────────
+print(f"📥 Lade Schulen von {JEDESCHULE_API} ...")
 
-
-def fetch_page(offset: int) -> list[dict]:
-    """Holt eine Seite Schulen von der jedeschule API."""
+def fetch_page(offset):
     url = f"{JEDESCHULE_API}?limit={PAGE_SIZE}&offset={offset}"
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             r = requests.get(url, timeout=30)
-            r.raise_for_status()
-            return r.json()
+            print(f"   offset={offset} → HTTP {r.status_code}")
+            if r.status_code != 200:
+                print(f"   Antwort: {r.text[:300]}")
+                return []
+            data = r.json()
+            # Manche API-Versionen geben {"items": [...]} statt direkt eine Liste
+            if isinstance(data, dict):
+                data = data.get("items") or data.get("schools") or data.get("data") or []
+            return data if isinstance(data, list) else []
         except Exception as e:
-            print(f"  ⚠️  Versuch {attempt}/{MAX_RETRIES} fehlgeschlagen: {e}")
+            print(f"   Versuch {attempt}/{MAX_RETRIES} fehlgeschlagen: {e}")
             if attempt < MAX_RETRIES:
-                time.sleep(RETRY_DELAY)
-    print(f"  ❌ Seite bei offset={offset} konnte nicht geladen werden.")
+                time.sleep(3)
     return []
 
+all_schools = []
+offset = 0
+while True:
+    page = fetch_page(offset)
+    if not page:
+        print(f"   Seite leer bei offset={offset} — fertig")
+        break
+    all_schools.extend(page)
+    print(f"   {len(all_schools)} Schulen bisher geladen ...")
+    if len(page) < PAGE_SIZE:
+        break
+    offset += PAGE_SIZE
+    time.sleep(0.5)
 
-def transform(school: dict) -> dict | None:
-    """Mappt jedeschule-Felder auf unsere schools-Tabelle."""
-    sid = school.get("id", "").strip()
-    name = school.get("name", "").strip()
-    city = (school.get("city") or school.get("ort") or "").strip()
-    state_raw = school.get("state") or school.get("bundesland") or ""
+print(f"\n✅ {len(all_schools)} Schulen gesamt geladen")
 
+if not all_schools:
+    print("⚠️  Keine Daten von jedeschule API erhalten.")
+    print("   API könnte vorübergehend nicht verfügbar sein.")
+    print("   Erster Datensatz (falls vorhanden):", all_schools[:1])
+    sys.exit(1)
+
+# Ersten Datensatz anzeigen (Debugging)
+print(f"\n📋 Beispiel-Datensatz (Felder): {list(all_schools[0].keys())}")
+print(f"   Werte: {json.dumps(all_schools[0], ensure_ascii=False)[:300]}")
+print()
+
+# ── Schritt 3: Transformieren ─────────────────────────────────────────────────
+STATE_MAP = {
+    "berlin":"BE","brandenburg":"BB","sachsen":"SN","thueringen":"TH",
+    "hamburg":"HH","bremen":"HB","mecklenburg-vorpommern":"MV",
+    "sachsen-anhalt":"ST","niedersachsen":"NI","nordrhein-westfalen":"NW",
+    "hessen":"HE","rheinland-pfalz":"RP","saarland":"SL",
+    "bayern":"BY","schleswig-holstein":"SH","baden-wuerttemberg":"BW",
+    "baden-württemberg":"BW","thüringen":"TH",
+}
+
+def norm_state(raw):
+    k = str(raw).lower().strip()
+    return STATE_MAP.get(k, str(raw).upper()[:2])
+
+def transform(s):
+    sid  = str(s.get("id") or "").strip()
+    name = str(s.get("name") or "").strip()
+    city = str(s.get("city") or s.get("ort") or "").strip()
     if not sid or not name or not city:
-        return None  # Unvollständige Datensätze überspringen
-
+        return None
     return {
         "id":          sid,
         "name":        name,
-        "address":     (school.get("address") or school.get("adresse") or "").strip() or None,
-        "zip":         (school.get("zip") or school.get("plz") or "").strip() or None,
-        "city":        city,
-        "state":       normalize_state(state_raw),
-        "school_type": (school.get("school_type") or school.get("schulart") or "").strip() or None,
-        "provider":    (school.get("provider") or school.get("traeger") or "").strip() or None,
-        "website":     school.get("website") or None,
-        "phone":       school.get("phone") or school.get("telefon") or None,
-        "email":       school.get("email") or None,
+        "address":     (s.get("address") or s.get("adresse") or "")[:200] or None,
+        "zip":         (s.get("zip") or s.get("plz") or "")[:10] or None,
+        "city":        city[:100],
+        "state":       norm_state(s.get("state") or s.get("bundesland") or ""),
+        "school_type": (s.get("school_type") or s.get("schulart") or "")[:100] or None,
+        "provider":    (s.get("provider") or s.get("traeger") or "")[:50] or None,
+        "website":     s.get("website") or None,
+        "phone":       s.get("phone") or s.get("telefon") or None,
+        "email":       s.get("email") or None,
         "source":      "jedeschule",
     }
 
+rows = [r for s in all_schools if (r := transform(s))]
+print(f"✅ {len(rows)} gültige Datensätze ({len(all_schools)-len(rows)} übersprungen)")
 
-def upsert_batch(rows: list[dict]) -> bool:
-    """Schreibt einen Batch per Upsert in Supabase."""
-    url = f"{SUPABASE_URL}/rest/v1/schools"
-    r = requests.post(url, headers=SUPABASE_HEADERS, json=rows, timeout=30)
-    if r.status_code not in (200, 201):
-        print(f"  ❌ Supabase Upsert fehlgeschlagen: {r.status_code} {r.text[:200]}")
-        return False
-    return True
+# ── Schritt 4: Upsert in Supabase ─────────────────────────────────────────────
+print(f"\n📤 Upsert in Supabase ({UPSERT_BATCH} pro Batch) ...")
+upsert_url = f"{SUPABASE_URL}/rest/v1/schools"
+success = 0
 
-
-def main():
-    print("🏫 StudyBuddy — Schulen-Import startet")
-    print(f"   Quelle: {JEDESCHULE_API}")
-    print(f"   Ziel:   {SUPABASE_URL}/rest/v1/schools\n")
-
-    all_schools: list[dict] = []
-    offset = 0
-
-    # ── Alle Seiten laden ──────────────────────────────────────
-    while True:
-        print(f"📥 Lade Schulen {offset}–{offset + PAGE_SIZE} ...", end=" ", flush=True)
-        page = fetch_page(offset)
-        if not page:
-            print("(leer — fertig)")
-            break
-        print(f"{len(page)} erhalten")
-        all_schools.extend(page)
-        if len(page) < PAGE_SIZE:
-            break  # Letzte Seite
-        offset += PAGE_SIZE
-        time.sleep(0.3)  # Höfliche Pause
-
-    print(f"\n✅ {len(all_schools)} Schulen gesamt geladen")
-
-    # ── Transformieren ─────────────────────────────────────────
-    rows = [r for s in all_schools if (r := transform(s)) is not None]
-    skipped = len(all_schools) - len(rows)
-    print(f"   {len(rows)} gültige Datensätze, {skipped} übersprungen (fehlende Pflichtfelder)")
-
-    if not rows:
-        print("⚠️  Keine Daten zum Importieren. Abbruch.")
-        sys.exit(1)
-
-    # ── Batched Upsert in Supabase ─────────────────────────────
-    print(f"\n📤 Upsert in Supabase ({UPSERT_BATCH} Rows/Batch) ...")
-    success = 0
-    for i in range(0, len(rows), UPSERT_BATCH):
-        batch = rows[i : i + UPSERT_BATCH]
-        ok = upsert_batch(batch)
-        if ok:
+for i in range(0, len(rows), UPSERT_BATCH):
+    batch = rows[i:i+UPSERT_BATCH]
+    try:
+        r = requests.post(upsert_url, headers=HEADERS, json=batch, timeout=30)
+        if r.status_code in (200, 201):
             success += len(batch)
-            print(f"   ✓ {success}/{len(rows)} importiert", end="\r", flush=True)
+            print(f"   ✓ {success}/{len(rows)}", end="\r")
         else:
-            print(f"   ✗ Fehler bei Batch {i//UPSERT_BATCH + 1}")
+            print(f"\n   ❌ Batch {i//UPSERT_BATCH+1} Fehler: {r.status_code} — {r.text[:300]}")
+    except Exception as e:
+        print(f"\n   ❌ Batch {i//UPSERT_BATCH+1} Exception: {e}")
 
-    print(f"\n\n🎉 Import abgeschlossen: {success}/{len(rows)} Schulen in Supabase")
+print(f"\n\n🎉 Fertig: {success}/{len(rows)} Schulen importiert")
 
-    # Statistik nach Bundesland
-    by_state: dict[str, int] = {}
-    for r in rows:
-        by_state[r["state"]] = by_state.get(r["state"], 0) + 1
-    print("\nSchulen nach Bundesland:")
-    for state, count in sorted(by_state.items(), key=lambda x: -x[1]):
-        print(f"  {state}: {count}")
+if success == 0:
+    print("❌ Kein einziger Datensatz importiert — Import fehlgeschlagen")
+    sys.exit(1)
 
-
-if __name__ == "__main__":
-    main()
+# Statistik
+by_state = {}
+for r in rows:
+    by_state[r["state"]] = by_state.get(r["state"], 0) + 1
+print("\nNach Bundesland:")
+for st, cnt in sorted(by_state.items(), key=lambda x: -x[1]):
+    print(f"  {st}: {cnt}")
