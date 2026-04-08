@@ -396,6 +396,10 @@ const I18N = {
     'settings.provider':'KI-Anbieter','settings.danger':'⚠️ Gefahrenzone',
     'settings.reset_note':'Lernfortschritte zurücksetzen (DSGVO: Recht auf Löschung)',
     'settings.reset_btn':'Alle Lernfortschritte löschen',
+    'settings.managed_by_parent':'Deine Einstellungen werden von deinen Eltern verwaltet.',
+    'settings.design_coming':'Darstellung (Hell / Dunkel / System) — bald verfügbar',
+    'child.school':'Schule','child.class':'Klasse / Kurs','child.email':'E-Mail (optional)',
+    'child.email_ph':'kind@beispiel.de','child.class_ph':'z.B. 7b oder Q1',
     // Page titles
     'page.dashboard':'Dashboard','page.subjects':'Fächer','page.flashcards':'Karteikarten',
     'page.tutor':'KI-Tutor','page.exam':'Prüfungsmodus','page.planner':'Lernplan',
@@ -491,6 +495,10 @@ const I18N = {
     'settings.provider':'AI Provider','settings.danger':'⚠️ Danger Zone',
     'settings.reset_note':'Reset learning progress (GDPR: Right to erasure)',
     'settings.reset_btn':'Delete all learning progress',
+    'settings.managed_by_parent':'Your settings are managed by your parents.',
+    'settings.design_coming':'Appearance (Light / Dark / System) — coming soon',
+    'child.school':'School','child.class':'Class / Course','child.email':'Email (optional)',
+    'child.email_ph':'child@example.com','child.class_ph':'e.g. 7b or Year 11',
     'page.dashboard':'Dashboard','page.subjects':'Subjects','page.flashcards':'Flashcards',
     'page.tutor':'AI Tutor','page.exam':'Exam Mode','page.planner':'Planner',
     'page.pomodoro':'Pomodoro','page.subscription':'Subscription','page.settings':'Settings',
@@ -580,6 +588,10 @@ const I18N = {
     'settings.provider':'Fournisseur IA','settings.danger':'⚠️ Zone dangereuse',
     'settings.reset_note':'Réinitialiser la progression (RGPD : droit à l\'effacement)',
     'settings.reset_btn':'Supprimer toute la progression',
+    'settings.managed_by_parent':'Tes paramètres sont gérés par tes parents.',
+    'settings.design_coming':'Apparence (Clair / Sombre / Système) — bientôt disponible',
+    'child.school':'École','child.class':'Classe / Cours','child.email':'E-mail (optionnel)',
+    'child.email_ph':'enfant@exemple.fr','child.class_ph':'ex. 5ème ou Terminale',
     'page.dashboard':'Tableau de bord','page.subjects':'Matières','page.flashcards':'Fiches',
     'page.tutor':'Tuteur IA','page.exam':'Mode Examen','page.planner':'Planning',
     'page.pomodoro':'Pomodoro','page.subscription':'Abonnement','page.settings':'Paramètres',
@@ -686,6 +698,10 @@ const I18N = {
     'nav.family':'Familia','nav.class':'Clase',
     'settings.language':'🌐 Idioma','settings.language_label':'Idioma de la aplicación',
     'settings.language_hint':'Se aplica inmediatamente al guardar.',
+    'settings.managed_by_parent':'Tus ajustes son gestionados por tus padres.',
+    'settings.design_coming':'Apariencia (Claro / Oscuro / Sistema) — próximamente',
+    'child.school':'Escuela','child.class':'Clase / Curso','child.email':'E-mail (opcional)',
+    'child.email_ph':'hijo@ejemplo.es','child.class_ph':'ej. 7b o 2.º Bach',
   },
 };
 
@@ -1395,7 +1411,7 @@ function renderSidebar() {
 
   html += `
     <span class="sidebar-section-label">${t('nav.account')}</span>
-    <button class="nav-item" data-page="subscription" onclick="goPage('subscription')" role="menuitem"><span class="nav-icon">💎</span>${t('nav.subscription')}</button>
+    ${U.isChild ? '' : `<button class="nav-item" data-page="subscription" onclick="goPage('subscription')" role="menuitem"><span class="nav-icon">💎</span>${t('nav.subscription')}</button>`}
     <button class="nav-item" data-page="settings" onclick="goPage('settings')" role="menuitem"><span class="nav-icon">⚙️</span>${t('nav.settings')}</button>
   `;
 
@@ -2331,8 +2347,19 @@ function childrenPage(el) {
               <select class="input" id="c-lang">${langOpts}</select>
             </div>
           </div>
-          <div class="field"><label>Schulwebseite <span style="color:var(--t3);font-size:11px;">(optional)</span></label>
-            <input class="input" id="c-url" type="url" placeholder="https://schule.de">
+          <div class="field" style="position:relative;">
+            <label>${t('child.school')} <span style="color:var(--t3);font-size:11px;">(optional)</span></label>
+            <input class="input" id="c-school-q" autocomplete="off" placeholder="${t('settings.school_search_ph')}" oninput="newChildSchoolAC(this.value)">
+            <input type="hidden" id="c-school-id">
+            <div id="c-school-results" style="display:none;position:absolute;z-index:200;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+          </div>
+          <div class="field">
+            <label>${t('child.class')} <span style="color:var(--t3);font-size:11px;">(optional)</span></label>
+            <input class="input" id="c-class" placeholder="${t('child.class_ph')}">
+          </div>
+          <div class="field">
+            <label>${t('child.email')} <span style="color:var(--t3);font-size:11px;">(optional)</span></label>
+            <input class="input" id="c-email" type="email" placeholder="${t('child.email_ph')}">
           </div>
           <div class="field">
             <label>PIN * <span style="color:var(--t3);font-weight:400;font-size:11px;">mind. 8 Zeichen, Buchstaben+Zahlen</span></label>
@@ -2405,12 +2432,30 @@ function childrenPage(el) {
                 </select>
               </div>
 
-              <!-- Schulwebseite -->
+              <!-- Schule (Autocomplete) -->
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <label style="font-size:12px;font-weight:600;">${t('child.school')}</label>
+                <div style="position:relative;">
+                  <input class="input" id="sq-${c.id}" autocomplete="off" style="font-size:13px;"
+                    placeholder="${t('settings.school_search_ph')}"
+                    value="${safe(c.school_name||c.school_id||'')}"
+                    oninput="childSchoolAC('${c.id}',this.value)">
+                  <input type="hidden" id="sid-${c.id}" value="${safe(c.school_id||'')}">
+                  <div id="sr-${c.id}" style="display:none;position:absolute;z-index:200;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;margin-top:2px;"></div>
+                </div>
+              </div>
+              <!-- Klasse / Kurs -->
               <div style="display:flex;align-items:center;gap:8px;">
-                <label style="font-size:12px;font-weight:600;min-width:100px;">Schulwebseite</label>
-                <input class="input" id="url-${c.id}" type="url" style="flex:1;font-size:13px;"
-                  placeholder="https://schule.de" value="${safe(c.school_url||'')}">
-                <button class="btn btn-ghost btn-sm" onclick="updateChildSetting('${c.id}',{school_url:document.getElementById('url-${c.id}').value.trim()||null}).then(()=>toast('✅ Gespeichert!'))">💾</button>
+                <label style="font-size:12px;font-weight:600;min-width:100px;">${t('child.class')}</label>
+                <input class="input" id="cls-${c.id}" style="flex:1;font-size:13px;"
+                  placeholder="${t('child.class_ph')}" value="${safe(c.class_name||'')}">
+                <button class="btn btn-ghost btn-sm" onclick="saveChildSchoolInfo('${c.id}')">💾</button>
+              </div>
+              <!-- E-Mail des Kindes -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12px;font-weight:600;min-width:100px;">${t('child.email')}</label>
+                <input class="input" id="ceml-${c.id}" type="email" style="flex:1;font-size:13px;"
+                  placeholder="${t('child.email_ph')}" value="${safe(c.email||'')}">
               </div>
 
               <!-- PIN ändern -->
@@ -2458,17 +2503,21 @@ function childrenPage(el) {
 }
 
 async function addChildWithPin() {
-  const name     = document.getElementById('c-name')?.value.trim();
-  const grade    = document.getElementById('c-grade')?.value;
-  const lang     = document.getElementById('c-lang')?.value || 'de';
-  const schoolUrl= document.getElementById('c-url')?.value.trim() || '';
-  const pin      = document.getElementById('c-pin')?.value.trim();
+  const name      = document.getElementById('c-name')?.value.trim();
+  const grade     = document.getElementById('c-grade')?.value;
+  const lang      = document.getElementById('c-lang')?.value || 'de';
+  const schoolId  = document.getElementById('c-school-id')?.value || null;
+  const schoolName= document.getElementById('c-school-q')?.value.trim() || null;
+  const className = document.getElementById('c-class')?.value.trim() || null;
+  const email     = document.getElementById('c-email')?.value.trim() || null;
+  const pin       = document.getElementById('c-pin')?.value.trim();
   if (!name)                 return toast('⚠️ Name eingeben!');
   if (pin.length < 8)        return toast('❌ PIN muss mind. 8 Zeichen haben!');
   if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN muss mind. einen Buchstaben enthalten!');
   if (!/[0-9]/.test(pin))    return toast('❌ PIN muss mind. eine Zahl enthalten!');
 
-  const child = { id: 'ch' + Date.now(), name, grade, pin, language: lang, schoolUrl };
+  const child = { id: 'ch' + Date.now(), name, grade, pin, language: lang,
+    school_id: schoolId, school_name: schoolName, class_name: className, email };
 
   // In Supabase speichern
   if (sb) {
@@ -2476,7 +2525,9 @@ async function addChildWithPin() {
       parent_id: U.id, name, grade: Number(grade), pin,
       language: lang,
     };
-    if (schoolUrl) insertData.school_url = schoolUrl;
+    if (schoolId)   insertData.school_id  = schoolId;
+    if (className)  insertData.class_name = className;
+    if (email)      insertData.email      = email;
     const { error } = await sb.from('children').insert(insertData);
     if (error) { toast('❌ ' + error.message); return; }
     // ID von Supabase holen
@@ -2489,8 +2540,85 @@ async function addChildWithPin() {
   toast(`✅ ${name} hinzugefügt! PIN: ${pin}`);
   document.getElementById('c-name').value='';
   document.getElementById('c-pin').value='';
-  document.getElementById('c-url').value='';
+  if (document.getElementById('c-school-q'))  document.getElementById('c-school-q').value='';
+  if (document.getElementById('c-school-id')) document.getElementById('c-school-id').value='';
+  if (document.getElementById('c-class'))     document.getElementById('c-class').value='';
+  if (document.getElementById('c-email'))     document.getElementById('c-email').value='';
   childrenPage(document.getElementById('content'));
+}
+
+// ── Schul-Autocomplete: "Kind hinzufügen"-Formular ───────────────────────────
+let _newChildACTimer = null;
+async function newChildSchoolAC(val) {
+  clearTimeout(_newChildACTimer);
+  const res = document.getElementById('c-school-results');
+  if (!res) return;
+  if (!val || val.length < 2) { res.style.display='none'; return; }
+  _newChildACTimer = setTimeout(async () => {
+    const { data } = await sb.rpc('search_schools', { query: val, p_limit: 8 });
+    if (!data?.length) { res.style.display='none'; return; }
+    res.style.display = 'block';
+    res.innerHTML = data.map(s =>
+      `<div style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border-light);"
+        onmousedown="selectNewChildSchool('${s.id.replace(/'/g,"\\'")}','${(s.name||'').replace(/'/g,"\\'")}','${(s.city||'').replace(/'/g,"\\'")}')"
+        onmouseenter="this.style.background='var(--bg-2)'" onmouseleave="this.style.background=''">
+        <span style="font-weight:600;">${safe(s.name)}</span>
+        <span style="color:var(--t3);font-size:11px;margin-left:6px;">${safe(s.city)}${s.school_type?' · '+safe(s.school_type):''}</span>
+      </div>`
+    ).join('');
+  }, 300);
+}
+function selectNewChildSchool(id, name, city) {
+  const q = document.getElementById('c-school-q');
+  const sid = document.getElementById('c-school-id');
+  const res = document.getElementById('c-school-results');
+  if (q) q.value = name + (city ? ', ' + city : '');
+  if (sid) sid.value = id;
+  if (res) res.style.display = 'none';
+}
+
+// ── Schul-Autocomplete: Bestehendes Kind ─────────────────────────────────────
+const _childACTimers = {};
+async function childSchoolAC(childId, val) {
+  clearTimeout(_childACTimers[childId]);
+  const res = document.getElementById('sr-' + childId);
+  if (!res) return;
+  if (!val || val.length < 2) { res.style.display='none'; return; }
+  _childACTimers[childId] = setTimeout(async () => {
+    const { data } = await sb.rpc('search_schools', { query: val, p_limit: 8 });
+    if (!data?.length) { res.style.display='none'; return; }
+    res.style.display = 'block';
+    res.innerHTML = data.map(s =>
+      `<div style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border-light);"
+        onmousedown="selectChildSchool('${childId}','${s.id.replace(/'/g,"\\'")}','${(s.name||'').replace(/'/g,"\\'")}','${(s.city||'').replace(/'/g,"\\'")}')"
+        onmouseenter="this.style.background='var(--bg-2)'" onmouseleave="this.style.background=''">
+        <span style="font-weight:600;">${safe(s.name)}</span>
+        <span style="color:var(--t3);font-size:11px;margin-left:6px;">${safe(s.city)}${s.school_type?' · '+safe(s.school_type):''}</span>
+      </div>`
+    ).join('');
+  }, 300);
+}
+function selectChildSchool(childId, id, name, city) {
+  const q   = document.getElementById('sq-' + childId);
+  const sid = document.getElementById('sid-' + childId);
+  const res = document.getElementById('sr-' + childId);
+  if (q) q.value = name + (city ? ', ' + city : '');
+  if (sid) sid.value = id;
+  if (res) res.style.display = 'none';
+}
+
+/** Schule + Klasse + E-Mail eines Kindes speichern */
+async function saveChildSchoolInfo(childId) {
+  const schoolId   = document.getElementById('sid-'  + childId)?.value.trim() || null;
+  const className  = document.getElementById('cls-'  + childId)?.value.trim() || null;
+  const email      = document.getElementById('ceml-' + childId)?.value.trim() || null;
+  const schoolName = document.getElementById('sq-'   + childId)?.value.trim() || null;
+  await updateChildSetting(childId, { school_id: schoolId, class_name: className, email });
+  U.children = (U.children||[]).map(c => c.id === childId
+    ? { ...c, school_id: schoolId, school_name: schoolName, class_name: className, email }
+    : c);
+  save();
+  toast('✅ Gespeichert!');
 }
 
 async function updatePin(childId) {
@@ -2567,6 +2695,18 @@ function subscription(el) {
 // PAGE: EINSTELLUNGEN
 // ═══════════════════════════════════════════════════════════════════════════
 function settings(el) {
+  // Kinder haben keine eigenen Einstellungen — alles wird von Eltern verwaltet
+  if (U.isChild) {
+    el.innerHTML = `
+      <div class="page-header"><h1>${t('settings.title')}</h1></div>
+      <div style="max-width:600px;">
+        <div class="card">
+          <p style="color:var(--t2);font-size:14px;line-height:1.6;">${t('settings.managed_by_parent')}</p>
+          <p style="color:var(--t3);font-size:12px;margin-top:10px;">🎨 ${t('settings.design_coming')}</p>
+        </div>
+      </div>`;
+    return;
+  }
   el.innerHTML = `
     <div class="page-header"><h1>${t('settings.title')}</h1></div>
     <div style="max-width:600px;display:flex;flex-direction:column;gap:20px;">
