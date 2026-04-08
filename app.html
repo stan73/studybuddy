@@ -2465,15 +2465,10 @@ function childrenPage(el) {
                 <button class="btn btn-secondary btn-sm" onclick="updatePin('${c.id}')">✓</button>
               </div>
 
-              <!-- Fächer verwalten -->
+              <!-- Fächer verwalten (nur Eltern) -->
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                   <label style="font-size:12px;font-weight:600;">Fächer</label>
-                  <label style="font-size:11px;color:var(--t3);display:flex;align-items:center;gap:6px;cursor:pointer;">
-                    <input type="checkbox" ${c.can_manage_subjects?'checked':''}
-                      onchange="updateChildSetting('${c.id}',{can_manage_subjects:this.checked}).then(()=>toast('✅ Gespeichert!'))">
-                    Kind darf Fächer selbst verwalten
-                  </label>
                 </div>
                 <!-- Aktuelle Fächer als Tags -->
                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
@@ -2735,36 +2730,6 @@ function settings(el) {
           <button class="btn btn-primary btn-sm" onclick="saveProfile()">${t('settings.save_profile')}</button>
         </div>
       </div>
-      ${U.isChild && U.canManageSubjects ? (() => {
-        const mySubjs = getChildSubjects(U);
-        const lang = U.language || 'de';
-        const byLang = CFG.SUBJECTS_BY_LANG[lang] || CFG.SUBJECTS_BY_LANG['de'];
-        const gradeSubjs = byLang[U.grade||9] || byLang[9] || [];
-        const customSubjs = Array.isArray(U.subjects) ? U.subjects : null;
-        const isCustom = !!customSubjs;
-        const availableToAdd = gradeSubjs.filter(s => !mySubjs.includes(s));
-        return `<div class="card">
-          <div class="card-header"><div class="card-title">${t('settings.my_subjects')}</div></div>
-          <div style="display:flex;flex-direction:column;gap:14px;">
-            <p style="font-size:13px;color:var(--t2);">${t('settings.subjects_note')}</p>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-              ${mySubjs.map(s=>`
-                <span style="display:inline-flex;align-items:center;gap:6px;background:var(--pri-l);color:var(--pri-d);padding:4px 10px;border-radius:20px;font-size:13px;font-weight:600;">
-                  ${safe(s)}
-                  <button onclick="childToggleSubject('${safe(s)}', false)" style="background:none;border:none;cursor:pointer;color:var(--pri-d);font-size:14px;line-height:1;padding:0 2px;">✕</button>
-                </span>`).join('')}
-            </div>
-            ${availableToAdd.length > 0 ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <select class="input" id="child-add-subj" style="max-width:220px;">
-                <option value="">${t('settings.add_subject_ph')}</option>
-                ${availableToAdd.map(s=>`<option value="${safe(s)}">${safe(s)}</option>`).join('')}
-              </select>
-              <button class="btn btn-secondary btn-sm" onclick="childToggleSubject(document.getElementById('child-add-subj').value, true)">${t('settings.add_subject_btn')}</button>
-            </div>` : ''}
-            ${isCustom ? `<button class="btn btn-sm" style="background:none;border:1px solid var(--border);color:var(--t2);font-size:12px;align-self:flex-start;" onclick="childResetSubjects()">${t('settings.reset_subjects')}</button>` : ''}
-          </div>
-        </div>`;
-      })() : ''}
       <div class="card">
         <div class="card-header"><div class="card-title">${t('settings.language')}</div></div>
         <div style="display:flex;flex-direction:column;gap:12px;">
