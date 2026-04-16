@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "App lokal öffnen (Live Server)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:5500/app.html",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "runtimeArgs": ["--disable-web-security", "--user-data-dir=/tmp/chrome-dev"]
+    }
+  ]
+}

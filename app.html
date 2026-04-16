@@ -22,6 +22,59 @@
 <script src="js/vendor/supabase.js"></script>
 <!-- Chart.js für Eltern-Dashboard (lokal gebündelt) -->
 <script src="js/vendor/chart.umd.min.js"></script>
+<!-- SheetJS für XLSX-Export (Feature #14) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+/* ── Feature #16: Tooltips ─────────────────────────────────────────── */
+.sb-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+}
+.sb-tooltip-icon {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--t3, #94a3b8);
+  background: var(--border, #e2e8f0);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+.sb-tooltip-box {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--t2, #cbd5e1);
+  white-space: normal;
+  min-width: 180px;
+  max-width: 260px;
+  text-align: center;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+  line-height: 1.5;
+}
+.sb-tooltip-wrap:hover .sb-tooltip-box,
+.sb-tooltip-wrap:focus-within .sb-tooltip-box {
+  opacity: 1;
+}
+</style>
 </head>
 <body>
 <div id="app" style="display:none;">
@@ -423,6 +476,17 @@ const I18N = {
     // Sprach-Einstellungen
     'settings.language':'🌐 Sprache','settings.language_label':'App-Sprache',
     'settings.language_hint':'Wird nach dem Speichern sofort übernommen.',
+    // Tooltips (Feature #16)
+    'tooltip.xp':'XP sind Erfahrungspunkte — du sammelst sie beim Lernen, Karten üben und Pomodoro-Sessions.',
+    'tooltip.streak':'Tage in Folge, an denen du gelernt hast. Nicht unterbrechen!',
+    'tooltip.cards_due':'Anzahl Karteikarten, die heute zur Wiederholung anstehen.',
+    'tooltip.tasks_due':'Offene Aufgaben aus deinem Lernplan — klicke „Alle", um sie zu sehen.',
+    // Export (Feature #14)
+    'export.flashcards_btn':'⬇ Karten exportieren',
+    'export.exams_btn':'⬇ Prüfungen exportieren',
+    'export.empty':'Nichts zu exportieren.',
+    'export.success_cards':'✅ Karteikarten exportiert.',
+    'export.success_exams':'✅ Prüfungsergebnisse exportiert.',
   },
   en: {
     'nav.learn':'Learning','nav.dashboard':'Dashboard','nav.subjects':'Subjects',
@@ -516,6 +580,17 @@ const I18N = {
     'nav.family':'Family','nav.class':'Class',
     'settings.language':'🌐 Language','settings.language_label':'App language',
     'settings.language_hint':'Applied immediately after saving.',
+    // Tooltips (Feature #16)
+    'tooltip.xp':'XP are experience points — you earn them by studying, practicing cards and Pomodoro sessions.',
+    'tooltip.streak':'Consecutive days you have studied. Don\'t break the chain!',
+    'tooltip.cards_due':'Number of flashcards due for review today.',
+    'tooltip.tasks_due':'Open tasks from your planner — click "All" to see them.',
+    // Export (Feature #14)
+    'export.flashcards_btn':'⬇ Export cards',
+    'export.exams_btn':'⬇ Export exams',
+    'export.empty':'Nothing to export.',
+    'export.success_cards':'✅ Flashcards exported.',
+    'export.success_exams':'✅ Exam results exported.',
   },
   fr: {
     'nav.learn':'Apprentissage','nav.dashboard':'Tableau de bord','nav.subjects':'Matières',
@@ -609,6 +684,17 @@ const I18N = {
     'nav.family':'Famille','nav.class':'Classe',
     'settings.language':'🌐 Langue','settings.language_label':"Langue de l'application",
     'settings.language_hint':'Appliqué immédiatement après la sauvegarde.',
+    // Tooltips (Feature #16)
+    'tooltip.xp':"Les XP sont des points d'expérience — vous en gagnez en étudiant, en révisant des cartes et lors des sessions Pomodoro.",
+    'tooltip.streak':"Jours consécutifs d'apprentissage. Ne brisez pas la chaîne !",
+    'tooltip.cards_due':'Nombre de fiches à réviser aujourd\'hui.',
+    'tooltip.tasks_due':'Tâches ouvertes de votre planificateur — cliquez « Toutes » pour les voir.',
+    // Export (Feature #14)
+    'export.flashcards_btn':'⬇ Exporter les fiches',
+    'export.exams_btn':'⬇ Exporter les examens',
+    'export.empty':'Rien à exporter.',
+    'export.success_cards':'✅ Fiches exportées.',
+    'export.success_exams':'✅ Résultats d\'examen exportés.',
   },
   es: {
     'nav.learn':'Aprendizaje','nav.dashboard':'Panel','nav.subjects':'Asignaturas',
@@ -702,6 +788,17 @@ const I18N = {
     'settings.design_coming':'Apariencia (Claro / Oscuro / Sistema) — próximamente',
     'child.school':'Escuela','child.class':'Clase / Curso','child.email':'E-mail (opcional)',
     'child.email_ph':'hijo@ejemplo.es','child.class_ph':'ej. 7b o 2.º Bach',
+    // Tooltips (Feature #16)
+    'tooltip.xp':'Los XP son puntos de experiencia — los ganas estudiando, practicando tarjetas y en sesiones Pomodoro.',
+    'tooltip.streak':'Días consecutivos en los que has estudiado. ¡No rompas la racha!',
+    'tooltip.cards_due':'Número de tarjetas pendientes de repasar hoy.',
+    'tooltip.tasks_due':'Tareas abiertas de tu planificador — haz clic en «Todas» para verlas.',
+    // Export (Feature #14)
+    'export.flashcards_btn':'⬇ Exportar tarjetas',
+    'export.exams_btn':'⬇ Exportar exámenes',
+    'export.empty':'Nada que exportar.',
+    'export.success_cards':'✅ Tarjetas exportadas.',
+    'export.success_exams':'✅ Resultados de examen exportados.',
   },
 };
 
@@ -716,6 +813,124 @@ function t(key, ...args) {
   const lang = getCurrentLang();
   const str = (I18N[lang] || I18N.de)[key] ?? I18N.de[key] ?? key;
   return args.reduce((s, a, i) => s.replace(`{${i}}`, a ?? ''), str);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE #16 — TOOLTIP-HELPER
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Erzeugt einen Tooltip-Wrapper um ein Label.
+ * @param {string} label   — Sichtbarer Text
+ * @param {string} tipKey  — I18N-Key für den Tooltip-Text
+ */
+function renderTooltip(label, tipKey) {
+  const tip = t(tipKey);
+  return `<span class="sb-tooltip-wrap">
+    ${label}
+    <i class="sb-tooltip-icon" role="img" aria-label="${tip}" tabindex="0">?</i>
+    <span class="sb-tooltip-box" role="tooltip">${safe(tip)}</span>
+  </span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE #14 — EXPORT (SheetJS XLSX / CSV-Fallback)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Exportiert ein 2D-Array als .xlsx (SheetJS) oder .csv (Fallback).
+ * BOM (\uFEFF) stellt sicher, dass Excel Umlaute korrekt erkennt.
+ *
+ * @param {string}     filename — Dateiname ohne Endung
+ * @param {string[][]} rows     — Zeilen; erste Zeile = Header
+ * @param {string}     [sheetName='Export'] — Name des Arbeitsblatts
+ */
+function exportXLSX(filename, rows, sheetName = 'Export') {
+  if (!rows || rows.length <= 1) { toast(t('export.empty')); return; }
+
+  if (typeof XLSX !== 'undefined') {
+    // SheetJS-Pfad — echtes .xlsx
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, filename + '.xlsx');
+  } else {
+    // CSV-Fallback wenn SheetJS nicht geladen
+    const csv = rows
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename + '.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * Exportiert alle Karteikarten des aktuell gewählten Fachs als XLSX/CSV.
+ * Spalten: Fach, Frage, Antwort, Level, Nächste Wiederholung
+ * @param {string} [subject] — Fach; nutzt FC.subj wenn nicht angegeben
+ */
+function exportFlashcards(subject) {
+  const subj = subject || FC.subj || Object.keys(D.cards)[0];
+  if (!subj) { toast(t('export.empty')); return; }
+
+  const cards = D.cards[subj] || [];
+  if (!cards.length) { toast(t('export.empty')); return; }
+
+  const lang = getCurrentLang();
+  const headers = {
+    de: ['Fach', 'Frage', 'Antwort', 'Level', 'Nächste Wiederholung'],
+    en: ['Subject', 'Question', 'Answer', 'Level', 'Next Review'],
+    fr: ['Matière', 'Question', 'Réponse', 'Niveau', 'Prochaine révision'],
+    es: ['Materia', 'Pregunta', 'Respuesta', 'Nivel', 'Próxima revisión'],
+  };
+  const rows = [
+    headers[lang] || headers.de,
+    ...cards.map(c => [
+      subj,
+      c.front || '',
+      c.back || '',
+      c.level ?? 0,
+      c.due ? new Date(c.due).toLocaleDateString(lang === 'de' ? 'de-DE' : lang + '-' + lang.toUpperCase()) : '—',
+    ]),
+  ];
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  exportXLSX(`StudyBuddy_Karteikarten_${subj}_${dateStr}`, rows, subj);
+  toast(t('export.success_cards'));
+}
+
+/**
+ * Exportiert alle gespeicherten Prüfungsergebnisse als XLSX/CSV.
+ * Spalten: Datum, Fach, Erreicht, Gesamt, Prozent
+ */
+function exportExams() {
+  const exams = D.exams || [];
+  if (!exams.length) { toast(t('export.empty')); return; }
+
+  const lang = getCurrentLang();
+  const headers = {
+    de: ['Datum', 'Fach', 'Erreicht', 'Gesamt', 'Prozent'],
+    en: ['Date', 'Subject', 'Score', 'Total', 'Percent'],
+    fr: ['Date', 'Matière', 'Score', 'Total', 'Pourcentage'],
+    es: ['Fecha', 'Materia', 'Puntuación', 'Total', 'Porcentaje'],
+  };
+  const rows = [
+    headers[lang] || headers.de,
+    ...exams.map(e => [
+      e.date ? new Date(e.date).toLocaleDateString('de-DE') : '—',
+      e.subject || '',
+      e.score ?? 0,
+      e.total ?? 0,
+      e.total ? Math.round(e.score / e.total * 100) + '%' : '—',
+    ]),
+  ];
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  exportXLSX(`StudyBuddy_Pruefungen_${dateStr}`, rows, 'Ergebnisse');
+  toast(t('export.success_exams'));
 }
 
 // ── Sprachhelfer ─────────────────────────────────────────────────────────────
@@ -1302,7 +1517,6 @@ async function init() {
         language: c.language || 'de',
         schoolUrl: c.school_url || '',
         subjects: c.subjects || null,
-        canManageSubjects: c.can_manage_subjects || false,
       };
       save();
     }
@@ -1523,22 +1737,22 @@ function dashboard(el) {
       <div class="stat-card">
         <div class="stat-icon">⭐</div>
         <div class="stat-value">${D.xp||0}</div>
-        <div class="stat-label">${t('dash.xp')}</div>
+        <div class="stat-label">${renderTooltip(t('dash.xp'), 'tooltip.xp')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🔥</div>
         <div class="stat-value">${D.streak||0}</div>
-        <div class="stat-label">${t('dash.streak')}</div>
+        <div class="stat-label">${renderTooltip(t('dash.streak'), 'tooltip.streak')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🃏</div>
         <div class="stat-value">${dueCards}</div>
-        <div class="stat-label">${t('dash.due_cards')}</div>
+        <div class="stat-label">${renderTooltip(t('dash.due_cards'), 'tooltip.cards_due')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">✅</div>
         <div class="stat-value">${openTasks}</div>
-        <div class="stat-label">${t('dash.open_tasks')}</div>
+        <div class="stat-label">${renderTooltip(t('dash.open_tasks'), 'tooltip.tasks_due')}</div>
       </div>
     </div>
     <div class="grid-2">
@@ -1566,7 +1780,10 @@ function dashboard(el) {
     </div>
     ${upcomingExams.length ? `
     <div class="card" style="margin-top:20px;">
-      <div class="card-header"><div class="card-title">${t('dash.recent_exams')}</div></div>
+      <div class="card-header">
+        <div class="card-title">${t('dash.recent_exams')}</div>
+        <button class="btn btn-secondary btn-sm" onclick="exportExams()" title="Als Excel/CSV exportieren">${t('export.exams_btn')}</button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${upcomingExams.map(ex=>{
           const pct = Math.round(ex.score/ex.total*100);
@@ -1634,9 +1851,12 @@ function renderFC(el) {
         <h1>${t('fc.title')}</h1>
         <p>${t('fc.due_total', due.length, cards.length)}</p>
       </div>
-      <select class="input" style="width:auto;" onchange="FC.subj=this.value;FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
-        ${getChildSubjects().map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
-      </select>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select class="input" style="width:auto;" onchange="FC.subj=this.value;FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
+          ${getChildSubjects().map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="exportFlashcards('${FC.subj}')" title="Als Excel/CSV exportieren">${t('export.flashcards_btn')}</button>
+      </div>
     </div>
 
     ${due.length ? `

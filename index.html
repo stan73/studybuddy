@@ -372,107 +372,31 @@ function renderAuth() {
 }
 
 function renderRegStep() {
+  // Registrierung ist jetzt Single-Step (nur Eltern-Account).
+  // Kinder werden später im Eltern-Dashboard angelegt.
   const title = document.getElementById('auth-title');
   const body = document.getElementById('auth-body');
-  // Nur 2 Schritte: 1. Eltern-Daten, 2. Kinder + PINs
-  const maxStep = 2;
-  regData.role = 'parent'; // Immer Elternteil
+  regData.role = 'parent';
 
-  const progress = `
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      ${Array.from({length: maxStep}, (_, i) => `
-        <div style="flex:1;height:5px;border-radius:99px;background:${i < regStep ? 'var(--pri)' : 'var(--border)'}"></div>
-      `).join('')}
-    </div>
-    <p style="font-size:12px;color:var(--t3);margin-bottom:16px;">Schritt ${regStep} von ${maxStep} — ${regStep===1?'Ihr Eltern-Account':'Ihre Kinder'}</p>`;
-
-  if (regStep === 1) {
-    title.textContent = 'Eltern-Account erstellen';
-    body.innerHTML = progress + `
-      <div style="display:flex;flex-direction:column;gap:14px;">
-        <div class="grid-2">
-          <div class="field"><label>Vorname *</label><input class="input" id="r-fn" placeholder="Max" value="${regData.fn||''}" autocomplete="given-name"></div>
-          <div class="field"><label>Nachname</label><input class="input" id="r-ln" placeholder="Müller" value="${regData.ln||''}" autocomplete="family-name"></div>
-        </div>
-        <div class="field"><label>E-Mail *</label><input class="input" id="r-em" type="email" placeholder="ihre@email.de" value="${regData.em||''}" autocomplete="email"></div>
-        <div class="field">
-          <label>Passwort * <span style="color:var(--t3);font-weight:400;font-size:11px;">(min. 8 Zeichen, mind. 1 Zahl)</span></label>
-          <input class="input" id="r-pw" type="password" placeholder="Sicheres Passwort" autocomplete="new-password">
-        </div>
-        <button class="btn btn-primary btn-full" onclick="regStep1Next()">Weiter: Kinder anlegen →</button>
-        <button class="btn btn-ghost btn-full" onclick="authMode='login';renderAuth()">← Zurück zum Login</button>
-      </div>`;
-    setTimeout(() => document.getElementById('r-fn')?.focus(), 50);
-
-  } else if (regStep === 2) {
-    title.textContent = 'Kinder anlegen';
-    if (!regData.children) regData.children = [{ name: '', grade: 5, pin: '', pin2: '' }];
-    body.innerHTML = progress + `
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <p style="color:var(--t2);font-size:13px;margin-bottom:8px;">
-          Jedes Kind erhält einen persönlichen PIN (mind. 8 Zeichen, Buchstaben + Zahlen).<br>
-          Kinder können sich damit auf jedem Gerät einloggen.
-        </p>
-        <div id="children-list">
-          ${regData.children.map((c, i) => `
-            <div style="background:var(--bg-2);border-radius:var(--r-md);padding:14px;margin-bottom:10px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <strong style="font-size:13px;">Kind ${i+1}</strong>
-                ${i > 0 ? `<button class="btn btn-ghost btn-sm" onclick="removeRegChild(${i})">✕ Entfernen</button>` : ''}
-              </div>
-              <div class="grid-2" style="margin-bottom:10px;">
-                <div class="field"><label>Name *</label><input class="input" id="cn-${i}" value="${c.name}" placeholder="z.B. Max"></div>
-                <div class="field"><label>Klasse</label><select class="input" id="cg-${i}">${[5,6,7,8,9,10,11,12,13].map(g=>`<option value="${g}" ${c.grade==g?'selected':''}>${g}. Klasse</option>`).join('')}</select></div>
-              </div>
-              <div class="grid-2">
-                <div class="field">
-                  <label>PIN * <span style="color:var(--t3);font-size:10px;">mind. 8 Zeichen, Buchstaben+Zahlen</span></label>
-                  <input class="input" id="cp-${i}" type="password" placeholder="z.B. Hund2024!" autocomplete="off">
-                </div>
-                <div class="field">
-                  <label>PIN bestätigen *</label>
-                  <input class="input" id="cp2-${i}" type="password" placeholder="PIN wiederholen" autocomplete="off">
-                </div>
-              </div>
-            </div>`).join('')}
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="addRegChild()" style="align-self:flex-start;margin-bottom:8px;">+ Weiteres Kind</button>
-        <button class="btn btn-primary btn-full" onclick="doRegister()">Konto erstellen 🎉</button>
-        <button class="btn btn-ghost btn-full" onclick="regStep=1;renderRegStep()">← Zurück</button>
-      </div>`;
-  }
-}
-
-function regStep1Next() {
-  const fn = document.getElementById('r-fn')?.value.trim();
-  const ln = document.getElementById('r-ln')?.value.trim();
-  const em = document.getElementById('r-em')?.value.trim();
-  const pw = document.getElementById('r-pw')?.value;
-
-  if (!fn || !em || !pw) return toast('⚠️ Bitte alle Pflichtfelder ausfüllen!');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return toast('❌ Ungültige E-Mail-Adresse!');
-  if (pw.length < 8) return toast('❌ Passwort zu kurz (min. 8 Zeichen)!');
-  if (!/[0-9]/.test(pw)) return toast('❌ Passwort braucht mindestens eine Zahl!');
-
-  Object.assign(regData, { fn, ln, em, pw });
-  regStep = 2;
-  renderRegStep();
-}
-
-function addRegChild() {
-  if (!regData.children) regData.children = [];
-  // Aktuelle Werte aus dem DOM retten
-  regData.children = regData.children.map((_, i) => ({
-    name: document.getElementById('cn-' + i)?.value.trim() || '',
-    grade: Number(document.getElementById('cg-' + i)?.value || 5),
-  }));
-  regData.children.push({ name: '', grade: 5, pin: '', pin2: '' });
-  renderRegStep();
-}
-
-function removeRegChild(i) {
-  regData.children.splice(i, 1);
-  renderRegStep();
+  title.textContent = 'Eltern-Account erstellen';
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <p style="color:var(--t2);font-size:13px;margin:0 0 4px;">
+        Nur für Eltern. Deine Kinder legst du danach bequem im Eltern-Dashboard an — mit eigenem PIN.
+      </p>
+      <div class="grid-2">
+        <div class="field"><label>Vorname *</label><input class="input" id="r-fn" placeholder="Max" value="${regData.fn||''}" autocomplete="given-name"></div>
+        <div class="field"><label>Nachname</label><input class="input" id="r-ln" placeholder="Müller" value="${regData.ln||''}" autocomplete="family-name"></div>
+      </div>
+      <div class="field"><label>E-Mail *</label><input class="input" id="r-em" type="email" placeholder="ihre@email.de" value="${regData.em||''}" autocomplete="email"></div>
+      <div class="field">
+        <label>Passwort * <span style="color:var(--t3);font-weight:400;font-size:11px;">(min. 8 Zeichen, mind. 1 Zahl)</span></label>
+        <input class="input" id="r-pw" type="password" placeholder="Sicheres Passwort" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="doRegister()">Konto erstellen 🎉</button>
+      <button class="btn btn-ghost btn-full" onclick="authMode='login';renderAuth()">← Zurück zum Login</button>
+    </div>`;
+  setTimeout(() => document.getElementById('r-fn')?.focus(), 50);
 }
 
 // ── Supabase Client ──────────────────────────────────────────────────────
@@ -583,32 +507,25 @@ async function doChildLogin() {
 async function doRegister() {
   if (!sb) return toast('❌ Keine Verbindung zur Datenbank — bitte Seite neu laden');
 
-  // Kinder-Daten lesen und validieren
-  const count = regData.children?.length || 0;
-  const children = [];
-  for (let i = 0; i < count; i++) {
-    const name  = document.getElementById('cn-' + i)?.value.trim() || '';
-    const grade = Number(document.getElementById('cg-' + i)?.value || 5);
-    const pin   = document.getElementById('cp-' + i)?.value || '';
-    const pin2  = document.getElementById('cp2-' + i)?.value || '';
+  // Eltern-Daten direkt aus dem DOM lesen (Single-Step Flow)
+  const fn = document.getElementById('r-fn')?.value.trim() || regData.fn;
+  const ln = document.getElementById('r-ln')?.value.trim() || regData.ln || '';
+  const em = document.getElementById('r-em')?.value.trim() || regData.em;
+  const pw = document.getElementById('r-pw')?.value || regData.pw;
 
-    if (!name) return toast('⚠️ Bitte Name für Kind ' + (i+1) + ' eingeben!');
-    if (pin.length < 8) return toast('❌ PIN für ' + name + ' muss mind. 8 Zeichen haben!');
-    if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN für ' + name + ' braucht mind. einen Buchstaben!');
-    if (!/[0-9]/.test(pin))    return toast('❌ PIN für ' + name + ' braucht mind. eine Zahl!');
-    if (pin !== pin2)          return toast('❌ PINs für ' + name + ' stimmen nicht überein!');
+  if (!fn || !em || !pw) return toast('⚠️ Bitte alle Pflichtfelder ausfüllen!');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return toast('❌ Ungültige E-Mail-Adresse!');
+  if (pw.length < 8) return toast('❌ Passwort zu kurz (min. 8 Zeichen)!');
+  if (!/[0-9]/.test(pw)) return toast('❌ Passwort braucht mindestens eine Zahl!');
 
-    children.push({ name, grade, pin });
-  }
-
-  if (children.length === 0) return toast('⚠️ Bitte mindestens ein Kind anlegen!');
+  Object.assign(regData, { fn, ln, em, pw });
 
   toast('Konto wird erstellt…');
-  const fullName = (regData.fn + ' ' + (regData.ln || '')).trim();
+  const fullName = (fn + ' ' + (ln || '')).trim();
 
   const { data, error } = await sb.auth.signUp({
-    email: regData.em,
-    password: regData.pw,
+    email: em,
+    password: pw,
     options: { data: { full_name: fullName, role: 'parent' } },
   });
 
@@ -616,22 +533,21 @@ async function doRegister() {
 
   // Profil anlegen
   await sb.from('profiles').upsert({
-    id: data.user.id, email: regData.em, full_name: fullName,
+    id: data.user.id, email: em, full_name: fullName,
     role: 'parent', subscription: 'free',
   });
 
-  // Kinder mit PIN anlegen
-  await sb.from('children').insert(
-    children.map(c => ({ parent_id: data.user.id, name: c.name, grade: c.grade, pin: c.pin }))
-  );
+  // Kinder werden NICHT hier angelegt — das macht der Elternteil später
+  // im Eltern-Dashboard. (Backlog: Kind-Account nur über bestehendes Eltern-Login)
 
   // Prüfen ob E-Mail-Bestätigung nötig
   if (!data.session) {
-    toast('✅ Konto erstellt! Bestätigungs-E-Mail gesendet — bitte Postfach prüfen!', 6000);
+    toast('✅ Konto erstellt! Bestätigungs-E-Mail gesendet — danach Kinder im Dashboard anlegen.', 6000);
     setTimeout(closeAuth, 6000);
   } else {
     sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile: null }));
-    window.location.href = '/app.html';
+    // Ins Eltern-Dashboard → Kinder-Bereich (direkter Sprung zur Kinder-Anlage)
+    window.location.href = '/app.html#children';
   }
 }
 
