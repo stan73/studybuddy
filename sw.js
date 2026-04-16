@@ -21,7 +21,7 @@
  */
 
 /** @type {string} Cache-Name — bei Asset-Änderungen inkrementieren */
-const CACHE_NAME = 'studybuddy-v2';
+const CACHE_NAME = 'studybuddy-v3';
 /** @type {number} Maximales Cachealter in Millisekunden (7 Tage) */
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 Tage
 
