@@ -21,7 +21,15 @@
  */
 
 /** @type {string} Cache-Name — bei Asset-Änderungen inkrementieren */
-const CACHE_NAME = 'studybuddy-v3';
+const CACHE_NAME = 'studybuddy-v4';
+
+/**
+ * HTML-Dateien (App-Entry-Points), die IMMER Network-First geladen werden.
+ * Verhindert, dass Nutzer auf einer veralteten app.html hängen bleiben, wenn
+ * wir Code deployen — der Cache wird nur noch als Offline-Fallback benutzt.
+ * @type {string[]}
+ */
+const HTML_NETWORK_FIRST = ['/index.html', '/app.html', '/'];
 /** @type {number} Maximales Cachealter in Millisekunden (7 Tage) */
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 Tage
 
@@ -103,7 +111,28 @@ self.addEventListener('fetch', e => {
   // POST-Anfragen: nicht cachen
   if (e.request.method !== 'GET') return;
 
-  // App-Shell: Cache First mit Netzwerk-Fallback
+  // HTML-Entry-Points: Network-First (User bekommt immer neuesten Code,
+  // Cache wird nur als Offline-Fallback benutzt). Verhindert, dass alte
+  // Versionen von index.html / app.html nach einem Deploy weiter laufen.
+  const isHtmlEntry = HTML_NETWORK_FIRST.some(
+    p => url.endsWith(p) || url === location.origin + p
+  );
+  if (isHtmlEntry) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Übrige App-Shell-Assets (CSS, Icons, Manifest): Cache First mit Netz-Update
   if (PRECACHE.some(p => url.endsWith(p) || url === location.origin + p)) {
     e.respondWith(
       caches.match(e.request).then(cached => {

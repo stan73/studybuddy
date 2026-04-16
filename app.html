@@ -3282,12 +3282,16 @@ async function testKeyConnection(providerKey, key) {
     const data = await r.json().catch(() => ({}));
 
     if (!r.ok) {
-      // Fehlermeldung direkt vom Anbieter weiterreichen (z.B. "invalid_api_key")
-      const msg = data?.error || data?.message || '';
-      if (r.status === 401) return { ok: false, error: 'Ungültiger API Key (401 Unauthorized)' };
-      if (r.status === 403) return { ok: false, error: 'API Key hat keine Berechtigung (403 Forbidden)' };
-      if (r.status === 429) return { ok: false, error: 'Rate Limit erreicht — kurz warten und erneut versuchen' };
-      return { ok: false, error: msg || `Fehler ${r.status}` };
+      // Echte Anbieter-Fehlermeldung durchreichen (z.B. "invalid x-api-key",
+      // "credit balance is too low", "authentication_error"). Das ist für den
+      // Nutzer deutlich hilfreicher als ein generisches "Unauthorized".
+      const msg = (typeof data?.error === 'string' ? data.error : data?.error?.message)
+                 || data?.message || '';
+      const prefix = r.status === 401 ? '401 (Unauthorized)'
+                   : r.status === 403 ? '403 (Forbidden)'
+                   : r.status === 429 ? '429 (Rate Limit)'
+                   : `Fehler ${r.status}`;
+      return { ok: false, error: msg ? `${prefix}: ${msg}` : prefix };
     }
 
     return { ok: true };
