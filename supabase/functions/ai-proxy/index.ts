@@ -89,6 +89,21 @@ serve(async (req: Request) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     let apiKey: string | null = passedKey || null;
 
+    // Account-Inhaber für Free-Tier-Limit bestimmen (Kind → Elternteil; sonst JWT-sub)
+    let ownerId: string | null = null;
+    if (passedChildId) {
+      const { data: cr } = await supabase.from("children").select("parent_id").eq("id", passedChildId).maybeSingle();
+      ownerId = cr?.parent_id ?? null;
+    } else {
+      const ah = req.headers.get("Authorization");
+      if (ah) {
+        try {
+          const p = JSON.parse(atob(ah.replace("Bearer ", "").split(".")[1]));
+          if (p.role === "authenticated" && p.sub) ownerId = p.sub;
+        } catch { /* anon-Key o.ä. — kein Owner */ }
+      }
+    }
+
     // Pfad 2: Kind-Anfrage ohne lokalen Key → Parent-Key via childId aus DB laden
     // Sicherheit: childId ist UUID (nicht erratbar); Key verlässt den Server nicht
     if (!apiKey && passedChildId) {
@@ -145,6 +160,18 @@ serve(async (req: Request) => {
         400,
         `Kein ${provider}-API-Key konfiguriert — Elternteil muss Key in den Einstellungen hinterlegen`
       );
+    }
+
+    // ── Free-Tier-Limit (Backlog P0.3) ─────────────────────────────────────────
+    const FREE_DAILY_LIMIT = 20;
+    if (ownerId) {
+      const { data: prof } = await supabase.from("profiles").select("subscription").eq("id", ownerId).maybeSingle();
+      if ((prof?.subscription ?? "free") === "free") {
+        const { data: allowed } = await supabase.rpc("consume_ai_quota", { p_user_id: ownerId, p_limit: FREE_DAILY_LIMIT });
+        if (allowed === false) {
+          return err(429, `Tageslimit erreicht (${FREE_DAILY_LIMIT} KI-Anfragen/Tag im Gratis-Tarif). Upgrade für unbegrenzte Anfragen.`);
+        }
+      }
     }
 
     // ── KI-Anfrage ────────────────────────────────────────────────────────────
