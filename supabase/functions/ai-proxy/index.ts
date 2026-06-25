@@ -79,6 +79,8 @@ serve(async (req: Request) => {
       apiKey: passedKey,
       // Pfad 2: Kind-ID → Proxy holt Parent-Key aus DB (geräteübergreifend)
       childId: passedChildId,
+      // Optional: Bild/PDF für Vision (base64 ohne data:-Präfix) → letzte User-Nachricht
+      image, // { mime: string, data: string }
     } = body;
 
     if (!provider || !messages) return err(400, "provider und messages erforderlich");
@@ -149,6 +151,22 @@ serve(async (req: Request) => {
     let text = "";
 
     if (provider === "claude") {
+      // Vision/Dokument: Bild oder PDF an die letzte User-Nachricht anhängen
+      const claudeMsgs = image
+        ? messages.map((m: { role: string; content: string }, i: number) =>
+            i === messages.length - 1 && m.role === "user"
+              ? {
+                  role: "user",
+                  content: [
+                    { type: "text", text: m.content },
+                    image.mime === "application/pdf"
+                      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: image.data } }
+                      : { type: "image", source: { type: "base64", media_type: image.mime, data: image.data } },
+                  ],
+                }
+              : m
+          )
+        : messages;
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -160,16 +178,30 @@ serve(async (req: Request) => {
           model: MODELS.claude,
           max_tokens: maxTok,
           system,
-          messages,
+          messages: claudeMsgs,
         }),
       });
       const d = await r.json();
       if (!r.ok) return err(r.status, d?.error?.message ?? r.statusText);
       text = d.content?.[0]?.text ?? "";
     } else if (provider === "openai") {
-      const msgs = system
-        ? [{ role: "system", content: system }, ...messages]
+      // Vision: Bild an die letzte User-Nachricht anhängen (image_url data-URL)
+      const oaiMsgs = image
+        ? messages.map((m: { role: string; content: string }, i: number) =>
+            i === messages.length - 1 && m.role === "user"
+              ? {
+                  role: "user",
+                  content: [
+                    { type: "text", text: m.content },
+                    { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.data}` } },
+                  ],
+                }
+              : m
+          )
         : messages;
+      const msgs = system
+        ? [{ role: "system", content: system }, ...oaiMsgs]
+        : oaiMsgs;
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -183,10 +215,13 @@ serve(async (req: Request) => {
       text = d.choices?.[0]?.message?.content ?? "";
     } else if (provider === "gemini") {
       const contents = messages.map(
-        (m: { role: string; content: string }) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        })
+        (m: { role: string; content: string }, i: number) => {
+          const parts: Array<Record<string, unknown>> = [{ text: m.content }];
+          if (image && i === messages.length - 1 && m.role === "user") {
+            parts.push({ inline_data: { mime_type: image.mime, data: image.data } });
+          }
+          return { role: m.role === "assistant" ? "model" : "user", parts };
+        }
       );
       if (system) contents.unshift({ role: "user", parts: [{ text: system }] });
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`;

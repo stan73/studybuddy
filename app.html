@@ -402,6 +402,8 @@ const I18N = {
     'fc.ai_label':'Text eingeben (KI erstellt daraus Karten)',
     'fc.ai_ph':'Lernstoff hier einfügen...','fc.ai_n':'{0} Karten',
     'fc.ai_btn':'🤖 KI-Karten erstellen',
+    'fc.photo_btn':'Foto/PDF → Karten',
+    'fc.photo_hint':'Arbeitsblatt oder Buchseite fotografieren',
     // Tutor
     'tutor.title':'🤖 KI-Tutor','tutor.subtitle':'Frag mich alles — ich helfe dir beim Lernen!',
     'tutor.greeting':'👋 Hallo! Ich bin dein KI-Tutor. Stell mir eine Frage zu {0} oder einem anderen Fach — ich helfe dir gerne!',
@@ -517,6 +519,8 @@ const I18N = {
     'fc.ai_label':'Enter text (AI will create cards from it)',
     'fc.ai_ph':'Paste learning content here...','fc.ai_n':'{0} cards',
     'fc.ai_btn':'🤖 Generate AI Cards',
+    'fc.photo_btn':'Photo/PDF → Cards',
+    'fc.photo_hint':'Snap a worksheet or book page',
     'tutor.title':'🤖 AI Tutor','tutor.subtitle':'Ask me anything — I\'ll help you learn!',
     'tutor.greeting':'👋 Hello! I\'m your AI Tutor. Ask me a question about {0} or any other subject — I\'m happy to help!',
     'tutor.placeholder':'Ask me something…','tutor.send':'Send →',
@@ -621,6 +625,8 @@ const I18N = {
     'fc.ai_label':'Entrez un texte (l\'IA créera des fiches)',
     'fc.ai_ph':'Collez le contenu ici...','fc.ai_n':'{0} fiches',
     'fc.ai_btn':'🤖 Créer des fiches IA',
+    'fc.photo_btn':'Photo/PDF → Fiches',
+    'fc.photo_hint':'Photographiez une feuille ou une page',
     'tutor.title':'🤖 Tuteur IA','tutor.subtitle':'Pose-moi toutes tes questions — je t\'aide à apprendre !',
     'tutor.greeting':'👋 Bonjour ! Je suis ton tuteur IA. Pose-moi une question sur {0} ou une autre matière !',
     'tutor.placeholder':'Pose ta question…','tutor.send':'Envoyer →',
@@ -725,6 +731,8 @@ const I18N = {
     'fc.ai_label':'Introduce texto (la IA creará tarjetas)',
     'fc.ai_ph':'Pega el contenido aquí...','fc.ai_n':'{0} tarjetas',
     'fc.ai_btn':'🤖 Crear tarjetas IA',
+    'fc.photo_btn':'Foto/PDF → Tarjetas',
+    'fc.photo_hint':'Fotografía una hoja o página',
     'tutor.title':'🤖 Tutor IA','tutor.subtitle':'¡Pregúntame lo que quieras — te ayudo a aprender!',
     'tutor.greeting':'👋 ¡Hola! Soy tu Tutor IA. Hazme una pregunta sobre {0} o cualquier otra asignatura.',
     'tutor.placeholder':'Hazme una pregunta…','tutor.send':'Enviar →',
@@ -1530,8 +1538,9 @@ function safeHTML(html) {
  * @returns {Promise<string>} KI-Antwort als Plaintext
  * @throws {Error} Bei Rate-Limit, fehlendem Key oder Proxy-Fehler
  */
-async function ai(messages, system, maxTok=400, useCache=true) {
+async function ai(messages, system, maxTok=400, useCache=true, image=null) {
   const prov = AI.provider;
+  if (image) useCache = false; // Bild/PDF-Anfragen nicht cachen (Cache-Key basiert nur auf Text)
 
   // Cache
   const ckBase = prov + system + JSON.stringify(messages);
@@ -1549,6 +1558,7 @@ async function ai(messages, system, maxTok=400, useCache=true) {
   // Headers aufbauen
   const headers = { 'Content-Type': 'application/json' };
   const payload = { provider: prov, messages, system, maxTok };
+  if (image) payload.image = image; // { mime, data } für Vision/PDF
 
   // Supabase-Gateway benötigt immer Bearer-Token — SB_KEY (anon JWT)
   headers['Authorization'] = 'Bearer ' + SB_KEY;
@@ -2075,6 +2085,12 @@ function renderFC(el) {
           </select>
           <button class="btn btn-primary btn-sm" onclick="genCards()">${t('fc.ai_btn')}</button>
         </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">📷 ${t('fc.photo_btn')}
+            <input type="file" accept="image/*,application/pdf" onchange="genCardsFromImage(this)" style="display:none;" aria-label="${t('fc.photo_btn')}">
+          </label>
+          <span style="font-size:11px;color:var(--t3);">${t('fc.photo_hint')}</span>
+        </div>
       </div>
     </div>`;
 }
@@ -2150,6 +2166,38 @@ async function genCards() {
     document.getElementById('gen-t').value='';
     renderFC(document.getElementById('content'));
   } catch(e) { toast('❌ '+e.message); }
+}
+
+/**
+ * Erstellt Karteikarten aus einem hochgeladenen Bild/PDF (Foto eines Arbeitsblatts,
+ * Buchseite o.ä.) via Vision-KI. PDF wird nur von Claude unterstützt.
+ * @param {HTMLInputElement} input — das <input type="file">
+ */
+async function genCardsFromImage(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (!hasActiveKey()) { input.value=''; return toast(t('toast.need_api_key')); }
+  const isPdf = file.type === 'application/pdf';
+  if (!/^image\//.test(file.type) && !isPdf) { input.value=''; return toast('❌ Nur Bilder (JPG/PNG) oder PDF'); }
+  if (isPdf && AI.provider !== 'claude') { input.value=''; return toast('❌ PDF nur mit Claude — sonst bitte ein Foto verwenden'); }
+  if (file.size > 6*1024*1024) { input.value=''; return toast('❌ Datei zu groß (max. 6 MB)'); }
+
+  const num = parseInt(document.getElementById('gen-n')?.value||5);
+  toast('🤖 KI liest die Datei…');
+  try {
+    const dataUrl = await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); });
+    const b64 = String(dataUrl).split(',')[1] || '';
+    const sys = `Karteikarten-Ersteller für Klasse ${U.grade}. Antworte NUR mit JSON.`;
+    const prompt = `Erstelle ${num} Karteikarten zum Fach ${FC.subj} aus dem Inhalt dieser Datei. Nur JSON:[{"front":"Frage?","back":"Antwort"}]`;
+    const r = await ai([{role:'user',content:prompt}], sys, 1500, false, { mime: isPdf?'application/pdf':file.type, data: b64 });
+    const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
+    if (!parsed.length) throw new Error('Keine Karten erkannt — anderes Foto versuchen');
+    if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
+    let n=0; parsed.forEach(c=>{ if(c.front&&c.back){ D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0}); n++; } });
+    save(); toast(`🎉 ${n} Karten aus Datei erstellt!`);
+    renderFC(document.getElementById('content'));
+  } catch(e) { toast('❌ '+e.message); }
+  finally { if (input) input.value=''; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
