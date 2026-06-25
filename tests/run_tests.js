@@ -306,6 +306,9 @@ test('T10.7', 'aria-live auf Content-Bereich', () => hasHtml('aria-live="polite"
 test('T10.8', 'Toast hat role="alert"', () => hasHtml('role="alert"'));
 test('T10.9', '#content als Rendering-Ziel vorhanden', () => hasHtml('id="content"'));
 test('T10.10', 'Sidebar-Overlay vorhanden (Mobile)', () => hasHtml('sidebar-overlay'));
+test('T10.11', 'aria-label auf icon-only Buttons', () =>
+  (hasHtml('aria-label="Log schließen"') && hasHtml('aria-label="Aufgabe löschen"') && hasHtml('aria-label="Kind entfernen"'))
+    ? true : 'aria-label auf icon-only Buttons fehlt');
 
 // ══════════════════════════════════════════════════════════════════════════
 // T11 — DATENKONSISTENZ

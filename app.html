@@ -170,7 +170,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn btn-secondary btn-sm" onclick="clearLog()" title="Log löschen">🗑 Löschen</button>
-        <button onclick="closeLog()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);line-height:1;padding:4px;">✕</button>
+        <button onclick="closeLog()" aria-label="Log schließen" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);line-height:1;padding:4px;">✕</button>
       </div>
     </div>
     <!-- Filter-Chips -->
@@ -2489,7 +2489,7 @@ function renderTaskList() {
         <div style="font-size:13px;font-weight:500;${t.completed?'text-decoration:line-through':''}">${safe(t.title)}</div>
         <div style="font-size:11px;color:var(--t3);">${t.subject||''} ${t.due?'· '+t.due:''}</div>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="deleteTask('${t.id}')">🗑</button>
+      <button class="btn btn-ghost btn-sm" onclick="deleteTask('${t.id}')" aria-label="Aufgabe löschen">🗑</button>
     </div>`).join('');
 }
 
@@ -2806,7 +2806,7 @@ function childrenPage(el) {
                   <div style="font-size:12px;color:var(--t3);">Klasse ${c.grade} · ${cLang.flag} ${cLang.name} · PIN: ${c.pin?'••••':'<span style="color:var(--warning)">fehlt</span>'}</div>
                 </div>
               </div>
-              <button class="btn btn-danger btn-sm" onclick="removeChild('${c.id}')">✕</button>
+              <button class="btn btn-danger btn-sm" onclick="removeChild('${c.id}')" aria-label="Kind entfernen">✕</button>
             </div>
 
             <!-- Statistiken -->
@@ -2881,7 +2881,7 @@ function childrenPage(el) {
                     const sm = CFG.SM[s]||CFG.SM.default;
                     return `<span style="display:inline-flex;align-items:center;gap:4px;background:${sm.c}22;color:${sm.c};border:1px solid ${sm.c}44;padding:3px 8px;border-radius:99px;font-size:12px;font-weight:600;">
                       ${sm.e} ${safe(s)}
-                      <button onclick="toggleChildSubject('${c.id}','${s.replace(/'/g,"\\'")}',false)" style="background:none;border:none;cursor:pointer;color:${sm.c};font-size:11px;padding:0 0 0 2px;opacity:.7;">✕</button>
+                      <button onclick="toggleChildSubject('${c.id}','${s.replace(/'/g,"\\'")}',false)" aria-label="Fach entfernen" style="background:none;border:none;cursor:pointer;color:${sm.c};font-size:11px;padding:0 0 0 2px;opacity:.7;">✕</button>
                     </span>`;
                   }).join('')}
                 </div>
