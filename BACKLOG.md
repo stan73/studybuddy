@@ -9,8 +9,8 @@ Aufwand: **S** = < 1 Tag · **M** = 1–3 Tage · **L** = > 3 Tage
 
 ## 🔴 P0 — Fundament & Compliance (zuerst — sonst trägt der Rest nicht)
 
-### [ ] P0.1 · Persistenz vollständig nach Supabase migrieren — **M**
-Karten/Aufgaben/Prüfungen/Streak liegen teils noch in `localStorage`. Ohne geräteübergreifenden Sync ist jede weitere Funktion wertlos.
+### [x] P0.1 · Persistenz vollständig nach Supabase migrieren — **ERLEDIGT (2026-06-25, Commit `0f04379`, live)**
+Karten/Aufgaben/Prüfungen werden geräteübergreifend in Supabase gespeichert (Migration 008: `child_id` + PIN-/RLS-RPCs `sync_my_data`/`load_my_data`/`sync_child_data`/`load_child_data`). localStorage nur noch Offline-Cache + einmalige Migration. Verifiziert: DB-Round-Trip + Browser-Smoke-Test (Schreiben + Cross-Device-Laden).
 - **Akzeptanz:**
   - Karteikarten, `tasks`, `exams`, `sessions`, `user_stats` werden ausschließlich in Supabase gelesen/geschrieben (kein `localStorage` als Quelle der Wahrheit).
   - Login auf zweitem Gerät zeigt identischen Stand (Karten, Streak, XP, Aufgaben).
@@ -113,7 +113,7 @@ Erst wenn PWA-Push-Grenzen (v.a. iOS) real limitieren.
 ## 🐛 Bekannte Bugs / Tech-Debt
 
 - [ ] Nach Passwort-Reset landet App auf `app.html#reset-password` — Formular noch nicht implementiert.
-- [ ] Kind-Streak wird nicht via `update_child_stats` gespeichert (PIN nicht in Session) → in P0.1 mitlösen.
+- [x] Kind-Streak-Bug behoben (P0.1): PIN bleibt im Speicher → `sync_child_data` schreibt Kind-Stats zuverlässig. *(2026-06-25)*
 - [ ] `js/api/claude.js.DELETE` — toten Datei-Rest entfernen.
 - [ ] Rate-Limiting in Edge Function pro User statt pro Browser-Tab → mit P0.3 zusammenlegen.
 - [ ] Automatische Session-Verlängerung (Supabase Auth Refresh Token).

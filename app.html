@@ -1306,6 +1306,27 @@ async function syncStats() {
  * @param {number} xpEarned    — Verdiente XP
  * @returns {Promise<void>}
  */
+/**
+ * Erfasst eine abgeschlossene Lerneinheit lokal in D.sessions (Basis für weeklyXP /
+ * Eltern-Chart) und synchronisiert sie für Auth-Nutzer in die Supabase-sessions-Tabelle.
+ * @param {string|null} subject — Fach (oder null, z.B. Pomodoro)
+ * @param {string} type — 'flashcard' | 'exam' | 'tutor' | 'pomodoro'
+ * @param {number|null} durationMin — Dauer in Minuten (oder null)
+ * @param {number} xp — verdiente XP
+ */
+function recordSession(subject, type, durationMin, xp) {
+  D.sessions = D.sessions || [];
+  D.sessions.push({
+    subject: subject || null,
+    session_type: type,
+    duration_minutes: durationMin || null,
+    xp_earned: xp || 0,
+    created_at: new Date().toISOString(),
+  });
+  if (D.sessions.length > 300) D.sessions = D.sessions.slice(-300); // Blob/Sync-Payload begrenzen
+  syncSession(subject, type, durationMin, xp); // Auth-Nutzer: zusätzlich in sessions-Tabelle
+}
+
 async function syncSession(subject, type, durationMin, xpEarned) {
   if (!sb || !U || U.isChild) return;
   try {
@@ -2074,6 +2095,7 @@ function rateCard(id, subj, rating) {
   D.correct = (D.correct||0) + (rating >= 2 ? 1 : 0);
   D.total = (D.total||0) + 1;
   D.xp = (D.xp||0) + (rating >= 2 ? CFG.XP.CARD : CFG.XP.CARD_WRONG);
+  recordSession(subj, 'flashcard', null, rating >= 2 ? CFG.XP.CARD : CFG.XP.CARD_WRONG);
   save(); updateXP();
 
   const due = (D.cards[subj]||[]).filter(c=>(c.due||0)<=Date.now());
@@ -2176,7 +2198,7 @@ async function sendMsg() {
     document.getElementById('typing')?.remove();
     tutorMsgs.push({role:'assistant',content:answer});
     msgs.innerHTML += `<div style="background:var(--bg-2);padding:12px 16px;border-radius:var(--r-md);max-width:85%;font-size:14px;line-height:1.6;">${safeHTML(answer.replace(/\n/g,'<br>'))}</div>`;
-    D.xp = (D.xp||0) + CFG.XP.TUTOR; save(); updateXP();
+    D.xp = (D.xp||0) + CFG.XP.TUTOR; recordSession(tutorSubj, 'tutor', null, CFG.XP.TUTOR); save(); updateXP();
   } catch(e) {
     document.getElementById('typing')?.remove();
     msgs.innerHTML += `<div style="background:#fee2e2;color:#991b1b;padding:12px 16px;border-radius:var(--r-md);max-width:85%;font-size:13px;">❌ ${safe(e.message)}</div>`;
@@ -2400,7 +2422,7 @@ function endExam(el) {
   const msg = pct >= 80 ? t('exam.excellent') : pct >= 60 ? t('exam.good') : t('exam.practice');
 
   D.exams = [...(D.exams||[]), {id:'e'+Date.now(),subject:EX.subj,score:EX.score,total:EX.qs.length,date:new Date().toISOString()}];
-  D.xp = (D.xp||0) + CFG.XP.EXAM; save(); updateXP();
+  D.xp = (D.xp||0) + CFG.XP.EXAM; recordSession(EX.subj, 'exam', null, CFG.XP.EXAM); save(); updateXP();
 
   el.innerHTML = `
     <div style="text-align:center;padding:60px 20px;max-width:480px;margin:0 auto;">
@@ -2530,7 +2552,7 @@ function togglePomo() {
       if (PO.sec <= 0) {
         if (!PO.isBreak) {
           PO.sessions++; PO.isBreak=true; PO.sec=PO.break*60;
-          D.xp=(D.xp||0)+CFG.XP.POMO; save(); updateXP();
+          D.xp=(D.xp||0)+CFG.XP.POMO; recordSession(null, 'pomodoro', PO.work, CFG.XP.POMO); save(); updateXP();
           toast(t('pomo.done', CFG.XP.POMO));
         } else {
           PO.isBreak=false; PO.sec=PO.work*60;

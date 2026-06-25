@@ -25,3 +25,6 @@ tests/last_report.json
 
 # VS Code user-settings (falls gewünscht komplett committen: hier leeren)
 # .vscode/ wird committet — Team-Settings
+
+# gstack (lokale Tooling-Artefakte, nicht ins Repo)
+.gstack/
