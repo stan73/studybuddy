@@ -404,6 +404,10 @@ const I18N = {
     'fc.ai_btn':'🤖 KI-Karten erstellen',
     'fc.photo_btn':'Foto/PDF → Karten',
     'fc.photo_hint':'Arbeitsblatt oder Buchseite fotografieren',
+    'goal.today':'Heute','goal.cards':'Karten','goal.freezes':'Streak-Freezes verfügbar','goal.set':'Ziel/Tag',
+    'onb.welcome':'Willkommen, {0}! 👋','onb.start':"Los geht's! 🚀",
+    'onb.tips_parent':'Lege im Bereich „Kinder" ein Kind mit PIN an, wähle Fächer und erstelle erste Karten – auch per Foto. Im Eltern-Dashboard siehst du den Fortschritt.',
+    'onb.tips_student':'Erstelle Karteikarten (tippen, KI oder Foto), setze dein Tagesziel 🎯 und halte deinen Streak 🔥. Bei Fragen hilft der KI-Tutor.',
     // Tutor
     'tutor.title':'🤖 KI-Tutor','tutor.subtitle':'Frag mich alles — ich helfe dir beim Lernen!',
     'tutor.greeting':'👋 Hallo! Ich bin dein KI-Tutor. Stell mir eine Frage zu {0} oder einem anderen Fach — ich helfe dir gerne!',
@@ -521,6 +525,10 @@ const I18N = {
     'fc.ai_btn':'🤖 Generate AI Cards',
     'fc.photo_btn':'Photo/PDF → Cards',
     'fc.photo_hint':'Snap a worksheet or book page',
+    'goal.today':'Today','goal.cards':'cards','goal.freezes':'Streak freezes available','goal.set':'Goal/day',
+    'onb.welcome':'Welcome, {0}! 👋','onb.start':"Let's go! 🚀",
+    'onb.tips_parent':'Add a child with a PIN under "Children", pick subjects and create your first cards – even from a photo. Track progress in the parent dashboard.',
+    'onb.tips_student':'Create flashcards (type, AI or photo), set your daily goal 🎯 and keep your streak 🔥. The AI tutor helps when you are stuck.',
     'tutor.title':'🤖 AI Tutor','tutor.subtitle':'Ask me anything — I\'ll help you learn!',
     'tutor.greeting':'👋 Hello! I\'m your AI Tutor. Ask me a question about {0} or any other subject — I\'m happy to help!',
     'tutor.placeholder':'Ask me something…','tutor.send':'Send →',
@@ -627,6 +635,10 @@ const I18N = {
     'fc.ai_btn':'🤖 Créer des fiches IA',
     'fc.photo_btn':'Photo/PDF → Fiches',
     'fc.photo_hint':'Photographiez une feuille ou une page',
+    'goal.today':"Aujourd'hui",'goal.cards':'fiches','goal.freezes':'Gels de série disponibles','goal.set':'Objectif/jour',
+    'onb.welcome':'Bienvenue, {0} ! 👋','onb.start':"C'est parti ! 🚀",
+    'onb.tips_parent':'Ajoutez un enfant avec un code PIN dans « Enfants », choisissez les matières et créez vos premières fiches – même via photo. Suivez la progression dans le tableau de bord parent.',
+    'onb.tips_student':'Crée des fiches (saisie, IA ou photo), fixe ton objectif quotidien 🎯 et garde ta série 🔥. Le tuteur IA t aide en cas de blocage.',
     'tutor.title':'🤖 Tuteur IA','tutor.subtitle':'Pose-moi toutes tes questions — je t\'aide à apprendre !',
     'tutor.greeting':'👋 Bonjour ! Je suis ton tuteur IA. Pose-moi une question sur {0} ou une autre matière !',
     'tutor.placeholder':'Pose ta question…','tutor.send':'Envoyer →',
@@ -733,6 +745,10 @@ const I18N = {
     'fc.ai_btn':'🤖 Crear tarjetas IA',
     'fc.photo_btn':'Foto/PDF → Tarjetas',
     'fc.photo_hint':'Fotografía una hoja o página',
+    'goal.today':'Hoy','goal.cards':'tarjetas','goal.freezes':'Congelaciones de racha disponibles','goal.set':'Meta/día',
+    'onb.welcome':'¡Bienvenido, {0}! 👋','onb.start':'¡Vamos! 🚀',
+    'onb.tips_parent':'Añade un hijo con PIN en «Hijos», elige asignaturas y crea tus primeras tarjetas – también por foto. Sigue el progreso en el panel de padres.',
+    'onb.tips_student':'Crea tarjetas (escribir, IA o foto), fija tu meta diaria 🎯 y mantén tu racha 🔥. El tutor IA te ayuda si te atascas.',
     'tutor.title':'🤖 Tutor IA','tutor.subtitle':'¡Pregúntame lo que quieras — te ayudo a aprender!',
     'tutor.greeting':'👋 ¡Hola! Soy tu Tutor IA. Hazme una pregunta sobre {0} o cualquier otra asignatura.',
     'tutor.placeholder':'Hazme una pregunta…','tutor.send':'Enviar →',
@@ -1332,7 +1348,44 @@ function recordSession(subject, type, durationMin, xp) {
     created_at: new Date().toISOString(),
   });
   if (D.sessions.length > 300) D.sessions = D.sessions.slice(-300); // Blob/Sync-Payload begrenzen
+  touchStreak(); // Streak/lastStudy bei jeder Lernaktion aktualisieren (inkl. Freeze)
   syncSession(subject, type, durationMin, xp); // Auth-Nutzer: zusätzlich in sessions-Tabelle
+}
+
+/**
+ * Aktualisiert Lern-Streak + lastStudy bei einer Lernaktion (P1.1 Retention).
+ * - gleicher Tag: keine Änderung · gestern: +1 · Lücke: Freeze einsetzen, sonst Reset auf 1.
+ * - Schreibt wöchentlich (max. 3) einen Streak-Freeze gut.
+ * Hinweis: streak/lastStudy syncen geräteübergreifend; freezes/dailyGoal sind v1 nur lokal.
+ */
+function touchStreak() {
+  const now = Date.now(), dayMs = 86400000;
+  const day0 = (ts) => { const d = new Date(ts); d.setHours(0,0,0,0); return d.getTime(); };
+  // Wöchentlich 1 Freeze gutschreiben (max. 3)
+  if (!D.lastFreezeGrant) D.lastFreezeGrant = now;
+  else if (now - D.lastFreezeGrant >= 7*dayMs) {
+    const weeks = Math.floor((now - D.lastFreezeGrant) / (7*dayMs));
+    D.freezes = Math.min(3, (D.freezes||0) + weeks);
+    D.lastFreezeGrant += weeks * 7*dayMs;
+  }
+  const today0 = day0(now), lastDay0 = D.lastStudy ? day0(D.lastStudy) : 0;
+  if (lastDay0 !== today0) {
+    const gap = lastDay0 ? Math.round((today0 - lastDay0) / dayMs) : 1;
+    if (gap <= 1) { D.streak = (D.streak||0) + 1; }            // gestern (oder erste Aktion) → +1
+    else {                                                      // Lücke
+      const missed = gap - 1;
+      if ((D.freezes||0) >= missed) { D.freezes -= missed; D.streak = (D.streak||0) + 1; } // Freeze rettet Streak
+      else { D.streak = 1; }                                    // sonst Reset
+    }
+  }
+  D.lastStudy = now;
+}
+
+/** Setzt das Tagesziel (Karten/Tag) und rendert das Dashboard neu. */
+function setDailyGoal(v) {
+  D.dailyGoal = Math.max(1, Math.min(50, parseInt(v) || 5));
+  save();
+  if (_page === 'dashboard') dashboard(document.getElementById('content'));
 }
 
 async function syncSession(subject, type, durationMin, xpEarned) {
@@ -1728,6 +1781,32 @@ async function init() {
   renderSidebar();
   _updateLogBadge(); // Fehler-Badge aus vorherigen Sessions anzeigen
   goPage('dashboard');
+  maybeOnboarding(); // einmaliges Willkommens-Onboarding für neue Nutzer (P2.3)
+}
+
+/**
+ * Zeigt einmalig pro Nutzer ein kurzes Willkommens-Onboarding (P2.3).
+ * Übersprungen für Bestandsnutzer (haben bereits Karten).
+ */
+function maybeOnboarding() {
+  try {
+    const key = 'sb_onboarded_' + (U?.id || 'anon');
+    if (localStorage.getItem(key)) return;
+    const hasCards = Object.values(D.cards||{}).some(a => a && a.length);
+    localStorage.setItem(key, '1');
+    if (hasCards) return; // Bestandsnutzer brauchen kein Onboarding
+    const tip = U?.role === 'parent' ? t('onb.tips_parent') : t('onb.tips_student');
+    const ov = document.createElement('div');
+    ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:var(--z-overlay,400);display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    ov.innerHTML = `<div class="card" style="max-width:440px;width:100%;">
+      <h2 style="margin:0 0 8px;">${t('onb.welcome', safe((U.full_name||'').split(' ')[0]||''))}</h2>
+      <p style="color:var(--t2);margin:0 0 18px;font-size:14px;line-height:1.6;">${tip}</p>
+      <button class="btn btn-primary btn-full" onclick="this.closest('[role=dialog]').remove()">${t('onb.start')}</button>
+    </div>`;
+    document.body.appendChild(ov);
+  } catch(e) {}
 }
 
 function populateDemoData() {
@@ -1862,7 +1941,7 @@ function goPage(page, params={}) {
   closeSidebar();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   const content = document.getElementById('content');
-  content.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:60px"><div class="spinner" style="width:28px;height:28px;"></div></div>';
+  content.innerHTML = '<div style="max-width:900px;margin:0 auto;"><div class="skeleton" style="height:32px;width:240px;margin-bottom:8px;"></div><div class="skeleton" style="height:16px;width:160px;margin-bottom:24px;"></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:24px;">' + '<div class="skeleton" style="height:96px;"></div>'.repeat(4) + '</div><div class="skeleton" style="height:200px;"></div></div>';
 
   const pages = {
     dashboard, subjects, flashcards, tutor, exam, planner, pomodoro,
@@ -1913,11 +1992,31 @@ function dashboard(el) {
   const dueCards = Object.values(D.cards).flat().filter(c => (c.due||0) <= Date.now()).length;
   const openTasks = (D.tasks||[]).filter(t => !t.completed).length;
   const upcomingExams = (D.exams||[]).slice(-3).reverse();
+  const goal = D.dailyGoal || 5;
+  const _t0 = new Date(); _t0.setHours(0,0,0,0);
+  const todayCount = (D.sessions||[]).filter(s => s.session_type === 'flashcard' && new Date(s.created_at).getTime() >= _t0.getTime()).length;
+  const goalPct = Math.min(100, Math.round(goal ? todayCount/goal*100 : 0));
 
   el.innerHTML = `
     <div class="page-header">
       <h1>${t('dash.greeting', safe((U.full_name||U.email||'').split(' ')[0]))}</h1>
       <p>${t('dash.subtitle')}</p>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-weight:600;margin-bottom:8px;">🎯 ${t('goal.today')}: ${todayCount}/${goal} ${t('goal.cards')} ${todayCount>=goal?'✅':''}</div>
+          <div style="height:8px;background:var(--bg-2);border-radius:99px;overflow:hidden;" role="progressbar" aria-valuenow="${todayCount}" aria-valuemin="0" aria-valuemax="${goal}">
+            <div style="height:100%;width:${goalPct}%;background:var(--pri);transition:width .3s var(--ease);"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span title="${t('goal.freezes')}" style="font-size:14px;">🧊 ${D.freezes||0}</span>
+          <label style="font-size:12px;color:var(--t3);display:flex;align-items:center;gap:6px;">${t('goal.set')}
+            <input type="number" min="1" max="50" value="${goal}" onchange="setDailyGoal(this.value)" aria-label="${t('goal.set')}" style="width:60px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--r-sm);">
+          </label>
+        </div>
+      </div>
     </div>
     <div class="grid-4" style="margin-bottom:24px;">
       <div class="stat-card">

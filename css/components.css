@@ -290,6 +290,18 @@ select.input { cursor: pointer; }
   animation: spin .6s linear infinite;
 }
 
+/* Skeleton-Screens (P2.3) — Platzhalter beim Laden statt nacktem Spinner */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-2) 25%, var(--border) 37%, var(--bg-2) 63%);
+  background-size: 400% 100%;
+  border-radius: var(--r-sm);
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
 /* ── Keyframes ───────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; }
