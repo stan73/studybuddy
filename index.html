@@ -498,7 +498,8 @@ async function doChildLogin() {
   if (error || !data) return toast('❌ Verbindungsfehler — bitte nochmal versuchen');
   if (data.error)     return toast('❌ ' + data.error);
 
-  // Erfolg → Kind-Session speichern
+  // Erfolg → Kind-Session speichern (PIN mitgeben: nötig für PIN-verifizierte Cloud-Sync-RPCs)
+  data.pin = pin;
   sessionStorage.setItem('sb_child_session', JSON.stringify(data));
   toast('✅ Willkommen, ' + data.child_name + '!');
   setTimeout(() => { window.location.href = '/app.html'; }, 600);

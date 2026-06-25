@@ -1076,6 +1076,14 @@ async function childResetSubjects() {
 /** @type {DataState} */
 let D = { cards:{}, tasks:[], exams:[], sessions:[], xp:0, streak:0, lastStudy:0, correct:0, total:0 };
 
+/** @type {string|null} PIN des aktuellen Kind-Logins (nur im Speicher — für PIN-verifizierte Sync-RPCs) */
+let _childPin = null;
+/** @type {boolean} true sobald Daten (lokal + Cloud) geladen sind. Verhindert, dass früher save()
+ *  im Login-Flow leere Daten in die Cloud schreibt und Cloud-Daten überschreibt. */
+let _dataLoaded = false;
+/** @type {number} Debounce-Timer-Handle für syncData() */
+let _syncTimer = 0;
+
 /** @type {string} Aktuell angezeigte Seite (für Pomodoro-Timer-Check) */
 let _page = 'dashboard';
 /** @type {number} Anzahl KI-Anfragen im aktuellen Rate-Limit-Fenster */
@@ -1236,6 +1244,7 @@ function save() {
     localStorage.setItem(_dataKey(), JSON.stringify(D));
   } catch(e) { console.warn('[Storage]', e.message); }
   syncStats(); // fire & forget — kein await, kein Fehler wenn offline
+  syncData();  // cards/tasks/exams (+ Kind-Stats) → Supabase, debounced
 }
 
 function load() {
@@ -1266,12 +1275,10 @@ function loadDataForUser(userId) {
  * @returns {Promise<void>}
  */
 async function syncStats() {
-  if (!sb || !U) return;
+  if (!sb || !U || !_dataLoaded) return;
 
-  if (U.isChild && U.id && U.parentEmail) {
-    // Kind: stats via PIN-verifizierter Supabase-Funktion speichern
-    // PIN ist nicht in Session — Kind-Stats werden beim nächsten Login synchronisiert
-    // (Workaround: stats werden beim Aufruf von update_child_stats mit PIN benötigt)
+  if (U.isChild) {
+    // Kind-Stats werden zusammen mit den Daten in sync_child_data() geschrieben (PIN-verifiziert).
     return;
   }
 
@@ -1309,6 +1316,140 @@ async function syncSession(subject, type, durationMin, xpEarned) {
       xp_earned: xpEarned,
     });
   } catch(e) {}
+}
+
+// ── Cloud-Persistenz: Karten/Aufgaben/Prüfungen ⇄ Supabase ──────────────────
+// Eltern/Schüler: über RLS (auth.uid()). Kinder: über PIN-verifizierte RPCs.
+// Persistenz folgt der save()-Semantik (Ganz-Ersetzen) und läuft transaktional in den RPCs.
+
+const _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Gibt id zurück, wenn sie eine UUID ist — sonst undefined (DB generiert dann eine). */
+function _uid(id) { return _UUID_RE.test(id || '') ? id : undefined; }
+
+/** D.cards (Objekt subject→Array) → flaches Zeilen-Array für die DB. */
+function _cardsToRows() {
+  const rows = [];
+  for (const subj in (D.cards || {})) {
+    for (const c of (D.cards[subj] || [])) {
+      rows.push({
+        id: _uid(c.id), subject: subj, front: c.front, back: c.back,
+        level: c.level || 0,
+        due_at: new Date(c.due || Date.now()).toISOString(),
+      });
+    }
+  }
+  return rows;
+}
+function _tasksToRows() {
+  return (D.tasks || []).map(t => ({
+    id: _uid(t.id), title: t.title, subject: t.subject || null,
+    due_at: t.due || null, completed: !!t.completed,
+  }));
+}
+function _examsToRows() {
+  return (D.exams || []).map(e => ({
+    id: _uid(e.id), subject: e.subject, score: e.score, total: e.total,
+    created_at: e.date ? new Date(e.date).toISOString() : new Date().toISOString(),
+  }));
+}
+/** Wöchentliche XP aus D.sessions (für Kind-Stats / Eltern-Chart). */
+function _weekly() {
+  const days = Array(7).fill(0);
+  (D.sessions || []).forEach(s => {
+    const d = Math.floor((Date.now() - new Date(s.created_at).getTime()) / 86400000);
+    if (d >= 0 && d < 7) days[6 - d] += (s.xp_earned || 0);
+  });
+  return days;
+}
+/** DB-Daten { cards:[], tasks:[], exams:[] } in den State D übernehmen. */
+function _applyCloudData(d) {
+  const cards = {};
+  (d.cards || []).forEach(c => {
+    (cards[c.subject] = cards[c.subject] || []).push({
+      id: c.id, front: c.front, back: c.back,
+      level: c.level || 0,
+      due: c.due_at ? new Date(c.due_at).getTime() : Date.now(),
+    });
+  });
+  D.cards = cards;
+  D.tasks = (d.tasks || []).map(t => ({
+    id: t.id, title: t.title, subject: t.subject || '',
+    due: t.due_at || '', completed: !!t.completed,
+  }));
+  D.exams = (d.exams || []).map(e => ({
+    id: e.id, subject: e.subject, score: e.score, total: e.total, date: e.created_at,
+  }));
+}
+
+/**
+ * Lädt Karten/Aufgaben/Prüfungen (+ Stats) aus Supabase in D.
+ * Cloud hat Vorrang; ist die Cloud leer, aber lokal Daten vorhanden, wird einmalig
+ * lokal → Cloud migriert (Rückgabe true). Offline-Fehler lassen lokale Daten unangetastet.
+ * @returns {Promise<boolean>} true, wenn lokale Daten in die (leere) Cloud hochzuladen sind
+ */
+async function loadCloudData() {
+  if (!sb || !U) return false;
+  try {
+    let cloud = null;
+    if (U.isChild) {
+      if (!U.id || !_childPin) return false;
+      const { data } = await sb.rpc('load_child_data', { p_child_id: U.id, p_pin: _childPin });
+      if (data && !data.error) {
+        cloud = data;
+        const st = data.stats;
+        if (st) {
+          D.xp = st.xp || 0; D.streak = st.streak || 0;
+          D.correct = st.correct || 0; D.total = st.total || 0;
+          if (st.lastStudy) D.lastStudy = new Date(st.lastStudy).getTime();
+        }
+      }
+    } else {
+      const { data: stats } = await sb.from('user_stats').select('*').eq('user_id', U.id).single();
+      if (stats) {
+        D.xp = stats.xp || 0; D.streak = stats.streak || 0;
+        D.correct = stats.total_correct || 0; D.total = stats.total_answered || 0;
+        if (stats.last_study_at) D.lastStudy = new Date(stats.last_study_at).getTime();
+      }
+      const { data } = await sb.rpc('load_my_data');
+      if (data) cloud = data;
+    }
+    if (cloud) {
+      const hasCloud = (cloud.cards && cloud.cards.length) ||
+                       (cloud.tasks && cloud.tasks.length) ||
+                       (cloud.exams && cloud.exams.length);
+      const hasLocal = Object.keys(D.cards || {}).length ||
+                       (D.tasks || []).length || (D.exams || []).length;
+      if (hasCloud) { _applyCloudData(cloud); }
+      else if (hasLocal) { return true; } // Cloud leer → lokale Daten migrieren
+    }
+  } catch(e) { /* offline: lokale Daten bleiben Quelle der Wahrheit */ }
+  return false;
+}
+
+/** Stößt einen debounced Cloud-Sync an (coalesct schnelle save()-Folgen). */
+function syncData() {
+  if (!sb || !U || !_dataLoaded) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(_syncDataNow, 1200);
+}
+async function _syncDataNow() {
+  if (!sb || !U || !_dataLoaded) return;
+  try {
+    if (U.isChild) {
+      if (!U.id || !_childPin) return;
+      await sb.rpc('sync_child_data', {
+        p_child_id: U.id, p_pin: _childPin,
+        p_cards: _cardsToRows(), p_tasks: _tasksToRows(), p_exams: _examsToRows(),
+        p_xp: D.xp || 0, p_streak: D.streak || 0,
+        p_correct: D.correct || 0, p_total: D.total || 0,
+        p_weekly: _weekly(),
+      });
+    } else {
+      await sb.rpc('sync_my_data', {
+        p_cards: _cardsToRows(), p_tasks: _tasksToRows(), p_exams: _examsToRows(),
+      });
+    }
+  } catch(e) { /* offline ok — lokale Daten bleiben erhalten */ }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1448,6 +1589,12 @@ async function ai(messages, system, maxTok=400, useCache=true) {
 async function init() {
   load();
 
+  // PIN aus Kind-Session wiederherstellen (auch nach Reload, wenn U aus localStorage kommt)
+  try {
+    const cs = sessionStorage.getItem('sb_child_session');
+    if (cs) _childPin = JSON.parse(cs).pin || null;
+  } catch(e) {}
+
   // 1. Supabase-Session prüfen (echter Login)
   if (sb) {
     const { data: { session } } = await sb.auth.getSession();
@@ -1501,8 +1648,8 @@ async function init() {
   if (!U) {
     const childSession = sessionStorage.getItem('sb_child_session');
     if (childSession) {
-      sessionStorage.removeItem('sb_child_session');
       const c = JSON.parse(childSession);
+      _childPin = c.pin || null; // im Speicher halten für PIN-verifizierte Cloud-Sync-RPCs
       U = {
         id: c.child_id,
         email: '',
@@ -1535,8 +1682,12 @@ async function init() {
   // Wird geawaitert damit hasActiveKey() sofort korrekt ist (z.B. in Prüfungsmodus)
   await loadConfiguredProviders();
 
-  // Daten für aktuellen User laden (pro-User-Key)
+  // Daten für aktuellen User laden: erst lokal (Offline-Cache), dann Cloud (Quelle der Wahrheit)
   loadDataForUser(U.id);
+  const migrate = await loadCloudData();
+  _dataLoaded = true;                 // ab jetzt dürfen save()/sync* in die Cloud schreiben
+  try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch(e) {} // Cloud-Daten in Offline-Cache spiegeln
+  if (migrate) _syncDataNow();        // lokale Bestandsdaten einmalig in die leere Cloud hochladen
 
   document.getElementById('app').style.display = 'flex';
   renderSidebar();
