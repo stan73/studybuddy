@@ -17,7 +17,8 @@ Karten/Aufgaben/Prüfungen werden geräteübergreifend in Supabase gespeichert (
   - **Streak-Bug behoben:** `update_child_stats` speichert zuverlässig (PIN-in-Session-Workaround dokumentiert/gelöst).
   - Offline erstellte Daten syncen beim nächsten Online-Gang (PWA).
 
-### [ ] P0.2 · Accessibility auf WCAG 2.1 AA — **M**
+### [~] P0.2 · Accessibility auf WCAG 2.1 AA — **TEILWEISE (2026-06-25, Commit `d419114`, live)**
+Erledigt: `prefers-reduced-motion`, aria-labels auf icon-only Buttons (focus-visible/nav-aria/content-aria-live/toast-role waren bereits da). Offen (iterativ): Kontrast-Audit, Lighthouse ≥ 95, vollständige Tastatur-/Screenreader-Tests.
 Heute: 13× `aria-`, 1× `tabindex`, 0 `alt`, 0 `prefers-reduced-motion`. **Rechtspflicht:** European Accessibility Act (seit 06/2025) + BITV 2.0 — ohne AA-Konformität ist Schul-/Behörden-Vertrieb blockiert.
 - **Akzeptanz:**
   - Alle interaktiven Elemente per Tastatur erreichbar + sichtbarer Fokus-Ring; logische Tab-Reihenfolge.
@@ -25,7 +26,8 @@ Heute: 13× `aria-`, 1× `tabindex`, 0 `alt`, 0 `prefers-reduced-motion`. **Rech
   - `@media (prefers-reduced-motion)` deaktiviert nicht-essenzielle Animationen.
   - Kontrast ≥ 4.5:1 (Token-Check); Lighthouse-A11y-Score ≥ 95.
 
-### [ ] P0.3 · Stripe + serverseitiges Free-Tier-Limit — **M**
+### [~] P0.3 · Stripe + serverseitiges Free-Tier-Limit — **Free-Limit ERLEDIGT (Commit `9707ed7`, live); Stripe OFFEN (braucht Credentials)**
+Free-Tier-Limit: ✅ 20 KI-Anfragen/Tag pro Account serverseitig im ai-proxy (Migration 010 `ai_usage` + `consume_ai_quota`, HTTP 429). Stripe-Checkout/Webhook: ⏳ benötigt Stripe-Konto + Secret-Key + Webhook-Secret + Price-IDs des Users.
 Abo ist heute reines UI-Mockup. Free-Limit muss in der Edge-Function greifen, nicht pro Browser-Tab.
 - **Akzeptanz:**
   - Echter Stripe-Checkout für `family_plus` / `family_pro` / `teacher`; Webhook setzt `profiles.subscription`.
@@ -44,14 +46,14 @@ XP/Streak/Badges existieren — der bindende Teil (Ziele + Erinnerungen) fehlt.
   - PWA-Push „Diese 3 Karten sind heute fällig" + Eltern-Benachrichtigung bei Inaktivität ≥ X Tage.
   - Eltern-Wochenbericht per E-Mail (Supabase Cron + Edge Function).
 
-### [ ] P1.2 · Foto/PDF → Karteikarten via KI — **M** *(Edge-Function-Basis vorhanden)*
+### [x] P1.2 · Foto/PDF → Karteikarten via KI — **ERLEDIGT (2026-06-25, Commit `3a0839e`, ai-proxy v4, live)** *(PDF nur mit Claude)*
 Größter wahrgenommener Mehrwert; hier gewinnen Knowunity/StudySmarter.
 - **Akzeptanz:**
   - Upload Bild/PDF → KI extrahiert Inhalte → Vorschlag editierbarer Karten → Speichern in `cards`.
   - Funktioniert für Foto eines Arbeitsblatts/einer Buchseite (OCR via Vision-Modell).
   - Free-Tier-Limit greift (siehe P0.3).
 
-### [ ] P1.3 · SR-Algorithmus FSRS/SM-2 statt fixer Leiter — **S–M**
+### [x] P1.3 · SR-Algorithmus FSRS/SM-2 statt fixer Leiter — **ERLEDIGT (2026-06-25, Commit `f5ce636`, Migration 009, live)**
 Heute fixe Leiter `SR_DAYS=[1,3,7,14,30]`. Adaptive Intervalle pro Karte → spürbar besserer Lernerfolg bei gleichem Aufwand.
 - **Akzeptanz:**
   - `cards` um `ease`, `reps`, `lapses` (oder FSRS-Stability/Difficulty) erweitert (Migration).
