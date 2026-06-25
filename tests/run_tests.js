@@ -168,9 +168,9 @@ test('T4.12', 'Alle 9 Fachbereiche in FALLBACK_QS', () => {
 console.log('\nT5 — Karteikarten');
 test('T5.1', 'FC-State definiert', () => has('let FC ='));
 test('T5.2', 'Spaced-Repetition SR_DAYS konfiguriert', () => has('SR_DAYS'));
-test('T5.3', 'rateCard: Level-Anpassung (SM-2)', () => {
+test('T5.3', 'rateCard: adaptive SR (SM-2: ease/reps/interval)', () => {
   const fn = js.match(/function rateCard[\s\S]*?(?=\nfunction manualAddCard)/)?.[0] || '';
-  return fn.includes('newLevel') && fn.includes('daysUntilNext') ? true : 'SR-Logik fehlt';
+  return fn.includes('ease') && fn.includes('reps') && fn.includes('card.interval') ? true : 'SM-2-Logik fehlt';
 });
 test('T5.4', 'manualAddCard: Validierung beider Felder', () => {
   const fn = js.match(/function manualAddCard[\s\S]*?(?=\n\/\*\*|async function genCards)/)?.[0] || '';
