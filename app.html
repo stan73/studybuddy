@@ -1323,6 +1323,9 @@ async function syncStats() {
       last_study_at: D.lastStudy ? new Date(D.lastStudy).toISOString() : null,
       total_correct: D.correct || 0,
       total_answered:D.total || 0,
+      daily_goal:    D.dailyGoal || 5,
+      freezes:       D.freezes || 0,
+      last_freeze_grant: D.lastFreezeGrant || null,
       updated_at:    new Date().toISOString(),
     }, { onConflict: 'user_id' });
   } catch(e) { /* Kein Fehler werfen — offline ist ok */ }
@@ -1495,6 +1498,9 @@ async function loadCloudData() {
           D.xp = st.xp || 0; D.streak = st.streak || 0;
           D.correct = st.correct || 0; D.total = st.total || 0;
           if (st.lastStudy) D.lastStudy = new Date(st.lastStudy).getTime();
+          if (st.dailyGoal) D.dailyGoal = st.dailyGoal;
+          D.freezes = st.freezes || 0;
+          if (st.lastFreezeGrant) D.lastFreezeGrant = st.lastFreezeGrant;
         }
       }
     } else {
@@ -1503,6 +1509,9 @@ async function loadCloudData() {
         D.xp = stats.xp || 0; D.streak = stats.streak || 0;
         D.correct = stats.total_correct || 0; D.total = stats.total_answered || 0;
         if (stats.last_study_at) D.lastStudy = new Date(stats.last_study_at).getTime();
+        if (stats.daily_goal) D.dailyGoal = stats.daily_goal;
+        D.freezes = stats.freezes || 0;
+        if (stats.last_freeze_grant) D.lastFreezeGrant = Number(stats.last_freeze_grant);
       }
       const { data } = await sb.rpc('load_my_data');
       if (data) cloud = data;
@@ -1537,6 +1546,7 @@ async function _syncDataNow() {
         p_xp: D.xp || 0, p_streak: D.streak || 0,
         p_correct: D.correct || 0, p_total: D.total || 0,
         p_weekly: _weekly(),
+        p_daily_goal: D.dailyGoal || 5, p_freezes: D.freezes || 0, p_lfg: D.lastFreezeGrant || null,
       });
     } else {
       await sb.rpc('sync_my_data', {
