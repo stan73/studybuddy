@@ -106,11 +106,6 @@
     <nav class="sidebar-nav" id="sidebar-nav" role="menubar">
       <!-- Dynamisch gefüllt je nach Rolle -->
     </nav>
-    <div class="sidebar-footer">
-      <button class="nav-item" onclick="doLogout()" style="color:rgba(255,255,255,.4);" role="menuitem">
-        <span class="nav-icon">🚪</span> Abmelden
-      </button>
-    </div>
   </aside>
 
   <!-- Main -->
@@ -134,6 +129,13 @@
             border-radius:99px;font-size:10px;font-weight:700;
             padding:1px 5px;min-width:16px;text-align:center;
           ">0</span>
+        </button>
+        <button id="logout-top" onclick="doLogout()" title="Abmelden" aria-label="Abmelden" style="
+          background:none;border:1px solid var(--border);border-radius:var(--r-md);
+          padding:6px 10px;cursor:pointer;font-size:14px;color:var(--t2);
+          display:flex;align-items:center;gap:5px;transition:background .15s;
+        " onmouseover="this.style.background='var(--bg-2)'" onmouseout="this.style.background='none'">
+          🚪 <span class="logout-label">Abmelden</span>
         </button>
       </div>
     </header>
@@ -1896,9 +1898,14 @@ function renderSidebar() {
 
   nav.innerHTML = html;
 
-  // Logout-Button übersetzen (liegt im statischen HTML-Footer)
-  const logoutBtn = document.querySelector('.sidebar-footer button[onclick="doLogout()"]');
-  if (logoutBtn) logoutBtn.innerHTML = `<span class="nav-icon">🚪</span> ${t('nav.logout')}`;
+  // Logout-Button übersetzen (oben rechts in der Header-Leiste — mobil gut erreichbar)
+  const logoutBtn = document.getElementById('logout-top');
+  if (logoutBtn) {
+    const lbl = logoutBtn.querySelector('.logout-label');
+    if (lbl) lbl.textContent = t('nav.logout');
+    logoutBtn.title = t('nav.logout');
+    logoutBtn.setAttribute('aria-label', t('nav.logout'));
+  }
 }
 
 function updateXP() {

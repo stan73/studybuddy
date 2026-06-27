@@ -348,6 +348,12 @@
   .landing-nav-links { display: none; }
 }
 
+/* Sehr schmale Screens: Logout nur als Icon (🚪), Header bleibt kompakt + erreichbar */
+@media (max-width: 480px) {
+  .logout-label { display: none; }
+  .header-right { gap: 6px; }
+}
+
 /* Hamburger für Mobile */
 #menu-toggle {
   display: none;
