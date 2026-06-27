@@ -38,8 +38,8 @@ Abo ist heute reines UI-Mockup. Free-Limit muss in der Edge-Function greifen, ni
 
 ## 🟠 P1 — Differenzierung & Bindung (der Wachstumshebel)
 
-### [~] P1.1 · Retention-Engine (Duolingo-Motor) — **Kern ERLEDIGT (2026-06-25, Commit `df82172`); Push/Mail offen**
-Erledigt: ✅ Tages-Lernziel (Dashboard-Banner + Fortschrittsbalken, setDailyGoal) · ✅ **Streak-Fix** (`touchStreak` — Streak wurde zuvor NIE erhöht) · ✅ Streak-Freeze (wöchentlich 1, max 3). Offen (brauchen Infra): ⏳ PWA-Push (VAPID + Push-Server) · ⏳ Eltern-Wochenmail (Supabase Cron + E-Mail-Dienst). Hinweis: dailyGoal/freezes vorerst nur lokal (kein Cross-Device-Sync).
+### [~] P1.1 · Retention-Engine (Duolingo-Motor) — **Kern ERLEDIGT; nur echtes Push/Mail offen**
+Erledigt: ✅ Tages-Lernziel (Dashboard-Banner + Fortschrittsbalken) · ✅ **Streak-Fix** (`touchStreak`) · ✅ Streak-Freeze (wöchentlich 1, max 3) · ✅ Tagesziel/Freeze **cross-device gesynct** (Migr. 011, Commit `7274217`) · ✅ Eltern-**Inaktivitäts-Banner** (≥3 Tage) · ✅ **lokale** Fällig-Erinnerung (Browser-Notification, Opt-in; Commit `550d899`). Offen (brauchen Infra): ⏳ echte **PWA-Push** (VAPID + Push-Server) · ⏳ Eltern-**Wochenmail** (Supabase Cron + E-Mail-Dienst).
 - **Akzeptanz:**
   - ✅ Tages-Lernziel (Eltern setzbar: z.B. „30 min/Tag", „5 Karten/Tag") mit Fortschrittsanzeige.
   - ✅ Streak-Freeze (1×/Woche automatisch oder kaufbar).
@@ -87,8 +87,8 @@ Erledigt: einmaliges rollenbasiertes Willkommens-Modal (`maybeOnboarding`) + Ske
 Geteilte Karten-Sets & Aufgaben pro Klasse; hoher Bindungseffekt, hoher Aufwand. (Detail unten „Schul-Anbindung".)
 - **Akzeptanz:** Schüler gleicher `school_id` + `grade` → virtuelle Klasse (Eltern-Opt-in, DSGVO); `shared_cards`/`shared_tasks`-Pool; Echtnamen nur für vernetzte Klassenkameraden.
 
-### [ ] P3.2 · Dark-Mode-Toggle — **S**
-Tokens existieren (`@media prefers-color-scheme`), nur manueller Schalter + `localStorage['theme']` fehlen. Kind-Settings-Platzhalter ist dafür vorbereitet.
+### [x] P3.2 · Dark-Mode-Toggle — **ERLEDIGT (2026-06-27, Commit `5a747e8`, live)**
+Hell/Dunkel/System via `[data-theme]` + Früh-Apply (kein Flash). Theme-Card in Settings (Eltern & Kinder), `localStorage['sb_theme']`.
 
 ### [ ] P3.3 · Native App-Hülle (iOS/Android) — **L**
 Erst wenn PWA-Push-Grenzen (v.a. iOS) real limitieren.
