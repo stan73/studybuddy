@@ -38,13 +38,13 @@ Abo ist heute reines UI-Mockup. Free-Limit muss in der Edge-Function greifen, ni
 
 ## 🟠 P1 — Differenzierung & Bindung (der Wachstumshebel)
 
-### [ ] P1.1 · Retention-Engine (Duolingo-Motor) — **M**
-XP/Streak/Badges existieren — der bindende Teil (Ziele + Erinnerungen) fehlt.
+### [~] P1.1 · Retention-Engine (Duolingo-Motor) — **Kern ERLEDIGT (2026-06-25, Commit `df82172`); Push/Mail offen**
+Erledigt: ✅ Tages-Lernziel (Dashboard-Banner + Fortschrittsbalken, setDailyGoal) · ✅ **Streak-Fix** (`touchStreak` — Streak wurde zuvor NIE erhöht) · ✅ Streak-Freeze (wöchentlich 1, max 3). Offen (brauchen Infra): ⏳ PWA-Push (VAPID + Push-Server) · ⏳ Eltern-Wochenmail (Supabase Cron + E-Mail-Dienst). Hinweis: dailyGoal/freezes vorerst nur lokal (kein Cross-Device-Sync).
 - **Akzeptanz:**
-  - Tages-Lernziel (Eltern setzbar: z.B. „30 min/Tag", „5 Karten/Tag") mit Fortschrittsanzeige.
-  - Streak-Freeze (1×/Woche automatisch oder kaufbar).
-  - PWA-Push „Diese 3 Karten sind heute fällig" + Eltern-Benachrichtigung bei Inaktivität ≥ X Tage.
-  - Eltern-Wochenbericht per E-Mail (Supabase Cron + Edge Function).
+  - ✅ Tages-Lernziel (Eltern setzbar: z.B. „30 min/Tag", „5 Karten/Tag") mit Fortschrittsanzeige.
+  - ✅ Streak-Freeze (1×/Woche automatisch oder kaufbar).
+  - ⏳ PWA-Push „Diese 3 Karten sind heute fällig" + Eltern-Benachrichtigung bei Inaktivität ≥ X Tage.
+  - ⏳ Eltern-Wochenbericht per E-Mail (Supabase Cron + Edge Function).
 
 ### [x] P1.2 · Foto/PDF → Karteikarten via KI — **ERLEDIGT (2026-06-25, Commit `3a0839e`, ai-proxy v4, live)** *(PDF nur mit Claude)*
 Größter wahrgenommener Mehrwert; hier gewinnen Knowunity/StudySmarter.
@@ -75,8 +75,8 @@ Für den DE-Schulmarkt höherer Hebel als Teams; speist den Lernplaner automatis
   - KI-Zusammenfassungen pro Fach (auf Basis der Karteikarten).
   - Schwierigkeitsgrad im Prüfungsmodus wählbar (leicht / mittel / schwer).
 
-### [ ] P2.3 · Onboarding-Flow + Skeleton-Screens — **S**
-Heute 0 First-Run-Flow, Spinner statt Skeletons.
+### [x] P2.3 · Onboarding-Flow + Skeleton-Screens — **ERLEDIGT (2026-06-25, Commit `df82172`)**
+Erledigt: einmaliges rollenbasiertes Willkommens-Modal (`maybeOnboarding`) + Skeleton-Screens (`.skeleton`-Shimmer) statt Spinner beim Laden. Verfeinerung möglich: mehrstufiger geführter Flow, leere Zustände mit CTA.
 - **Akzeptanz:** Geführter Erststart (Rolle, erstes Kind/Fach, erste Karten); leere Zustände mit klarer CTA; Skeleton-Screens beim Laden.
 
 ---
