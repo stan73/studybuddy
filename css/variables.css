@@ -91,9 +91,24 @@
   --z-overlay: 400;
 }
 
-/* Dunkel-Modus (vorbereitet für Phase 3) */
+/* ── Dunkel-Modus ──────────────────────────────────────────────────────────
+   Steuerung über data-theme am <html>:
+     (kein Attribut) / "system" → folgt dem Betriebssystem
+     "light"  → immer hell · "dark" → immer dunkel
+*/
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --bg-2: #1e293b;
+  --bg-card: #1e293b;
+  --border: #334155;
+  --t1: #f1f5f9;
+  --t2: #94a3b8;
+  --t3: #64748b;
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
     --bg: #0f172a;
     --bg-2: #1e293b;
     --bg-card: #1e293b;

@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/layout.css">
+<!-- Theme früh setzen (verhindert Flash); 'light' | 'dark' | 'system' -->
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('sb_theme')||'system';}catch(e){}</script>
 <!-- DOMPurify XSS-Schutz (lokal gebündelt für CDN-Ausfallsicherheit) -->
 <script src="js/vendor/purify.min.js"></script>
 <!-- Supabase JS Client (lokal gebündelt) -->
@@ -458,6 +460,7 @@ const I18N = {
     'settings.reset_note':'Lernfortschritte zurücksetzen (DSGVO: Recht auf Löschung)',
     'settings.reset_btn':'Alle Lernfortschritte löschen',
     'settings.managed_by_parent':'Deine Einstellungen werden von deinen Eltern verwaltet.',
+    'settings.appearance':'Erscheinungsbild','settings.theme_system':'System','settings.theme_light':'Hell','settings.theme_dark':'Dunkel',
     'settings.design_coming':'Darstellung (Hell / Dunkel / System) — bald verfügbar',
     'child.school':'Schule','child.class':'Klasse / Kurs','child.email':'E-Mail (optional)',
     'child.email_ph':'kind@beispiel.de','child.class_ph':'z.B. 7b oder Q1',
@@ -574,6 +577,7 @@ const I18N = {
     'settings.reset_note':'Reset learning progress (GDPR: Right to erasure)',
     'settings.reset_btn':'Delete all learning progress',
     'settings.managed_by_parent':'Your settings are managed by your parents.',
+    'settings.appearance':'Appearance','settings.theme_system':'System','settings.theme_light':'Light','settings.theme_dark':'Dark',
     'settings.design_coming':'Appearance (Light / Dark / System) — coming soon',
     'child.school':'School','child.class':'Class / Course','child.email':'Email (optional)',
     'child.email_ph':'child@example.com','child.class_ph':'e.g. 7b or Year 11',
@@ -684,6 +688,7 @@ const I18N = {
     'settings.reset_note':'Réinitialiser la progression (RGPD : droit à l\'effacement)',
     'settings.reset_btn':'Supprimer toute la progression',
     'settings.managed_by_parent':'Tes paramètres sont gérés par tes parents.',
+    'settings.appearance':'Apparence','settings.theme_system':'Système','settings.theme_light':'Clair','settings.theme_dark':'Sombre',
     'settings.design_coming':'Apparence (Clair / Sombre / Système) — bientôt disponible',
     'child.school':'École','child.class':'Classe / Cours','child.email':'E-mail (optionnel)',
     'child.email_ph':'enfant@exemple.fr','child.class_ph':'ex. 5ème ou Terminale',
@@ -811,6 +816,7 @@ const I18N = {
     'settings.language':'🌐 Idioma','settings.language_label':'Idioma de la aplicación',
     'settings.language_hint':'Se aplica inmediatamente al guardar.',
     'settings.managed_by_parent':'Tus ajustes son gestionados por tus padres.',
+    'settings.appearance':'Apariencia','settings.theme_system':'Sistema','settings.theme_light':'Claro','settings.theme_dark':'Oscuro',
     'settings.design_coming':'Apariencia (Claro / Oscuro / Sistema) — próximamente',
     'child.school':'Escuela','child.class':'Clase / Curso','child.email':'E-mail (opcional)',
     'child.email_ph':'hijo@ejemplo.es','child.class_ph':'ej. 7b o 2.º Bach',
@@ -3291,22 +3297,43 @@ function subscription(el) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: EINSTELLUNGEN
 // ═══════════════════════════════════════════════════════════════════════════
+/** Setzt das Farbschema (light|dark|system), persistiert es und rendert Settings neu. */
+function setTheme(mode) {
+  if (!['light','dark','system'].includes(mode)) mode = 'system';
+  try { localStorage.setItem('sb_theme', mode); } catch(e) {}
+  document.documentElement.dataset.theme = mode;
+  if (_page === 'settings') settings(document.getElementById('content'));
+}
+
+/** HTML-Card für die Theme-Auswahl (Hell/Dunkel/System) — für Eltern & Kinder. */
+function _themeCard() {
+  let cur = 'system';
+  try { cur = localStorage.getItem('sb_theme') || 'system'; } catch(e) {}
+  return `<div class="card">
+    <div class="card-header"><div class="card-title">🎨 ${t('settings.appearance')}</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${['system','light','dark'].map(m=>`<button class="btn btn-sm ${cur===m?'btn-primary':'btn-secondary'}" onclick="setTheme('${m}')">${t('settings.theme_'+m)}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
 function settings(el) {
   // Kinder haben keine eigenen Einstellungen — alles wird von Eltern verwaltet
   if (U.isChild) {
     el.innerHTML = `
       <div class="page-header"><h1>${t('settings.title')}</h1></div>
-      <div style="max-width:600px;">
+      <div style="max-width:600px;display:flex;flex-direction:column;gap:20px;">
         <div class="card">
           <p style="color:var(--t2);font-size:14px;line-height:1.6;">${t('settings.managed_by_parent')}</p>
-          <p style="color:var(--t3);font-size:12px;margin-top:10px;">🎨 ${t('settings.design_coming')}</p>
         </div>
+        ${_themeCard()}
       </div>`;
     return;
   }
   el.innerHTML = `
     <div class="page-header"><h1>${t('settings.title')}</h1></div>
     <div style="max-width:600px;display:flex;flex-direction:column;gap:20px;">
+      ${_themeCard()}
       <div class="card">
         <div class="card-header"><div class="card-title">${t('settings.profile')}</div></div>
         <div style="display:flex;flex-direction:column;gap:12px;">

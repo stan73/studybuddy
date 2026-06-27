@@ -27,9 +27,10 @@ const path = require('path');
 const APP = path.resolve(__dirname, '../app.html');
 if (!fs.existsSync(APP)) { console.error('❌ app.html nicht gefunden:', APP); process.exit(1); }
 const html = fs.readFileSync(APP, 'utf8');
-const scriptMatch = html.match(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/);
-if (!scriptMatch) { console.error('❌ Kein <script>-Block gefunden'); process.exit(1); }
-const js = scriptMatch[1];
+// Größtes inline-<script> = Haupt-App-Code (es kann mehrere geben, z.B. Theme-Früh-Apply im <head>)
+const _scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+if (!_scripts.length) { console.error('❌ Kein <script>-Block gefunden'); process.exit(1); }
+const js = _scripts.sort((a, b) => b.length - a.length)[0];
 
 // ── Test-Engine ────────────────────────────────────────────────────────────
 let passed = 0, failed = 0, warned = 0;
