@@ -377,6 +377,7 @@ const I18N = {
     'nav.learn':'Lernen','nav.dashboard':'Dashboard','nav.subjects':'Fächer',
     'nav.flashcards':'Karteikarten','nav.tutor':'KI-Tutor','nav.exam':'Prüfungsmodus',
     'nav.organisation':'Organisation','nav.planner':'Lernplan','nav.pomodoro':'Pomodoro',
+    'ms.title':'Schul-Konto (Microsoft)','ms.connected':'verbunden','ms.connect':'Schule verbinden','ms.sync':'Aufgaben holen','ms.disconnect':'Trennen','ms.disconnected':'Schul-Konto getrennt','ms.hint':'Verbinde das Schul-Microsoft-Konto, um Aufgaben & Termine automatisch in den Lernplan zu holen.','ms.fetching':'Hole Schul-Aufgaben…','ms.reconnect':'Bitte Schul-Konto neu verbinden','ms.imported':'{0} Schul-Aufgaben importiert!','ms.no_new':'Keine neuen Aufgaben',
     'nav.account':'Konto','nav.subscription':'Abo & Preise','nav.settings':'Einstellungen',
     'nav.logout':'Abmelden',
     // Sidebar
@@ -509,6 +510,7 @@ const I18N = {
     'nav.learn':'Learning','nav.dashboard':'Dashboard','nav.subjects':'Subjects',
     'nav.flashcards':'Flashcards','nav.tutor':'AI Tutor','nav.exam':'Exam Mode',
     'nav.organisation':'Organisation','nav.planner':'Planner','nav.pomodoro':'Pomodoro',
+    'ms.title':'School account (Microsoft)','ms.connected':'connected','ms.connect':'Connect school','ms.sync':'Get assignments','ms.disconnect':'Disconnect','ms.disconnected':'School account disconnected','ms.hint':'Connect the school Microsoft account to pull assignments & deadlines into the planner automatically.','ms.fetching':'Fetching school assignments…','ms.reconnect':'Please reconnect the school account','ms.imported':'{0} school assignments imported!','ms.no_new':'No new assignments',
     'nav.account':'Account','nav.subscription':'Subscription','nav.settings':'Settings',
     'nav.logout':'Sign out',
     'role.child':'Year {0} · Student Account',
@@ -626,6 +628,7 @@ const I18N = {
     'nav.learn':'Apprentissage','nav.dashboard':'Tableau de bord','nav.subjects':'Matières',
     'nav.flashcards':'Fiches','nav.tutor':'Tuteur IA','nav.exam':'Mode Examen',
     'nav.organisation':'Organisation','nav.planner':'Planning','nav.pomodoro':'Pomodoro',
+    'ms.title':'Compte scolaire (Microsoft)','ms.connected':'connecté','ms.connect':'Connecter l école','ms.sync':'Récupérer les devoirs','ms.disconnect':'Déconnecter','ms.disconnected':'Compte scolaire déconnecté','ms.hint':'Connecte le compte Microsoft scolaire pour importer automatiquement devoirs et échéances dans le planning.','ms.fetching':'Récupération des devoirs…','ms.reconnect':'Reconnecte le compte scolaire','ms.imported':'{0} devoirs importés !','ms.no_new':'Aucun nouveau devoir',
     'nav.account':'Compte','nav.subscription':'Abonnement','nav.settings':'Paramètres',
     'nav.logout':'Déconnexion',
     'role.child':'Classe {0} · Compte Élève',
@@ -743,6 +746,7 @@ const I18N = {
     'nav.learn':'Aprendizaje','nav.dashboard':'Panel','nav.subjects':'Asignaturas',
     'nav.flashcards':'Tarjetas','nav.tutor':'Tutor IA','nav.exam':'Modo Examen',
     'nav.organisation':'Organización','nav.planner':'Planificador','nav.pomodoro':'Pomodoro',
+    'ms.title':'Cuenta escolar (Microsoft)','ms.connected':'conectada','ms.connect':'Conectar escuela','ms.sync':'Obtener tareas','ms.disconnect':'Desconectar','ms.disconnected':'Cuenta escolar desconectada','ms.hint':'Conecta la cuenta Microsoft escolar para traer tareas y fechas al planificador automáticamente.','ms.fetching':'Obteniendo tareas escolares…','ms.reconnect':'Vuelve a conectar la cuenta escolar','ms.imported':'¡{0} tareas escolares importadas!','ms.no_new':'Sin tareas nuevas',
     'nav.account':'Cuenta','nav.subscription':'Suscripción','nav.settings':'Ajustes',
     'nav.logout':'Cerrar sesión',
     'role.child':'Clase {0} · Cuenta Alumno',
@@ -1335,6 +1339,110 @@ const sb = (typeof window.supabase !== 'undefined')
   ? window.supabase.createClient(SB_URL, SB_KEY)
   : null;
 
+// ── Microsoft Schul-Anbindung (Entra + Graph Education API) ─────────────────
+// Phase 1: Public-Client OAuth Auth-Code + PKCE im Browser (nur Client-ID, kein Secret).
+// Token pro Profil in localStorage. Holt Schul-Aufgaben (delegiert, schüler-zustimmbar).
+const MS = {
+  clientId: '0af49aed-b475-4055-baf1-7a4dc36cbfa8',
+  authority: 'https://login.microsoftonline.com/organizations',
+  redirectUri: location.origin + '/app.html',
+  scopes: 'openid profile offline_access User.Read EduAssignments.ReadBasic EduRoster.ReadBasic',
+};
+function _b64url(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function _msRand(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return _b64url(a.buffer); }
+
+/** Ist das aktuelle Profil mit einem Schul-Konto verbunden? */
+function msConnected() { return !!(U?.id && localStorage.getItem('ms_conn_' + U.id)); }
+
+/** Startet die Schul-Konto-Anbindung (OAuth + PKCE) für das aktuelle Profil. */
+async function msConnect() {
+  if (!U?.id) return;
+  const verifier = _msRand(48);
+  const challenge = _b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  const state = _msRand(16);
+  sessionStorage.setItem('ms_pkce', JSON.stringify({ verifier, state, who: U.id }));
+  const p = new URLSearchParams({
+    client_id: MS.clientId, response_type: 'code', redirect_uri: MS.redirectUri,
+    scope: MS.scopes, code_challenge: challenge, code_challenge_method: 'S256',
+    state, response_mode: 'query', prompt: 'select_account',
+  });
+  location.href = MS.authority + '/oauth2/v2.0/authorize?' + p.toString();
+}
+
+/** Verarbeitet die OAuth-Rückleitung (?code=…) nach dem Login. */
+async function msHandleRedirect() {
+  const q = new URLSearchParams(location.search);
+  const code = q.get('code'), err = q.get('error');
+  if (!code && !err) return;
+  history.replaceState({}, '', '/app.html'); // ?code aus der URL entfernen
+  if (err) return toast('❌ Schul-Login: ' + (q.get('error_description') || err), 7000);
+  let pk = null; try { pk = JSON.parse(sessionStorage.getItem('ms_pkce') || 'null'); } catch (e) {}
+  sessionStorage.removeItem('ms_pkce');
+  if (!pk || pk.state !== q.get('state')) return toast('❌ Schul-Login: ungültiger State', 7000);
+  try {
+    const body = new URLSearchParams({
+      client_id: MS.clientId, grant_type: 'authorization_code', code,
+      redirect_uri: MS.redirectUri, code_verifier: pk.verifier, scope: MS.scopes,
+    });
+    const r = await fetch(MS.authority + '/oauth2/v2.0/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error_description || d.error || 'Token-Fehler');
+    localStorage.setItem('ms_conn_' + (pk.who || U.id), JSON.stringify({ access: d.access_token, refresh: d.refresh_token || null, exp: Date.now() + (d.expires_in || 3600) * 1000 }));
+    toast('✅ Schul-Konto verbunden!');
+    await msSyncAssignments();
+  } catch (e) { toast('❌ Schul-Login: ' + e.message, 7000); }
+}
+
+/** Gibt ein gültiges Access-Token zurück (refresht bei Bedarf), sonst null. */
+async function msToken() {
+  if (!U?.id) return null;
+  const raw = localStorage.getItem('ms_conn_' + U.id); if (!raw) return null;
+  let c; try { c = JSON.parse(raw); } catch (e) { return null; }
+  if (c.exp - 60000 > Date.now()) return c.access;
+  if (!c.refresh) { localStorage.removeItem('ms_conn_' + U.id); return null; }
+  try {
+    const body = new URLSearchParams({ client_id: MS.clientId, grant_type: 'refresh_token', refresh_token: c.refresh, scope: MS.scopes });
+    const r = await fetch(MS.authority + '/oauth2/v2.0/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    const d = await r.json(); if (!r.ok) throw new Error('refresh');
+    const conn = { access: d.access_token, refresh: d.refresh_token || c.refresh, exp: Date.now() + (d.expires_in || 3600) * 1000 };
+    localStorage.setItem('ms_conn_' + U.id, JSON.stringify(conn));
+    return conn.access;
+  } catch (e) { localStorage.removeItem('ms_conn_' + U.id); return null; }
+}
+
+/** Trennt das Schul-Konto vom aktuellen Profil. */
+function msDisconnect() {
+  if (U?.id) localStorage.removeItem('ms_conn_' + U.id);
+  toast(t('ms.disconnected'));
+  if (_page) goPage(_page);
+}
+
+/** Holt Schul-Aufgaben (Graph Education API) und importiert sie als Aufgaben. */
+async function msSyncAssignments() {
+  const tok = await msToken();
+  if (!tok) return toast('❌ ' + t('ms.reconnect'), 7000);
+  toast('🏫 ' + t('ms.fetching'));
+  try {
+    const r = await fetch('https://graph.microsoft.com/v1.0/education/me/assignments', { headers: { Authorization: 'Bearer ' + tok } });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error?.message || 'Graph-Fehler');
+    let n = 0;
+    (d.value || []).forEach(a => {
+      const id = 'ms_' + a.id;
+      if ((D.tasks || []).some(tk => tk.id === id)) return; // schon importiert
+      D.tasks = [...(D.tasks || []), {
+        id, title: a.displayName || 'Aufgabe', subject: 'Schule',
+        due: a.dueDateTime ? a.dueDateTime.slice(0, 10) : '',
+        completed: (a.status === 'submitted' || a.status === 'returned'),
+      }];
+      n++;
+    });
+    save();
+    toast(n ? `✅ ${t('ms.imported', n)}` : t('ms.no_new'));
+    goPage('planner');
+  } catch (e) { toast('❌ ' + e.message, 7000); }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // STORAGE (sicher)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1885,6 +1993,7 @@ async function init() {
   goPage('dashboard');
   maybeOnboarding(); // einmaliges Willkommens-Onboarding für neue Nutzer (P2.3)
   maybeNotifyDue();  // lokale Erinnerung an fällige Karten (P1.1, nur wenn erlaubt)
+  if (location.search.includes('code=') || location.search.includes('error=')) msHandleRedirect(); // Schul-Login-Rückleitung
 }
 
 /** Lokale Browser-Benachrichtigung über fällige Karten beim App-Start (kein Server-Push). */
@@ -2980,6 +3089,18 @@ function planner(el) {
   const today = new Date().toISOString().split('T')[0];
   el.innerHTML = `
     <div class="page-header"><h1>${t('plan.title')}</h1><p>${t('plan.subtitle')}</p></div>
+    ${(U.role==='student'||U.isChild) ? `
+    <div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="font-size:14px;font-weight:600;">🏫 ${t('ms.title')} ${msConnected()?`<span style="color:var(--success);">✓ ${t('ms.connected')}</span>`:''}</div>
+        <div style="display:flex;gap:8px;">
+          ${msConnected()
+            ? `<button class="btn btn-primary btn-sm" onclick="msSyncAssignments()">🔄 ${t('ms.sync')}</button><button class="btn btn-secondary btn-sm" onclick="msDisconnect()">${t('ms.disconnect')}</button>`
+            : `<button class="btn btn-primary btn-sm" onclick="msConnect()">🔗 ${t('ms.connect')}</button>`}
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--t3);margin:8px 0 0;">${t('ms.hint')}</p>
+    </div>` : ''}
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><div class="card-title">${t('plan.add')}</div></div>
