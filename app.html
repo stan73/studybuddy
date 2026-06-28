@@ -378,6 +378,7 @@ const I18N = {
     'nav.flashcards':'Karteikarten','nav.tutor':'KI-Tutor','nav.exam':'Prüfungsmodus',
     'nav.organisation':'Organisation','nav.planner':'Lernplan','nav.pomodoro':'Pomodoro',
     'ms.title':'Schul-Konto (Microsoft)','ms.connected':'verbunden','ms.connect':'Schule verbinden','ms.sync':'Aufgaben holen','ms.disconnect':'Trennen','ms.disconnected':'Schul-Konto getrennt','ms.hint':'Verbinde das Schul-Microsoft-Konto, um Aufgaben & Termine automatisch in den Lernplan zu holen.','ms.fetching':'Hole Schul-Aufgaben…','ms.reconnect':'Bitte Schul-Konto neu verbinden','ms.imported':'{0} Schul-Aufgaben importiert!','ms.no_new':'Keine neuen Aufgaben',
+    'ms.paste_title':'Schul-Aufgaben hinzufügen (Text/Foto)','ms.paste_hint':'Aufgaben aus Teams/Schulportal kopieren oder abfotografieren — die KI macht daraus Aufgaben mit Datum. Ohne Schul-Login.','ms.paste_ph':'Aufgaben-Text hier einfügen (z.B. „Mathe S.42 Nr.3 bis Freitag, Bio-Test am 15.07.")','ms.paste_btn':'KI: Aufgaben extrahieren','ms.paste_photo':'Foto/Screenshot','ms.extracting':'KI liest die Aufgaben…','ms.none_found':'Keine Aufgaben erkannt — anderen Text/Foto versuchen',
     'nav.account':'Konto','nav.subscription':'Abo & Preise','nav.settings':'Einstellungen',
     'nav.logout':'Abmelden',
     // Sidebar
@@ -511,6 +512,7 @@ const I18N = {
     'nav.flashcards':'Flashcards','nav.tutor':'AI Tutor','nav.exam':'Exam Mode',
     'nav.organisation':'Organisation','nav.planner':'Planner','nav.pomodoro':'Pomodoro',
     'ms.title':'School account (Microsoft)','ms.connected':'connected','ms.connect':'Connect school','ms.sync':'Get assignments','ms.disconnect':'Disconnect','ms.disconnected':'School account disconnected','ms.hint':'Connect the school Microsoft account to pull assignments & deadlines into the planner automatically.','ms.fetching':'Fetching school assignments…','ms.reconnect':'Please reconnect the school account','ms.imported':'{0} school assignments imported!','ms.no_new':'No new assignments',
+    'ms.paste_title':'Add school assignments (text/photo)','ms.paste_hint':'Copy assignments from Teams/school portal or take a photo — AI turns them into tasks with dates. No school login.','ms.paste_ph':'Paste assignment text here (e.g. "Math p.42 #3 by Friday, Bio test on 15 Jul")','ms.paste_btn':'AI: Extract tasks','ms.paste_photo':'Photo/Screenshot','ms.extracting':'AI is reading the assignments…','ms.none_found':'No tasks recognized — try other text/photo',
     'nav.account':'Account','nav.subscription':'Subscription','nav.settings':'Settings',
     'nav.logout':'Sign out',
     'role.child':'Year {0} · Student Account',
@@ -629,6 +631,7 @@ const I18N = {
     'nav.flashcards':'Fiches','nav.tutor':'Tuteur IA','nav.exam':'Mode Examen',
     'nav.organisation':'Organisation','nav.planner':'Planning','nav.pomodoro':'Pomodoro',
     'ms.title':'Compte scolaire (Microsoft)','ms.connected':'connecté','ms.connect':'Connecter l école','ms.sync':'Récupérer les devoirs','ms.disconnect':'Déconnecter','ms.disconnected':'Compte scolaire déconnecté','ms.hint':'Connecte le compte Microsoft scolaire pour importer automatiquement devoirs et échéances dans le planning.','ms.fetching':'Récupération des devoirs…','ms.reconnect':'Reconnecte le compte scolaire','ms.imported':'{0} devoirs importés !','ms.no_new':'Aucun nouveau devoir',
+    'ms.paste_title':'Ajouter des devoirs (texte/photo)','ms.paste_hint':'Copie les devoirs depuis Teams/le portail ou prends une photo — l IA en fait des tâches avec dates. Sans connexion scolaire.','ms.paste_ph':'Colle le texte des devoirs ici (p. ex. « Maths p.42 n°3 pour vendredi, contrôle de bio le 15/07 »)','ms.paste_btn':'IA : extraire les tâches','ms.paste_photo':'Photo/Capture','ms.extracting':'L IA lit les devoirs…','ms.none_found':'Aucune tâche reconnue — essaie un autre texte/photo',
     'nav.account':'Compte','nav.subscription':'Abonnement','nav.settings':'Paramètres',
     'nav.logout':'Déconnexion',
     'role.child':'Classe {0} · Compte Élève',
@@ -747,6 +750,7 @@ const I18N = {
     'nav.flashcards':'Tarjetas','nav.tutor':'Tutor IA','nav.exam':'Modo Examen',
     'nav.organisation':'Organización','nav.planner':'Planificador','nav.pomodoro':'Pomodoro',
     'ms.title':'Cuenta escolar (Microsoft)','ms.connected':'conectada','ms.connect':'Conectar escuela','ms.sync':'Obtener tareas','ms.disconnect':'Desconectar','ms.disconnected':'Cuenta escolar desconectada','ms.hint':'Conecta la cuenta Microsoft escolar para traer tareas y fechas al planificador automáticamente.','ms.fetching':'Obteniendo tareas escolares…','ms.reconnect':'Vuelve a conectar la cuenta escolar','ms.imported':'¡{0} tareas escolares importadas!','ms.no_new':'Sin tareas nuevas',
+    'ms.paste_title':'Añadir tareas escolares (texto/foto)','ms.paste_hint':'Copia las tareas de Teams/portal escolar o haz una foto — la IA las convierte en tareas con fecha. Sin inicio de sesión escolar.','ms.paste_ph':'Pega aquí el texto de las tareas (p. ej. «Mates pág.42 n.º3 para el viernes, examen de bio el 15/07»)','ms.paste_btn':'IA: extraer tareas','ms.paste_photo':'Foto/Captura','ms.extracting':'La IA lee las tareas…','ms.none_found':'No se reconocieron tareas — prueba con otro texto/foto',
     'nav.account':'Cuenta','nav.subscription':'Suscripción','nav.settings':'Ajustes',
     'nav.logout':'Cerrar sesión',
     'role.child':'Clase {0} · Cuenta Alumno',
@@ -1441,6 +1445,47 @@ async function msSyncAssignments() {
     toast(n ? `✅ ${t('ms.imported', n)}` : t('ms.no_new'));
     goPage('planner');
   } catch (e) { toast('❌ ' + e.message, 7000); }
+}
+
+// ── Admin-freier Schul-Aufgaben-Import: Text/Foto → KI → Aufgaben ───────────
+/** Extrahiert Aufgaben aus eingefügtem Text via KI. */
+async function genTasksFromText() {
+  const text = document.getElementById('task-gen-t')?.value.trim();
+  if (!text) return toast(t('toast.enter_text'));
+  await _aiTasks(text, null);
+  const el = document.getElementById('task-gen-t'); if (el) el.value = '';
+}
+/** Extrahiert Aufgaben aus einem Foto/PDF (Teams-Screenshot, Tafel, Schulportal) via KI. */
+async function genTasksFromImage(input) {
+  const file = input?.files?.[0]; if (!file) return;
+  const isPdf = file.type === 'application/pdf';
+  if (!/^image\//.test(file.type) && !isPdf) { input.value = ''; return toast('❌ Nur Bilder (JPG/PNG) oder PDF'); }
+  if (isPdf && AI.provider !== 'claude') { input.value = ''; return toast('❌ PDF nur mit Claude'); }
+  if (file.size > 6 * 1024 * 1024) { input.value = ''; return toast('❌ Datei zu groß (max. 6 MB)'); }
+  try {
+    const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); });
+    await _aiTasks(null, { mime: isPdf ? 'application/pdf' : file.type, data: String(dataUrl).split(',')[1] || '' });
+  } catch (e) { toast('❌ ' + e.message, 7000); }
+  finally { if (input) input.value = ''; }
+}
+/** Kern: schickt Text oder Bild an die KI und legt erkannte Aufgaben (mit Datum) an. */
+async function _aiTasks(text, image) {
+  if (!hasActiveKey()) return toast(t('toast.need_api_key'));
+  toast('🤖 ' + t('ms.extracting'));
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const sys = `Du extrahierst Schul-Aufgaben/Hausaufgaben/Klausuren. Heute ist ${today}. Antworte NUR mit JSON.`;
+    const prompt = (text ? `Aus diesem Text:\n${text.slice(0, 3000)}\n` : `Aus diesem Foto/dieser Datei: `)
+      + `extrahiere alle Aufgaben mit Fälligkeitsdatum. Datum als YYYY-MM-DD (relative Angaben wie "nächsten Montag", "bis Freitag" in ein echtes Datum umrechnen, Bezug heute ${today}). Klausuren/Tests als Titel mit "📝" markieren. Nur JSON:[{"title":"...","subject":"Fach oder leer","due":"YYYY-MM-DD oder leer"}]`;
+    const r = await ai([{ role: 'user', content: prompt }], sys, 1500, false, image || undefined);
+    const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0] || '[]');
+    if (!parsed.length) throw new Error(t('ms.none_found'));
+    let n = 0;
+    parsed.forEach(a => { if (a && a.title) { D.tasks = [...(D.tasks || []), { id: 'c' + Date.now() + Math.random(), title: String(a.title).slice(0, 200), subject: a.subject || 'Schule', due: a.due || '', completed: false }]; n++; } });
+    save();
+    toast(`✅ ${t('ms.imported', n)}`);
+    goPage('planner');
+  } catch (e) { toast(/key|schlüssel/i.test(e.message) ? '🔑 ' + t('toast.need_key_long') : '❌ ' + e.message, 7000); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3089,6 +3134,17 @@ function planner(el) {
   const today = new Date().toISOString().split('T')[0];
   el.innerHTML = `
     <div class="page-header"><h1>${t('plan.title')}</h1><p>${t('plan.subtitle')}</p></div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><div class="card-title">📋 ${t('ms.paste_title')}</div></div>
+      <p style="font-size:12px;color:var(--t3);margin:0 0 10px;">${t('ms.paste_hint')}</p>
+      <textarea class="input" id="task-gen-t" rows="3" placeholder="${t('ms.paste_ph')}"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="genTasksFromText()">🤖 ${t('ms.paste_btn')}</button>
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">📷 ${t('ms.paste_photo')}
+          <input type="file" accept="image/*,application/pdf" onchange="genTasksFromImage(this)" style="display:none;" aria-label="${t('ms.paste_photo')}">
+        </label>
+      </div>
+    </div>
     ${(U.role==='student'||U.isChild) ? `
     <div class="card" style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
