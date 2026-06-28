@@ -498,6 +498,7 @@ const I18N = {
     // Export (Feature #14)
     'export.flashcards_btn':'⬇ Karten exportieren',
     'fc.csv_export':'Karten als CSV exportieren','fc.csv_import':'Karten aus CSV importieren (Frage,Antwort)',
+    'fc.topic':'Thema','fc.all_topics':'Alle Themen','fc.general':'Allgemein','fc.topic_optional':'(optional)','fc.topic_ph':'z.B. Bruchrechnung','fc.manage':'Karten verwalten','fc.manage_hint':'Karten umsortieren: Thema je Karte ändern oder löschen.','fc.no_cards':'Noch keine Karten in diesem Fach.','fc.delete_confirm':'Diese Karte wirklich löschen?','fc.delete_card':'Karte löschen','common.close':'Schließen',
     'export.exams_btn':'⬇ Prüfungen exportieren',
     'export.empty':'Nichts zu exportieren.',
     'export.success_cards':'✅ Karteikarten exportiert.',
@@ -613,6 +614,7 @@ const I18N = {
     // Export (Feature #14)
     'export.flashcards_btn':'⬇ Export cards',
     'fc.csv_export':'Export cards as CSV','fc.csv_import':'Import cards from CSV (Question,Answer)',
+    'fc.topic':'Topic','fc.all_topics':'All topics','fc.general':'General','fc.topic_optional':'(optional)','fc.topic_ph':'e.g. Fractions','fc.manage':'Manage cards','fc.manage_hint':'Reorganize: change each card topic or delete it.','fc.no_cards':'No cards in this subject yet.','fc.delete_confirm':'Really delete this card?','fc.delete_card':'Delete card','common.close':'Close',
     'export.exams_btn':'⬇ Export exams',
     'export.empty':'Nothing to export.',
     'export.success_cards':'✅ Flashcards exported.',
@@ -728,6 +730,7 @@ const I18N = {
     // Export (Feature #14)
     'export.flashcards_btn':'⬇ Exporter les fiches',
     'fc.csv_export':'Exporter les fiches en CSV','fc.csv_import':'Importer des fiches CSV (Question,Réponse)',
+    'fc.topic':'Thème','fc.all_topics':'Tous les thèmes','fc.general':'Général','fc.topic_optional':'(optionnel)','fc.topic_ph':'p. ex. Fractions','fc.manage':'Gérer les fiches','fc.manage_hint':'Réorganiser : changer le thème de chaque fiche ou la supprimer.','fc.no_cards':'Aucune fiche dans cette matière.','fc.delete_confirm':'Supprimer cette fiche ?','fc.delete_card':'Supprimer la fiche','common.close':'Fermer',
     'export.exams_btn':'⬇ Exporter les examens',
     'export.empty':'Rien à exporter.',
     'export.success_cards':'✅ Fiches exportées.',
@@ -843,6 +846,7 @@ const I18N = {
     // Export (Feature #14)
     'export.flashcards_btn':'⬇ Exportar tarjetas',
     'fc.csv_export':'Exportar tarjetas como CSV','fc.csv_import':'Importar tarjetas desde CSV (Pregunta,Respuesta)',
+    'fc.topic':'Tema','fc.all_topics':'Todos los temas','fc.general':'General','fc.topic_optional':'(opcional)','fc.topic_ph':'p. ej. Fracciones','fc.manage':'Gestionar tarjetas','fc.manage_hint':'Reorganizar: cambia el tema de cada tarjeta o elimínala.','fc.no_cards':'Aún no hay tarjetas en esta asignatura.','fc.delete_confirm':'¿Eliminar esta tarjeta?','fc.delete_card':'Eliminar tarjeta','common.close':'Cerrar',
     'export.exams_btn':'⬇ Exportar exámenes',
     'export.empty':'Nada que exportar.',
     'export.success_cards':'✅ Tarjetas exportadas.',
@@ -1501,6 +1505,7 @@ function _cardsToRows() {
         level: c.level || 0,
         due_at: new Date(c.due || Date.now()).toISOString(),
         ease: c.ease || 2.5, reps: c.reps || 0, interval_days: c.interval || 0,
+        topic: c.topic || null,
       });
     }
   }
@@ -1538,6 +1543,7 @@ function _applyCloudData(d) {
       ease: c.ease != null ? Number(c.ease) : 2.5,
       reps: c.reps || 0,
       interval: c.interval_days || 0,
+      topic: c.topic || null,
     });
   });
   D.cards = cards;
@@ -2233,7 +2239,29 @@ function subjects(el) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: KARTEIKARTEN
 // ═══════════════════════════════════════════════════════════════════════════
-let FC = { subj:null, idx:0, flipped:false };
+let FC = { subj:null, idx:0, flipped:false, topic:'Alle' };
+
+/** Distinkte Themen eines Fachs (sortiert). */
+function _topics(subj) {
+  const set = new Set();
+  (D.cards[subj] || []).forEach(c => { if (c.topic) set.add(c.topic); });
+  return [...set].sort((a, b) => a.localeCompare(b, 'de'));
+}
+/** Hat das Fach Karten ohne Thema (Allgemein)? */
+function _hasUncategorized(subj) {
+  return (D.cards[subj] || []).some(c => !c.topic);
+}
+/** Passt die Karte zum aktuell gewählten Thema-Filter? ('Alle' | '' = Allgemein | Thema) */
+function _cardInTopic(c) {
+  if (FC.topic === 'Alle') return true;
+  if (FC.topic === '') return !c.topic;
+  return c.topic === FC.topic;
+}
+/** Liest das Thema-Feld im Erstellen-Bereich (max. 80 Zeichen) oder null. */
+function _newTopic() {
+  const v = document.getElementById('new-topic')?.value.trim();
+  return v ? v.slice(0, 80) : null;
+}
 
 function flashcards(el, params={}) {
   const subs = getChildSubjects();
@@ -2243,7 +2271,11 @@ function flashcards(el, params={}) {
 
 function renderFC(el) {
   const cards = D.cards[FC.subj]||[];
-  const due = cards.filter(c=>(c.due||0)<=Date.now());
+  const topics = _topics(FC.subj);
+  // Themen-Filter validieren (z.B. nach Fachwechsel / wenn Thema gelöscht)
+  if (FC.topic !== 'Alle' && FC.topic !== '' && !topics.includes(FC.topic)) FC.topic = 'Alle';
+  if (FC.topic === '' && !_hasUncategorized(FC.subj)) FC.topic = 'Alle';
+  const due = cards.filter(c=>(c.due||0)<=Date.now() && _cardInTopic(c));
   const card = due[FC.idx % Math.max(due.length,1)];
 
   el.innerHTML = `
@@ -2253,9 +2285,16 @@ function renderFC(el) {
         <p>${t('fc.due_total', due.length, cards.length)}</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <select class="input" style="width:auto;" onchange="FC.subj=this.value;FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
+        <select class="input" style="width:auto;" aria-label="${t('fc.title')}" onchange="FC.subj=this.value;FC.topic='Alle';FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
           ${getChildSubjects().map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
         </select>
+        ${(topics.length || _hasUncategorized(FC.subj)) ? `
+        <select class="input" style="width:auto;" aria-label="${t('fc.topic')}" onchange="FC.topic=this.value;FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
+          <option value="Alle" ${FC.topic==='Alle'?'selected':''}>📂 ${t('fc.all_topics')}</option>
+          ${topics.map(tp=>`<option value="${safe(tp)}" ${FC.topic===tp?'selected':''}>${safe(tp)}</option>`).join('')}
+          ${_hasUncategorized(FC.subj)?`<option value="" ${FC.topic===''?'selected':''}>${t('fc.general')}</option>`:''}
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="manageCards()" title="${t('fc.manage')}">📂 ${t('fc.manage')}</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="exportFlashcards('${FC.subj}')" title="Als Excel exportieren">${t('export.flashcards_btn')}</button>
         <button class="btn btn-secondary btn-sm" onclick="exportCardsCSV('${FC.subj}')" title="${t('fc.csv_export')}">⬇ CSV</button>
         <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;" title="${t('fc.csv_import')}">⬆ CSV
@@ -2269,6 +2308,7 @@ function renderFC(el) {
       <div onclick="FC.flipped=!FC.flipped;renderFC(document.getElementById('content'))"
            style="background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-xl);padding:48px 32px;text-align:center;cursor:pointer;min-height:200px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;box-shadow:var(--shadow-md);transition:transform .1s;" onmouseover="this.style.transform='scale(1.01)'" onmouseout="this.style.transform='scale(1)'">
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);">${FC.flipped?t('fc.answer'):t('fc.question')} ${FC.idx+1}/${due.length}</div>
+        ${card.topic?`<div style="font-size:11px;color:var(--pri);font-weight:600;">📂 ${safe(card.topic)}</div>`:''}
         <div style="font-size:18px;font-weight:600;line-height:1.5;">${safe(FC.flipped?card.back:card.front)}</div>
         <div style="font-size:12px;color:var(--t3);">${FC.flipped?t('fc.flip_back'):t('fc.flip_reveal')}</div>
       </div>
@@ -2289,6 +2329,11 @@ function renderFC(el) {
     <div class="card" style="margin-top:24px;">
       <div class="card-header"><div class="card-title">${t('fc.new_card')}</div></div>
       <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="field">
+          <label>📂 ${t('fc.topic')} <span style="color:var(--t3);font-weight:400;font-size:11px;">${t('fc.topic_optional')}</span></label>
+          <input class="input" id="new-topic" list="topic-list" placeholder="${t('fc.topic_ph')}" value="${(FC.topic!=='Alle'&&FC.topic!=='')?safe(FC.topic):''}">
+          <datalist id="topic-list">${topics.map(tp=>`<option value="${safe(tp)}"></option>`).join('')}</datalist>
+        </div>
         <div class="grid-2">
           <div class="field"><label>${t('fc.front')}</label><input class="input" id="nf" placeholder="${t('fc.front_ph')}"></div>
           <div class="field"><label>${t('fc.back')}</label><input class="input" id="nb" placeholder="${t('fc.back_ph')}"></div>
@@ -2355,11 +2400,75 @@ function manualAddCard() {
   const front = document.getElementById('nf')?.value.trim();
   const back = document.getElementById('nb')?.value.trim();
   if (!front || !back) return toast(t('toast.fill_card'));
+  const topic = _newTopic();
   if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
-  D.cards[FC.subj].push({id:'c'+Date.now(),front,back,level:0,due:0});
+  D.cards[FC.subj].push({id:'c'+Date.now(),front,back,level:0,due:0,topic});
+  if (topic) FC.topic = topic; // direkt ins neue Thema wechseln
   save(); toast(t('toast.card_added'));
   document.getElementById('nf').value=''; document.getElementById('nb').value='';
   renderFC(document.getElementById('content'));
+}
+
+/**
+ * Verwalten-Modal: alle Karten des aktuellen Fachs nach Thema gruppiert.
+ * Thema je Karte änderbar (umsortieren) + löschen. Für Kinder/Eltern/Lehrer.
+ */
+function manageCards() {
+  const subj = FC.subj;
+  const cards = D.cards[subj] || [];
+  if (!cards.length) return toast(t('fc.no_cards'));
+  const topics = _topics(subj);
+  const groups = {};
+  cards.forEach(c => { const k = c.topic || ''; (groups[k] = groups[k] || []).push(c); });
+  const order = [...topics, ...(groups[''] ? [''] : [])];
+  document.getElementById('manage-modal')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'manage-modal';
+  ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:var(--z-overlay,400);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.innerHTML = `<div class="card" style="max-width:560px;width:100%;max-height:85vh;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h2 style="margin:0;font-size:18px;">📂 ${t('fc.manage')} — ${safe(subj)}</h2>
+      <button onclick="this.closest('[role=dialog]').remove()" aria-label="${t('common.close')}" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--t3);margin:0 0 8px;">${t('fc.manage_hint')}</p>
+    <div style="overflow-y:auto;flex:1;">
+      ${order.map(tp => `
+        <div style="font-weight:700;font-size:13px;color:var(--pri);margin:12px 0 4px;">${tp ? ('📂 ' + safe(tp)) : ('📋 ' + t('fc.general'))} <span style="color:var(--t3);font-weight:400;">(${groups[tp].length})</span></div>
+        ${groups[tp].map(c => `
+          <div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+            <div style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${safe(c.front)}">${safe(c.front)}</div>
+            <input class="input" style="width:130px;padding:4px 6px;font-size:12px;" list="topic-list-m" value="${safe(c.topic || '')}" placeholder="${t('fc.general')}" onchange="moveCardTopic('${c.id}', this.value)" aria-label="${t('fc.topic')}">
+            <button onclick="deleteCardById('${c.id}')" aria-label="${t('fc.delete_card')}" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:14px;">🗑</button>
+          </div>`).join('')}
+      `).join('')}
+      <datalist id="topic-list-m">${topics.map(tp => `<option value="${safe(tp)}"></option>`).join('')}</datalist>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+/** Verschiebt eine Karte in ein (anderes) Thema. */
+function moveCardTopic(id, topic) {
+  const tp = topic.trim() ? topic.trim().slice(0, 80) : null;
+  for (const subj in D.cards) {
+    const c = (D.cards[subj] || []).find(x => x.id === id);
+    if (c) { c.topic = tp; save(); break; }
+  }
+  manageCards(); // neu aufbauen (Karte erscheint in neuer Gruppe)
+}
+
+/** Löscht eine Karte (mit Bestätigung) und aktualisiert das Verwalten-Modal. */
+function deleteCardById(id) {
+  if (!confirm(t('fc.delete_confirm'))) return;
+  for (const subj in D.cards) {
+    const arr = D.cards[subj] || [];
+    const next = arr.filter(x => x.id !== id);
+    if (next.length !== arr.length) { D.cards[subj] = next; save(); break; }
+  }
+  manageCards();
+  if (_page === 'flashcards') renderFC(document.getElementById('content'));
 }
 
 /**
@@ -2373,14 +2482,17 @@ async function genCards() {
   if (!text) return toast(t('toast.enter_text'));
   if (!hasActiveKey()) return toast(t('toast.need_api_key'));
   const num = parseInt(document.getElementById('gen-n')?.value||5);
+  const userTopic = _newTopic();
   toast('🤖 KI erstellt Karten…');
   try {
     const sys = `Karteikarten-Ersteller für Klasse ${U.grade}. Antworte NUR mit JSON.`;
-    const r = await ai([{role:'user',content:`${num} Karteikarten zu ${FC.subj} aus:\n${text.slice(0,2000)}\nNur JSON:[{"front":"Frage?","back":"Antwort"}]`}], sys, 1200);
+    const topicHint = userTopic ? '' : ' Ordne jede Karte einem kurzen Lernthema zu (Feld "topic").';
+    const r = await ai([{role:'user',content:`${num} Karteikarten zu ${FC.subj} aus:\n${text.slice(0,2000)}.${topicHint}\nNur JSON:[{"front":"Frage?","back":"Antwort","topic":"Thema"}]`}], sys, 1200);
     const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
     if (!parsed.length) throw new Error('Kein gültiges JSON');
     if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
-    parsed.forEach(c=>{ if(c.front&&c.back) D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0}); });
+    parsed.forEach(c=>{ if(c.front&&c.back) D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0,topic:userTopic||(c.topic?String(c.topic).slice(0,80):null)}); });
+    if (userTopic) FC.topic = userTopic;
     save(); toast(`🎉 ${parsed.length} Karten erstellt!`);
     document.getElementById('gen-t').value='';
     renderFC(document.getElementById('content'));
@@ -2401,18 +2513,21 @@ async function genCardsFromImage(input) {
   if (isPdf && AI.provider !== 'claude') { input.value=''; return toast('❌ PDF nur mit Claude — sonst bitte ein Foto verwenden'); }
   if (file.size > 6*1024*1024) { input.value=''; return toast('❌ Datei zu groß (max. 6 MB)'); }
 
+  const userTopic = _newTopic();
   toast('🤖 KI liest die Datei…');
   try {
     const dataUrl = await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); });
     const b64 = String(dataUrl).split(',')[1] || '';
     const sys = `Karteikarten-Ersteller für Klasse ${U.grade}. Antworte NUR mit kompaktem JSON, kein Text drumherum.`;
     // Foto = alle erkennbaren Aufgaben erfassen (KEINE feste Anzahl — die 3/5/8-Auswahl ist nur fürs Üben)
-    const prompt = `Erstelle aus dieser Seite Karteikarten für das Fach ${FC.subj}: für JEDE erkennbare Aufgabe, jeden Begriff bzw. jedes Frage-Antwort-/Vokabel-Paar genau EINE Karte. Erfasse ALLE, lass nichts aus, fasse nichts zusammen. Vorderseite = Aufgabe/Frage, Rückseite = Lösung/Antwort. Antworte NUR mit einem JSON-Array: [{"front":"...","back":"..."}]`;
+    const topicHint = userTopic ? '' : ' Ordne jede Karte einem kurzen Lernthema/Kapitel zu (Feld "topic").';
+    const prompt = `Erstelle aus dieser Seite Karteikarten für das Fach ${FC.subj}: für JEDE erkennbare Aufgabe, jeden Begriff bzw. jedes Frage-Antwort-/Vokabel-Paar genau EINE Karte. Erfasse ALLE, lass nichts aus, fasse nichts zusammen.${topicHint} Vorderseite = Aufgabe/Frage, Rückseite = Lösung/Antwort. Antworte NUR mit einem JSON-Array: [{"front":"...","back":"...","topic":"Thema"}]`;
     const r = await ai([{role:'user',content:prompt}], sys, 4000, false, { mime: isPdf?'application/pdf':file.type, data: b64 });
     const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
     if (!parsed.length) throw new Error('Keine Karten erkannt — anderes Foto versuchen');
     if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
-    let n=0; parsed.forEach(c=>{ if(c.front&&c.back){ D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0}); n++; } });
+    let n=0; parsed.forEach(c=>{ if(c.front&&c.back){ D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0,topic:userTopic||(c.topic?String(c.topic).slice(0,80):null)}); n++; } });
+    if (userTopic) FC.topic = userTopic;
     save(); toast(`🎉 ${n} Karten aus Datei erstellt!`);
     renderFC(document.getElementById('content'));
   } catch(e) { toast(/key|schlüssel/i.test(e.message) ? '🔑 '+t('toast.need_key_long') : '❌ '+e.message, 7000); }
