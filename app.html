@@ -398,6 +398,7 @@ const I18N = {
     'fc.question':'Frage','fc.answer':'Antwort',
     'fc.flip_reveal':'Aufdecken','fc.flip_back':'zurückdrehen',
     'fc.tap_hint':'Klicke auf die Karte um die Antwort zu sehen',
+    'test.mode_learn':'Lernen','test.mode_test':'Test','test.question':'Frage','test.correct':'Richtig!','test.wrong':'Leider falsch','test.next':'Weiter','test.need_more':'Für den Test-Modus brauchst du mindestens 4 Karten in diesem Fach.',
     'fc.wrong':'Falsch','fc.hard':'Schwer','fc.ok':'Ok','fc.easy':'Leicht',
     'fc.done_title':'Alle Karten für heute gelernt!',
     'fc.done_sub':'Super Arbeit! Neue Karten werden morgen fällig.',
@@ -528,6 +529,7 @@ const I18N = {
     'fc.question':'Question','fc.answer':'Answer',
     'fc.flip_reveal':'reveal','fc.flip_back':'flip back',
     'fc.tap_hint':'Click the card to see the answer',
+    'test.mode_learn':'Learn','test.mode_test':'Test','test.question':'Question','test.correct':'Correct!','test.wrong':'Wrong','test.next':'Next','test.need_more':'Test mode needs at least 4 cards in this subject.',
     'fc.wrong':'Wrong','fc.hard':'Hard','fc.ok':'Ok','fc.easy':'Easy',
     'fc.done_title':'All cards studied for today!',
     'fc.done_sub':'Great work! New cards will be due tomorrow.',
@@ -647,6 +649,7 @@ const I18N = {
     'fc.question':'Question','fc.answer':'Réponse',
     'fc.flip_reveal':'révéler','fc.flip_back':'retourner',
     'fc.tap_hint':'Cliquez sur la fiche pour voir la réponse',
+    'test.mode_learn':'Apprendre','test.mode_test':'Test','test.question':'Question','test.correct':'Correct !','test.wrong':'Faux','test.next':'Suivant','test.need_more':'Le mode test nécessite au moins 4 fiches dans cette matière.',
     'fc.wrong':'Faux','fc.hard':'Difficile','fc.ok':'Ok','fc.easy':'Facile',
     'fc.done_title':'Toutes les fiches du jour apprises !',
     'fc.done_sub':'Bon travail ! De nouvelles fiches seront disponibles demain.',
@@ -766,6 +769,7 @@ const I18N = {
     'fc.question':'Pregunta','fc.answer':'Respuesta',
     'fc.flip_reveal':'revelar','fc.flip_back':'voltear',
     'fc.tap_hint':'Haz clic en la tarjeta para ver la respuesta',
+    'test.mode_learn':'Aprender','test.mode_test':'Test','test.question':'Pregunta','test.correct':'¡Correcto!','test.wrong':'Incorrecto','test.next':'Siguiente','test.need_more':'El modo test necesita al menos 4 tarjetas en esta asignatura.',
     'fc.wrong':'Incorrecto','fc.hard':'Difícil','fc.ok':'Ok','fc.easy':'Fácil',
     'fc.done_title':'¡Todas las tarjetas de hoy estudiadas!',
     'fc.done_sub':'¡Buen trabajo! Nuevas tarjetas estarán disponibles mañana.',
@@ -2422,7 +2426,46 @@ function subjects(el) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: KARTEIKARTEN
 // ═══════════════════════════════════════════════════════════════════════════
-let FC = { subj:null, idx:0, flipped:false, topic:'Alle', exam:null };
+let FC = { subj:null, idx:0, flipped:false, topic:'Alle', exam:null, mode:'learn', answered:null, mcOpts:null, mcCorrectIdx:-1, mcCard:null, mcForKey:'' };
+
+function _shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+/** 4 Multiple-Choice-Optionen: richtige Rückseite + 3 plausible Ablenker (bevorzugt gleiches Thema). */
+function _mcOptions(card, subj){
+  const correct = card.back;
+  const all = (D.cards[subj]||[]).filter(c=>c.id!==card.id && c.back && c.back!==correct);
+  let cand = [...new Set(all.filter(c=>card.topic && c.topic===card.topic).map(c=>c.back))];
+  if (cand.length < 3) cand = [...new Set([...cand, ...all.map(c=>c.back)])];
+  _shuffle(cand);
+  return _shuffle([correct, ...cand.slice(0,3)]);
+}
+/** Wechselt zwischen Lern- (Aufdecken) und Test- (Multiple-Choice) Modus. */
+function setFCMode(m){ FC.mode = (m==='test'?'test':'learn'); FC.answered=null; FC.mcOpts=null; FC.mcForKey=''; FC.flipped=false; FC.idx=0; renderFC(document.getElementById('content')); }
+/** Beantwortet die MC-Frage (Index der gewählten Option). */
+function mcPick(i){ if(FC.answered!=null) return; FC.answered=i; renderFC(document.getElementById('content')); }
+/** Nächste Frage: bewertet die Karte (richtig→Ok, falsch→Nochmal) → speist Spaced-Repetition. */
+function mcNext(){ const correct = FC.answered===FC.mcCorrectIdx; const id=FC.mcCard; FC.answered=null; FC.mcOpts=null; FC.mcForKey=''; if(id) rateCard(id, FC.subj, correct?2:0); }
+/** HTML für eine MC-Testfrage (Frage + 4 Optionen + Feedback). */
+function _mcBlockHTML(card, due, mc){
+  if (mc && mc.tooFew) return `<div style="max-width:560px;margin:0 auto;"><div class="card" style="text-align:center;padding:32px;color:var(--t3);">${t('test.need_more')}</div></div>`;
+  return `<div style="max-width:560px;margin:0 auto;">
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);text-align:center;margin-bottom:8px;">${t('test.question')} ${FC.idx+1}/${due.length}${card.topic?` · 📂 ${safe(card.topic)}`:''}</div>
+    <div class="card" style="padding:28px;text-align:center;font-size:18px;font-weight:600;line-height:1.5;margin-bottom:16px;">${safe(card.front)}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${mc.opts.map((o,i)=>{
+        let bg='var(--bg-card)', bd='var(--border)';
+        if (mc.answered!=null){
+          if (i===mc.correctIdx){ bg='rgba(16,185,129,.15)'; bd='var(--success)'; }
+          else if (i===mc.answered){ bg='rgba(239,68,68,.15)'; bd='var(--danger)'; }
+        }
+        return `<button onclick="mcPick(${i})" ${mc.answered!=null?'disabled':''} style="text-align:left;padding:14px 16px;background:${bg};border:2px solid ${bd};border-radius:var(--r-md);font-size:14px;line-height:1.4;cursor:${mc.answered!=null?'default':'pointer'};color:var(--t1);">${String.fromCharCode(65+i)}) ${safe(o)}</button>`;
+      }).join('')}
+    </div>
+    ${mc.answered!=null ? `<div style="text-align:center;margin-top:16px;">
+      <div style="font-weight:700;margin-bottom:10px;color:${mc.answered===mc.correctIdx?'var(--success)':'var(--danger)'};">${mc.answered===mc.correctIdx?('✅ '+t('test.correct')):('❌ '+t('test.wrong'))}</div>
+      <button class="btn btn-primary" onclick="mcNext()">${t('test.next')} →</button>
+    </div>` : ''}
+  </div>`;
+}
 
 /** Startet den Prüfungs-Lernmodus für eine Prüfung (Key = "name|date"; übt alle Karten, wenigst Beherrschtes zuerst). */
 function prepExam(key) {
@@ -2535,6 +2578,19 @@ function renderFC(el) {
   if (!FC.exam) due = cards.filter(c => (c.due || 0) <= Date.now() && _cardInTopic(c));
   const card = due[FC.idx % Math.max(due.length, 1)];
   const examSub = examInfo ? `📝 ${safe(examInfo.name)} · ${examInfo.daysLeft > 0 ? t('exam.days_left', examInfo.daysLeft) : (examInfo.daysLeft === 0 ? t('exam.today') : t('exam.past'))} · ${due.length}/${examInfo.total}` : '';
+  // Multiple-Choice-Testmodus: Optionen je Karte einmal bauen (nicht bei Feedback-Render neu mischen)
+  let mc = null;
+  if (FC.mode === 'test' && card) {
+    const backs = [...new Set((D.cards[FC.subj] || []).filter(c => c.back).map(c => c.back))];
+    if (backs.length >= 4) {
+      if (FC.answered == null && FC.mcForKey !== card.id) {
+        FC.mcOpts = _mcOptions(card, FC.subj);
+        FC.mcCorrectIdx = FC.mcOpts.indexOf(card.back);
+        FC.mcCard = card.id; FC.mcForKey = card.id;
+      }
+      mc = { opts: FC.mcOpts, correctIdx: FC.mcCorrectIdx, answered: FC.answered };
+    } else mc = { tooFew: true };
+  }
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
@@ -2542,7 +2598,11 @@ function renderFC(el) {
         <h1>${t('fc.title')}</h1>
         <p>${FC.exam && examInfo ? examSub : t('fc.due_total', due.length, cards.length)}</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div style="display:inline-flex;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+          <button class="btn btn-sm" style="border-radius:0;border:none;${FC.mode==='learn'?'background:var(--pri);color:#fff;':'background:transparent;color:var(--t2);'}" onclick="setFCMode('learn')">🃏 ${t('test.mode_learn')}</button>
+          <button class="btn btn-sm" style="border-radius:0;border:none;${FC.mode==='test'?'background:var(--pri);color:#fff;':'background:transparent;color:var(--t2);'}" onclick="setFCMode('test')">✅ ${t('test.mode_test')}</button>
+        </div>
         ${FC.exam ? `<button class="btn btn-secondary btn-sm" onclick="exitExamPrep()">✕ ${t('exam.exit')}</button>` : `
         <select class="input" style="width:auto;" aria-label="${t('fc.title')}" onchange="FC.subj=this.value;FC.topic='Alle';FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
           ${getChildSubjects().map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
@@ -2562,7 +2622,7 @@ function renderFC(el) {
       </div>
     </div>
 
-    ${due.length ? `
+    ${due.length ? `${FC.mode==='test' ? _mcBlockHTML(card, due, mc) : `
     <div style="max-width:500px;margin:0 auto;">
       <div onclick="FC.flipped=!FC.flipped;renderFC(document.getElementById('content'))"
            style="background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-xl);padding:48px 32px;text-align:center;cursor:pointer;min-height:200px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;box-shadow:var(--shadow-md);transition:transform .1s;" onmouseover="this.style.transform='scale(1.01)'" onmouseout="this.style.transform='scale(1)'">
@@ -2579,7 +2639,7 @@ function renderFC(el) {
             <span style="font-size:20px;">${e}</span><span>${l}</span>
           </button>`).join('')}
       </div>` : `<p style="text-align:center;color:var(--t3);margin-top:16px;font-size:13px;">${t('fc.tap_hint')}</p>`}
-    </div>` : `
+    </div>`}` : `
     <div style="text-align:center;padding:60px 20px;">
       <div style="font-size:48px;margin-bottom:16px;">🎉</div>
       <h2>${t('fc.done_title')}</h2>
@@ -3145,7 +3205,7 @@ function planner(el) {
         </label>
       </div>
     </div>
-    ${(U.role==='student'||U.isChild) ? `
+    ${false /* Microsoft-OAuth ausgeblendet: Schul-Tenants sperren die Consent häufig; der admin-freie Text/Foto-Import oben genügt. Bei Bedarf reaktivieren. */ ? `
     <div class="card" style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="font-size:14px;font-weight:600;">🏫 ${t('ms.title')} ${msConnected()?`<span style="color:var(--success);">✓ ${t('ms.connected')}</span>`:''}</div>
