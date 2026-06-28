@@ -407,7 +407,7 @@ const I18N = {
     'fc.ai_ph':'Lernstoff hier einfügen...','fc.ai_n':'{0} Karten',
     'fc.ai_btn':'🤖 KI-Karten erstellen',
     'fc.photo_btn':'Foto/PDF → Karten',
-    'fc.photo_hint':'Arbeitsblatt oder Buchseite fotografieren',
+    'fc.photo_hint':'Arbeitsblatt/Buchseite — alle erkennbaren Aufgaben werden zu Karten',
     'goal.today':'Heute','goal.cards':'Karten','goal.freezes':'Streak-Freezes verfügbar','goal.set':'Ziel/Tag',
     'notify.due_cards':'{0} Karten sind heute fällig 📚','notify.enabled':'Erinnerungen aktiviert','notify.denied':'Erinnerungen nicht erlaubt','notify.unsupported':'Browser unterstützt keine Erinnerungen','notify.enable_btn':'Erinnerungen aktivieren',
     'onb.welcome':'Willkommen, {0}! 👋','onb.start':"Los geht's! 🚀",
@@ -533,7 +533,7 @@ const I18N = {
     'fc.ai_ph':'Paste learning content here...','fc.ai_n':'{0} cards',
     'fc.ai_btn':'🤖 Generate AI Cards',
     'fc.photo_btn':'Photo/PDF → Cards',
-    'fc.photo_hint':'Snap a worksheet or book page',
+    'fc.photo_hint':'Worksheet/book page — every exercise becomes a card',
     'goal.today':'Today','goal.cards':'cards','goal.freezes':'Streak freezes available','goal.set':'Goal/day',
     'notify.due_cards':'{0} cards are due today 📚','notify.enabled':'Reminders enabled','notify.denied':'Reminders not allowed','notify.unsupported':'Browser does not support reminders','notify.enable_btn':'Enable reminders',
     'onb.welcome':'Welcome, {0}! 👋','onb.start':"Let's go! 🚀",
@@ -648,7 +648,7 @@ const I18N = {
     'fc.ai_ph':'Collez le contenu ici...','fc.ai_n':'{0} fiches',
     'fc.ai_btn':'🤖 Créer des fiches IA',
     'fc.photo_btn':'Photo/PDF → Fiches',
-    'fc.photo_hint':'Photographiez une feuille ou une page',
+    'fc.photo_hint':'Feuille/page — chaque exercice devient une fiche',
     'goal.today':"Aujourd'hui",'goal.cards':'fiches','goal.freezes':'Gels de série disponibles','goal.set':'Objectif/jour',
     'notify.due_cards':'{0} fiches à réviser aujourd hui 📚','notify.enabled':'Rappels activés','notify.denied':'Rappels non autorisés','notify.unsupported':'Le navigateur ne supporte pas les rappels','notify.enable_btn':'Activer les rappels',
     'onb.welcome':'Bienvenue, {0} ! 👋','onb.start':"C'est parti ! 🚀",
@@ -763,7 +763,7 @@ const I18N = {
     'fc.ai_ph':'Pega el contenido aquí...','fc.ai_n':'{0} tarjetas',
     'fc.ai_btn':'🤖 Crear tarjetas IA',
     'fc.photo_btn':'Foto/PDF → Tarjetas',
-    'fc.photo_hint':'Fotografía una hoja o página',
+    'fc.photo_hint':'Hoja/página — cada ejercicio se convierte en tarjeta',
     'goal.today':'Hoy','goal.cards':'tarjetas','goal.freezes':'Congelaciones de racha disponibles','goal.set':'Meta/día',
     'notify.due_cards':'{0} tarjetas pendientes hoy 📚','notify.enabled':'Recordatorios activados','notify.denied':'Recordatorios no permitidos','notify.unsupported':'El navegador no admite recordatorios','notify.enable_btn':'Activar recordatorios',
     'onb.welcome':'¡Bienvenido, {0}! 👋','onb.start':'¡Vamos! 🚀',
@@ -2401,14 +2401,14 @@ async function genCardsFromImage(input) {
   if (isPdf && AI.provider !== 'claude') { input.value=''; return toast('❌ PDF nur mit Claude — sonst bitte ein Foto verwenden'); }
   if (file.size > 6*1024*1024) { input.value=''; return toast('❌ Datei zu groß (max. 6 MB)'); }
 
-  const num = parseInt(document.getElementById('gen-n')?.value||5);
   toast('🤖 KI liest die Datei…');
   try {
     const dataUrl = await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); });
     const b64 = String(dataUrl).split(',')[1] || '';
-    const sys = `Karteikarten-Ersteller für Klasse ${U.grade}. Antworte NUR mit JSON.`;
-    const prompt = `Erstelle ${num} Karteikarten zum Fach ${FC.subj} aus dem Inhalt dieser Datei. Nur JSON:[{"front":"Frage?","back":"Antwort"}]`;
-    const r = await ai([{role:'user',content:prompt}], sys, 1500, false, { mime: isPdf?'application/pdf':file.type, data: b64 });
+    const sys = `Karteikarten-Ersteller für Klasse ${U.grade}. Antworte NUR mit kompaktem JSON, kein Text drumherum.`;
+    // Foto = alle erkennbaren Aufgaben erfassen (KEINE feste Anzahl — die 3/5/8-Auswahl ist nur fürs Üben)
+    const prompt = `Erstelle aus dieser Seite Karteikarten für das Fach ${FC.subj}: für JEDE erkennbare Aufgabe, jeden Begriff bzw. jedes Frage-Antwort-/Vokabel-Paar genau EINE Karte. Erfasse ALLE, lass nichts aus, fasse nichts zusammen. Vorderseite = Aufgabe/Frage, Rückseite = Lösung/Antwort. Antworte NUR mit einem JSON-Array: [{"front":"...","back":"..."}]`;
+    const r = await ai([{role:'user',content:prompt}], sys, 4000, false, { mime: isPdf?'application/pdf':file.type, data: b64 });
     const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
     if (!parsed.length) throw new Error('Keine Karten erkannt — anderes Foto versuchen');
     if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
