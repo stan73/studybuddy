@@ -474,6 +474,7 @@ const I18N = {
     'toast.task_added':'✅ Aufgabe hinzugefügt!','toast.enter_title':'Titel eingeben!',
     'toast.fill_card':'Vorder- und Rückseite ausfüllen!','toast.card_added':'Karte hinzugefügt! ✓',
     'toast.enter_text':'Text eingeben!','toast.need_api_key':'API Key in Einstellungen eintragen!',
+    'toast.need_key_long':'KI-Key fehlt. Das Elternteil trägt ihn ein unter Einstellungen → KI-Anbieter (z.B. Claude). Das Kind erbt ihn automatisch.',
     // Common
     'common.error_loading':'Fehler beim Laden','common.back_dashboard':'Zum Dashboard',
     'common.all_subjects_present':'Alle Standard-Fächer bereits vorhanden',
@@ -592,6 +593,7 @@ const I18N = {
     'toast.task_added':'✅ Task added!','toast.enter_title':'Enter a title!',
     'toast.fill_card':'Fill in front and back!','toast.card_added':'Card added! ✓',
     'toast.enter_text':'Enter some text!','toast.need_api_key':'Add API Key in Settings!',
+    'toast.need_key_long':'AI key missing. A parent adds it under Settings → AI Provider (e.g. Claude). The child inherits it automatically.',
     'common.error_loading':'Error loading','common.back_dashboard':'Go to Dashboard',
     'common.all_subjects_present':'All standard subjects already present',
     'toast.profile_saved':'✅ Profile saved!',
@@ -706,6 +708,7 @@ const I18N = {
     'toast.task_added':'✅ Tâche ajoutée !','toast.enter_title':'Entrez un titre !',
     'toast.fill_card':'Remplissez recto et verso !','toast.card_added':'Fiche ajoutée ! ✓',
     'toast.enter_text':'Entrez un texte !','toast.need_api_key':'Ajoutez une clé API dans les Paramètres !',
+    'toast.need_key_long':'Clé IA manquante. Un parent la saisit dans Paramètres → Fournisseur IA (ex. Claude). L enfant en hérite automatiquement.',
     'common.error_loading':'Erreur de chargement','common.back_dashboard':'Aller au tableau de bord',
     'common.all_subjects_present':'Toutes les matières standard déjà présentes',
     'toast.profile_saved':'✅ Profil sauvegardé !',
@@ -815,6 +818,7 @@ const I18N = {
     'toast.task_added':'✅ ¡Tarea añadida!','toast.enter_title':'¡Introduce un título!',
     'toast.fill_card':'¡Rellena anverso y reverso!','toast.card_added':'¡Tarjeta añadida! ✓',
     'toast.enter_text':'¡Introduce un texto!','toast.need_api_key':'¡Añade una clave API en Ajustes!',
+    'toast.need_key_long':'Falta la clave de IA. Un padre la añade en Ajustes → Proveedor de IA (p. ej. Claude). El hijo la hereda automáticamente.',
     'common.error_loading':'Error al cargar','common.back_dashboard':'Ir al panel',
     'common.all_subjects_present':'Todas las asignaturas estándar ya presentes',
     'toast.profile_saved':'✅ ¡Perfil guardado!',
@@ -2380,7 +2384,7 @@ async function genCards() {
     save(); toast(`🎉 ${parsed.length} Karten erstellt!`);
     document.getElementById('gen-t').value='';
     renderFC(document.getElementById('content'));
-  } catch(e) { toast('❌ '+e.message); }
+  } catch(e) { toast(/key|schlüssel/i.test(e.message) ? '🔑 '+t('toast.need_key_long') : '❌ '+e.message, 7000); }
 }
 
 /**
@@ -2411,7 +2415,7 @@ async function genCardsFromImage(input) {
     let n=0; parsed.forEach(c=>{ if(c.front&&c.back){ D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0}); n++; } });
     save(); toast(`🎉 ${n} Karten aus Datei erstellt!`);
     renderFC(document.getElementById('content'));
-  } catch(e) { toast('❌ '+e.message); }
+  } catch(e) { toast(/key|schlüssel/i.test(e.message) ? '🔑 '+t('toast.need_key_long') : '❌ '+e.message, 7000); }
   finally { if (input) input.value=''; }
 }
 
