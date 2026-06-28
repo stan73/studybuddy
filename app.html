@@ -426,6 +426,7 @@ const I18N = {
     'exam.q5':'5 Fragen','exam.q8':'8 Fragen','exam.q10':'10 Fragen',
     'exam.start':'🚀 Prüfung starten',
     'exam.ai_active':'✓ KI-Modus aktiv ({0} {1})','exam.fallback':'⚠️ Ohne API Key: Beispielfragen',
+    'exam.assign':'Für Prüfung','exam.none':'Keine Prüfung','exam.new_prep':'Neue Prüfung…','exam.name_ph':'z.B. Mathe-Klausur','exam.date':'Prüfungsdatum','exam.upcoming':'Anstehende Prüfungen','exam.days_left':'noch {0} Tage','exam.today':'heute!','exam.past':'vorbei','exam.mastered':'{0} von {1} gut beherrscht','exam.prepare':'Vorbereiten','exam.exit':'Prüfungsmodus verlassen',
     'exam.recent':'Letzte Ergebnisse','exam.generating':'KI generiert Fragen…',
     'exam.question':'Frage','exam.excellent':'Ausgezeichnet!','exam.good':'Gut gemacht!',
     'exam.practice':'Weiter üben!','exam.correct_of':'{0} von {1} Fragen richtig',
@@ -551,6 +552,7 @@ const I18N = {
     'exam.q5':'5 Questions','exam.q8':'8 Questions','exam.q10':'10 Questions',
     'exam.start':'🚀 Start Exam',
     'exam.ai_active':'✓ AI mode active ({0} {1})','exam.fallback':'⚠️ No API Key: Sample questions',
+    'exam.assign':'For exam','exam.none':'No exam','exam.new_prep':'New exam…','exam.name_ph':'e.g. Math test','exam.date':'Exam date','exam.upcoming':'Upcoming exams','exam.days_left':'{0} days left','exam.today':'today!','exam.past':'past','exam.mastered':'{0} of {1} mastered','exam.prepare':'Prepare','exam.exit':'Exit exam mode',
     'exam.recent':'Recent Results','exam.generating':'AI generating questions…',
     'exam.question':'Question','exam.excellent':'Excellent!','exam.good':'Well done!',
     'exam.practice':'Keep practicing!','exam.correct_of':'{0} of {1} questions correct',
@@ -667,6 +669,7 @@ const I18N = {
     'exam.q5':'5 Questions','exam.q8':'8 Questions','exam.q10':'10 Questions',
     'exam.start':'🚀 Commencer l\'examen',
     'exam.ai_active':'✓ Mode IA actif ({0} {1})','exam.fallback':'⚠️ Sans clé API : Questions exemples',
+    'exam.assign':'Pour un contrôle','exam.none':'Aucun contrôle','exam.new_prep':'Nouveau contrôle…','exam.name_ph':'p. ex. Contrôle de maths','exam.date':'Date du contrôle','exam.upcoming':'Contrôles à venir','exam.days_left':'encore {0} jours','exam.today':"aujourd'hui !",'exam.past':'passé','exam.mastered':'{0} sur {1} maîtrisées','exam.prepare':'Préparer','exam.exit':'Quitter le mode contrôle',
     'exam.recent':'Derniers résultats','exam.generating':'L\'IA génère des questions…',
     'exam.question':'Question','exam.excellent':'Excellent !','exam.good':'Bien fait !',
     'exam.practice':'Continue à t\'entraîner !','exam.correct_of':'{0} sur {1} questions correctes',
@@ -783,6 +786,7 @@ const I18N = {
     'exam.q5':'5 Preguntas','exam.q8':'8 Preguntas','exam.q10':'10 Preguntas',
     'exam.start':'🚀 Iniciar examen',
     'exam.ai_active':'✓ Modo IA activo ({0} {1})','exam.fallback':'⚠️ Sin clave API: Preguntas de ejemplo',
+    'exam.assign':'Para examen','exam.none':'Sin examen','exam.new_prep':'Nuevo examen…','exam.name_ph':'p. ej. Examen de mates','exam.date':'Fecha del examen','exam.upcoming':'Exámenes próximos','exam.days_left':'quedan {0} días','exam.today':'¡hoy!','exam.past':'pasado','exam.mastered':'{0} de {1} dominadas','exam.prepare':'Preparar','exam.exit':'Salir del modo examen',
     'exam.recent':'Últimos resultados','exam.generating':'La IA genera preguntas…',
     'exam.question':'Pregunta','exam.excellent':'¡Excelente!','exam.good':'¡Bien hecho!',
     'exam.practice':'¡Sigue practicando!','exam.correct_of':'{0} de {1} preguntas correctas',
@@ -1506,6 +1510,7 @@ function _cardsToRows() {
         due_at: new Date(c.due || Date.now()).toISOString(),
         ease: c.ease || 2.5, reps: c.reps || 0, interval_days: c.interval || 0,
         topic: c.topic || null,
+        exam_name: c.examName || null, exam_date: c.examDate || null,
       });
     }
   }
@@ -1544,6 +1549,7 @@ function _applyCloudData(d) {
       reps: c.reps || 0,
       interval: c.interval_days || 0,
       topic: c.topic || null,
+      examName: c.exam_name || null, examDate: c.exam_date || null,
     });
   });
   D.cards = cards;
@@ -2117,6 +2123,7 @@ function dashboard(el) {
   const _t0 = new Date(); _t0.setHours(0,0,0,0);
   const todayCount = (D.sessions||[]).filter(s => s.session_type === 'flashcard' && new Date(s.created_at).getTime() >= _t0.getTime()).length;
   const goalPct = Math.min(100, Math.round(goal ? todayCount/goal*100 : 0));
+  const exams = _exams();
 
   el.innerHTML = `
     <div class="page-header">
@@ -2140,6 +2147,28 @@ function dashboard(el) {
         </div>
       </div>
     </div>
+    ${exams.length ? `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><div class="card-title">📝 ${t('exam.upcoming')}</div></div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        ${exams.slice(0,4).map(e=>{
+          const pct = e.total ? Math.round(e.mastered/e.total*100) : 0;
+          const urgent = e.daysLeft <= 3;
+          return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:180px;">
+              <div style="font-weight:600;font-size:14px;">${safe(e.name)} <span style="color:var(--t3);font-weight:400;font-size:12px;">· ${safe(e.subject)}</span></div>
+              <div style="height:6px;background:var(--bg-2);border-radius:99px;overflow:hidden;margin-top:6px;"><div style="height:100%;width:${pct}%;background:var(--success);"></div></div>
+              <div style="font-size:11px;color:var(--t3);margin-top:3px;">${t('exam.mastered', e.mastered, e.total)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-weight:700;font-size:13px;color:${urgent?'var(--danger)':'var(--warning)'};">${e.daysLeft>0?t('exam.days_left',e.daysLeft):(e.daysLeft===0?t('exam.today'):t('exam.past'))}</div>
+              <div style="font-size:11px;color:var(--t3);">${_fmtDate(e.date)}</div>
+              <button class="btn btn-primary btn-sm" style="margin-top:6px;" data-k="${safe(e.key)}" onclick="prepExam(this.dataset.k)">${t('exam.prepare')}</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
     <div class="grid-4" style="margin-bottom:24px;">
       <div class="stat-card">
         <div class="stat-icon">⭐</div>
@@ -2239,7 +2268,25 @@ function subjects(el) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: KARTEIKARTEN
 // ═══════════════════════════════════════════════════════════════════════════
-let FC = { subj:null, idx:0, flipped:false, topic:'Alle' };
+let FC = { subj:null, idx:0, flipped:false, topic:'Alle', exam:null };
+
+/** Startet den Prüfungs-Lernmodus für eine Prüfung (Key = "name|date"; übt alle Karten, wenigst Beherrschtes zuerst). */
+function prepExam(key) {
+  if (!key) return;
+  const i = key.lastIndexOf('|');
+  const name = key.slice(0, i), date = key.slice(i + 1);
+  FC.exam = key;
+  for (const subj in (D.cards || {})) {
+    if ((D.cards[subj] || []).some(c => c.examName === name && c.examDate === date)) { FC.subj = subj; break; }
+  }
+  FC.topic = 'Alle'; FC.idx = 0; FC.flipped = false;
+  goPage('flashcards');
+}
+/** Beendet den Prüfungs-Lernmodus. */
+function exitExamPrep() {
+  FC.exam = null; FC.idx = 0; FC.flipped = false;
+  renderFC(document.getElementById('content'));
+}
 
 /** Distinkte Themen eines Fachs (sortiert). */
 function _topics(subj) {
@@ -2263,6 +2310,54 @@ function _newTopic() {
   return v ? v.slice(0, 80) : null;
 }
 
+/** Formatiert ein YYYY-MM-DD-Datum lokalisiert (kurz). */
+function _fmtDate(d) {
+  if (!d) return '';
+  try { return new Date(d + 'T00:00:00').toLocaleDateString(getCurrentLang?.() || 'de', { day: '2-digit', month: '2-digit', year: '2-digit' }); }
+  catch { return d; }
+}
+
+/**
+ * Leitet Prüfungen aus den Karten ab (gruppiert nach Name+Datum, fachübergreifend).
+ * @param {{includePast?:boolean}} [opts]
+ * @returns {Array} { name, date, subject, key, cards, total, mastered, daysLeft }
+ */
+function _exams(opts) {
+  const map = new Map();
+  for (const subj in (D.cards || {})) {
+    for (const c of (D.cards[subj] || [])) {
+      if (!c.examName || !c.examDate) continue;
+      const key = c.examName + '|' + c.examDate;
+      let e = map.get(key);
+      if (!e) { e = { name: c.examName, date: c.examDate, key, subjects: new Set(), total: 0, mastered: 0 }; map.set(key, e); }
+      e.total++; if ((c.reps || 0) >= 2) e.mastered++; e.subjects.add(subj);
+    }
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let list = [...map.values()].map(e => ({
+    ...e, subject: [...e.subjects].join(', '),
+    daysLeft: Math.ceil((new Date(e.date + 'T00:00:00').getTime() - today.getTime()) / 86400000),
+  }));
+  if (!opts?.includePast) list = list.filter(e => e.daysLeft >= 0);
+  return list.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Liest die Prüfungs-Auswahl im Erstellen-Bereich: {name, date} oder null. */
+function _newExam() {
+  const sel = document.getElementById('new-exam');
+  if (!sel) return null;
+  if (sel.value === '__new__') {
+    const name = document.getElementById('new-exam-name')?.value.trim();
+    const date = document.getElementById('new-exam-date')?.value;
+    return (name && date) ? { name: name.slice(0, 100), date } : null;
+  }
+  if (sel.value && sel.value.includes('|')) {
+    const i = sel.value.lastIndexOf('|');
+    return { name: sel.value.slice(0, i), date: sel.value.slice(i + 1) };
+  }
+  return null;
+}
+
 function flashcards(el, params={}) {
   const subs = getChildSubjects();
   FC.subj = params.subject || FC.subj || subs[0];
@@ -2275,16 +2370,26 @@ function renderFC(el) {
   // Themen-Filter validieren (z.B. nach Fachwechsel / wenn Thema gelöscht)
   if (FC.topic !== 'Alle' && FC.topic !== '' && !topics.includes(FC.topic)) FC.topic = 'Alle';
   if (FC.topic === '' && !_hasUncategorized(FC.subj)) FC.topic = 'Alle';
-  const due = cards.filter(c=>(c.due||0)<=Date.now() && _cardInTopic(c));
-  const card = due[FC.idx % Math.max(due.length,1)];
+  // Prüfungs-Lernmodus: ALLE Karten der Prüfung, wenigst Beherrschtes zuerst (Vorbereitung bis Termin)
+  let examInfo = null, due;
+  if (FC.exam) {
+    examInfo = _exams({ includePast: true }).find(e => e.key === FC.exam);
+    due = cards.filter(c => (c.examName + '|' + c.examDate) === FC.exam)
+      .sort((a, b) => (a.reps || 0) - (b.reps || 0) || (a.due || 0) - (b.due || 0));
+    if (!due.length) { FC.exam = null; examInfo = null; }
+  }
+  if (!FC.exam) due = cards.filter(c => (c.due || 0) <= Date.now() && _cardInTopic(c));
+  const card = due[FC.idx % Math.max(due.length, 1)];
+  const examSub = examInfo ? `📝 ${safe(examInfo.name)} · ${examInfo.daysLeft > 0 ? t('exam.days_left', examInfo.daysLeft) : (examInfo.daysLeft === 0 ? t('exam.today') : t('exam.past'))} · ${due.length}/${examInfo.total}` : '';
 
   el.innerHTML = `
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
       <div>
         <h1>${t('fc.title')}</h1>
-        <p>${t('fc.due_total', due.length, cards.length)}</p>
+        <p>${FC.exam && examInfo ? examSub : t('fc.due_total', due.length, cards.length)}</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
+        ${FC.exam ? `<button class="btn btn-secondary btn-sm" onclick="exitExamPrep()">✕ ${t('exam.exit')}</button>` : `
         <select class="input" style="width:auto;" aria-label="${t('fc.title')}" onchange="FC.subj=this.value;FC.topic='Alle';FC.idx=0;FC.flipped=false;renderFC(document.getElementById('content'))">
           ${getChildSubjects().map(s=>`<option value="${s}" ${s===FC.subj?'selected':''}>${s}</option>`).join('')}
         </select>
@@ -2294,7 +2399,7 @@ function renderFC(el) {
           ${topics.map(tp=>`<option value="${safe(tp)}" ${FC.topic===tp?'selected':''}>${safe(tp)}</option>`).join('')}
           ${_hasUncategorized(FC.subj)?`<option value="" ${FC.topic===''?'selected':''}>${t('fc.general')}</option>`:''}
         </select>
-        <button class="btn btn-secondary btn-sm" onclick="manageCards()" title="${t('fc.manage')}">📂 ${t('fc.manage')}</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="manageCards()" title="${t('fc.manage')}">📂 ${t('fc.manage')}</button>` : ''}`}
         <button class="btn btn-secondary btn-sm" onclick="exportFlashcards('${FC.subj}')" title="Als Excel exportieren">${t('export.flashcards_btn')}</button>
         <button class="btn btn-secondary btn-sm" onclick="exportCardsCSV('${FC.subj}')" title="${t('fc.csv_export')}">⬇ CSV</button>
         <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;" title="${t('fc.csv_import')}">⬆ CSV
@@ -2309,6 +2414,7 @@ function renderFC(el) {
            style="background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-xl);padding:48px 32px;text-align:center;cursor:pointer;min-height:200px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;box-shadow:var(--shadow-md);transition:transform .1s;" onmouseover="this.style.transform='scale(1.01)'" onmouseout="this.style.transform='scale(1)'">
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);">${FC.flipped?t('fc.answer'):t('fc.question')} ${FC.idx+1}/${due.length}</div>
         ${card.topic?`<div style="font-size:11px;color:var(--pri);font-weight:600;">📂 ${safe(card.topic)}</div>`:''}
+        ${card.examName?`<div style="font-size:11px;color:var(--warning);font-weight:600;">📝 ${safe(card.examName)}${card.examDate?' · '+_fmtDate(card.examDate):''}</div>`:''}
         <div style="font-size:18px;font-weight:600;line-height:1.5;">${safe(FC.flipped?card.back:card.front)}</div>
         <div style="font-size:12px;color:var(--t3);">${FC.flipped?t('fc.flip_back'):t('fc.flip_reveal')}</div>
       </div>
@@ -2333,6 +2439,18 @@ function renderFC(el) {
           <label>📂 ${t('fc.topic')} <span style="color:var(--t3);font-weight:400;font-size:11px;">${t('fc.topic_optional')}</span></label>
           <input class="input" id="new-topic" list="topic-list" placeholder="${t('fc.topic_ph')}" value="${(FC.topic!=='Alle'&&FC.topic!=='')?safe(FC.topic):''}">
           <datalist id="topic-list">${topics.map(tp=>`<option value="${safe(tp)}"></option>`).join('')}</datalist>
+        </div>
+        <div class="field">
+          <label>📝 ${t('exam.assign')} <span style="color:var(--t3);font-weight:400;font-size:11px;">${t('fc.topic_optional')}</span></label>
+          <select class="input" id="new-exam" onchange="document.getElementById('new-exam-fields').style.display=this.value==='__new__'?'grid':'none'">
+            <option value="">${t('exam.none')}</option>
+            ${_exams().map(e=>`<option value="${safe(e.key)}">${safe(e.name)} (${_fmtDate(e.date)})</option>`).join('')}
+            <option value="__new__">➕ ${t('exam.new_prep')}</option>
+          </select>
+          <div id="new-exam-fields" class="grid-2" style="display:none;gap:8px;margin-top:8px;">
+            <input class="input" id="new-exam-name" placeholder="${t('exam.name_ph')}">
+            <input class="input" id="new-exam-date" type="date" aria-label="${t('exam.date')}">
+          </div>
         </div>
         <div class="grid-2">
           <div class="field"><label>${t('fc.front')}</label><input class="input" id="nf" placeholder="${t('fc.front_ph')}"></div>
@@ -2383,6 +2501,11 @@ function rateCard(id, subj, rating) {
   card.interval = intv;
   card.level = Math.max(0, Math.min(4, reps)); // grober Anzeige-Proxy (UI-Kompatibilität)
   card.due = Date.now() + intv * 86400000;
+  // Lernplan: Prüfungs-Karten spätestens am Prüfungstag wieder fällig (bis dahin in Wiederholung halten)
+  if (card.examName && card.examDate) {
+    const examMs = new Date(card.examDate + 'T23:59:59').getTime();
+    if (examMs > Date.now() && card.due > examMs) card.due = examMs;
+  }
 
   D.correct = (D.correct||0) + (rating >= 2 ? 1 : 0);
   D.total = (D.total||0) + 1;
@@ -2390,8 +2513,10 @@ function rateCard(id, subj, rating) {
   recordSession(subj, 'flashcard', null, rating >= 2 ? CFG.XP.CARD : CFG.XP.CARD_WRONG);
   save(); updateXP();
 
-  const due = (D.cards[subj]||[]).filter(c=>(c.due||0)<=Date.now());
-  if (due.length) FC.idx = (FC.idx + 1) % due.length;
+  const pool = FC.exam
+    ? (D.cards[subj]||[]).filter(c => (c.examName+'|'+c.examDate) === FC.exam)
+    : (D.cards[subj]||[]).filter(c => (c.due||0)<=Date.now() && _cardInTopic(c));
+  if (pool.length) FC.idx = (FC.idx + 1) % pool.length;
   FC.flipped = false;
   renderFC(document.getElementById('content'));
 }
@@ -2400,9 +2525,9 @@ function manualAddCard() {
   const front = document.getElementById('nf')?.value.trim();
   const back = document.getElementById('nb')?.value.trim();
   if (!front || !back) return toast(t('toast.fill_card'));
-  const topic = _newTopic();
+  const topic = _newTopic(); const ex = _newExam();
   if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
-  D.cards[FC.subj].push({id:'c'+Date.now(),front,back,level:0,due:0,topic});
+  D.cards[FC.subj].push({id:'c'+Date.now(),front,back,level:0,due:0,topic,examName:ex?.name||null,examDate:ex?.date||null});
   if (topic) FC.topic = topic; // direkt ins neue Thema wechseln
   save(); toast(t('toast.card_added'));
   document.getElementById('nf').value=''; document.getElementById('nb').value='';
@@ -2439,7 +2564,11 @@ function manageCards() {
         ${groups[tp].map(c => `
           <div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
             <div style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${safe(c.front)}">${safe(c.front)}</div>
-            <input class="input" style="width:130px;padding:4px 6px;font-size:12px;" list="topic-list-m" value="${safe(c.topic || '')}" placeholder="${t('fc.general')}" onchange="moveCardTopic('${c.id}', this.value)" aria-label="${t('fc.topic')}">
+            <input class="input" style="width:110px;padding:4px 6px;font-size:12px;" list="topic-list-m" value="${safe(c.topic || '')}" placeholder="${t('fc.general')}" onchange="moveCardTopic('${c.id}', this.value)" aria-label="${t('fc.topic')}">
+            ${_exams({includePast:true}).length ? `<select class="input" style="width:110px;padding:4px;font-size:12px;" onchange="assignCardExam('${c.id}', this.value)" aria-label="${t('exam.assign')}">
+              <option value="">${t('exam.none')}</option>
+              ${_exams({includePast:true}).map(e=>`<option value="${safe(e.key)}" ${(c.examName+'|'+c.examDate)===e.key?'selected':''}>${safe(e.name)}</option>`).join('')}
+            </select>` : ''}
             <button onclick="deleteCardById('${c.id}')" aria-label="${t('fc.delete_card')}" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:14px;">🗑</button>
           </div>`).join('')}
       `).join('')}
@@ -2447,6 +2576,17 @@ function manageCards() {
     </div>
   </div>`;
   document.body.appendChild(ov);
+}
+
+/** Ordnet eine Karte einer (bestehenden) Prüfung zu — oder entfernt die Zuordnung ('' ). */
+function assignCardExam(id, key) {
+  let name = null, date = null;
+  if (key && key.includes('|')) { const i = key.lastIndexOf('|'); name = key.slice(0, i); date = key.slice(i + 1); }
+  for (const subj in D.cards) {
+    const c = (D.cards[subj] || []).find(x => x.id === id);
+    if (c) { c.examName = name; c.examDate = date; save(); break; }
+  }
+  manageCards();
 }
 
 /** Verschiebt eine Karte in ein (anderes) Thema. */
@@ -2482,7 +2622,7 @@ async function genCards() {
   if (!text) return toast(t('toast.enter_text'));
   if (!hasActiveKey()) return toast(t('toast.need_api_key'));
   const num = parseInt(document.getElementById('gen-n')?.value||5);
-  const userTopic = _newTopic();
+  const userTopic = _newTopic(); const ex = _newExam();
   toast('🤖 KI erstellt Karten…');
   try {
     const sys = `Karteikarten-Ersteller für Klasse ${U.grade}. Antworte NUR mit JSON.`;
@@ -2491,7 +2631,7 @@ async function genCards() {
     const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
     if (!parsed.length) throw new Error('Kein gültiges JSON');
     if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
-    parsed.forEach(c=>{ if(c.front&&c.back) D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0,topic:userTopic||(c.topic?String(c.topic).slice(0,80):null)}); });
+    parsed.forEach(c=>{ if(c.front&&c.back) D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0,topic:userTopic||(c.topic?String(c.topic).slice(0,80):null),examName:ex?.name||null,examDate:ex?.date||null}); });
     if (userTopic) FC.topic = userTopic;
     save(); toast(`🎉 ${parsed.length} Karten erstellt!`);
     document.getElementById('gen-t').value='';
@@ -2513,7 +2653,7 @@ async function genCardsFromImage(input) {
   if (isPdf && AI.provider !== 'claude') { input.value=''; return toast('❌ PDF nur mit Claude — sonst bitte ein Foto verwenden'); }
   if (file.size > 6*1024*1024) { input.value=''; return toast('❌ Datei zu groß (max. 6 MB)'); }
 
-  const userTopic = _newTopic();
+  const userTopic = _newTopic(); const ex = _newExam();
   toast('🤖 KI liest die Datei…');
   try {
     const dataUrl = await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); });
@@ -2526,7 +2666,7 @@ async function genCardsFromImage(input) {
     const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
     if (!parsed.length) throw new Error('Keine Karten erkannt — anderes Foto versuchen');
     if (!D.cards[FC.subj]) D.cards[FC.subj] = [];
-    let n=0; parsed.forEach(c=>{ if(c.front&&c.back){ D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0,topic:userTopic||(c.topic?String(c.topic).slice(0,80):null)}); n++; } });
+    let n=0; parsed.forEach(c=>{ if(c.front&&c.back){ D.cards[FC.subj].push({id:'c'+Date.now()+Math.random(),front:c.front,back:c.back,level:0,due:0,topic:userTopic||(c.topic?String(c.topic).slice(0,80):null),examName:ex?.name||null,examDate:ex?.date||null}); n++; } });
     if (userTopic) FC.topic = userTopic;
     save(); toast(`🎉 ${n} Karten aus Datei erstellt!`);
     renderFC(document.getElementById('content'));
