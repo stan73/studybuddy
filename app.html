@@ -24,8 +24,8 @@
 <script src="js/vendor/supabase.js"></script>
 <!-- Chart.js für Eltern-Dashboard (lokal gebündelt) -->
 <script src="js/vendor/chart.umd.min.js"></script>
-<!-- SheetJS für XLSX-Export (Feature #14) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- SheetJS für XLSX-Export (Feature #14) — lokal gebündelt (CSP-konform, kein CDN) -->
+<script src="js/vendor/xlsx.full.min.js"></script>
 <style>
 /* ── Feature #16: Tooltips ─────────────────────────────────────────── */
 .sb-tooltip-wrap {
