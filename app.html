@@ -385,6 +385,7 @@ const I18N = {
     'role.child':'Klasse {0} · Kind-Account',
     // Dashboard
     'dash.greeting':'Guten Tag, {0}! 👋','dash.subtitle':'Dein Lernfortschritt auf einen Blick',
+    'focus.label':'Heute-Fokus','focus.exam_title':'{0} · {1}','focus.exam_sub':'Noch {0} Karten bis dahin — jetzt vorbereiten.','focus.exam_cta':'Für Prüfung üben','focus.due_title':'{0} Karten sind heute dran','focus.due_sub':'Kurz wiederholen hält dein Wissen frisch.','focus.due_cta':'Jetzt üben','focus.empty_title':'Bereit loszulegen?','focus.empty_sub':'Leg deine ersten Karteikarten an — per Foto geht es am schnellsten.','focus.empty_cta':'Karten anlegen','focus.done_title':'Alles erledigt für heute!','focus.done_sub':'Nichts mehr fällig. Lust auf eine freie Übungsrunde?','focus.done_cta':'Weiter üben',
     'dash.xp':'XP-Punkte','dash.streak':'Tage Streak','dash.due_cards':'Karten fällig',
     'dash.open_tasks':'Aufgaben offen','dash.tasks':'📋 Aufgaben','dash.all':'Alle →',
     'dash.no_tasks':'Keine offenen Aufgaben 🎉','dash.due':'fällig',
@@ -524,6 +525,7 @@ const I18N = {
     'nav.logout':'Sign out',
     'role.child':'Year {0} · Student Account',
     'dash.greeting':'Hello, {0}! 👋','dash.subtitle':'Your learning progress at a glance',
+    'focus.label':'Today\'s focus','focus.exam_title':'{0} · {1}','focus.exam_sub':'{0} cards left before then — prepare now.','focus.exam_cta':'Study for exam','focus.due_title':'{0} cards are due today','focus.due_sub':'A quick review keeps your knowledge fresh.','focus.due_cta':'Study now','focus.empty_title':'Ready to start?','focus.empty_sub':'Create your first flashcards — a photo is the fastest way.','focus.empty_cta':'Create cards','focus.done_title':'All done for today!','focus.done_sub':'Nothing due. Fancy a free practice round?','focus.done_cta':'Keep practicing',
     'dash.xp':'XP Points','dash.streak':'Day Streak','dash.due_cards':'Cards due',
     'dash.open_tasks':'Tasks open','dash.tasks':'📋 Tasks','dash.all':'All →',
     'dash.no_tasks':'No open tasks 🎉','dash.due':'due',
@@ -650,6 +652,7 @@ const I18N = {
     'nav.logout':'Déconnexion',
     'role.child':'Classe {0} · Compte Élève',
     'dash.greeting':'Bonjour, {0} ! 👋','dash.subtitle':'Ton progrès scolaire en un coup d\'œil',
+    'focus.label':'Objectif du jour','focus.exam_title':'{0} · {1}','focus.exam_sub':'Encore {0} fiches d\'ici là — prépare-toi maintenant.','focus.exam_cta':'Réviser pour l\'examen','focus.due_title':'{0} fiches à revoir aujourd\'hui','focus.due_sub':'Une révision rapide garde tes connaissances fraîches.','focus.due_cta':'Réviser','focus.empty_title':'Prêt à commencer ?','focus.empty_sub':'Crée tes premières fiches — une photo, c\'est le plus rapide.','focus.empty_cta':'Créer des fiches','focus.done_title':'Tout est fait pour aujourd\'hui !','focus.done_sub':'Rien à revoir. Envie d\'un tour d\'entraînement libre ?','focus.done_cta':'Continuer',
     'dash.xp':'Points XP','dash.streak':'Jours de suite','dash.due_cards':'Fiches à réviser',
     'dash.open_tasks':'Tâches ouvertes','dash.tasks':'📋 Tâches','dash.all':'Tout →',
     'dash.no_tasks':'Aucune tâche ouverte 🎉','dash.due':'échéance',
@@ -776,6 +779,7 @@ const I18N = {
     'nav.logout':'Cerrar sesión',
     'role.child':'Clase {0} · Cuenta Alumno',
     'dash.greeting':'¡Hola, {0}! 👋','dash.subtitle':'Tu progreso de aprendizaje de un vistazo',
+    'focus.label':'Foco de hoy','focus.exam_title':'{0} · {1}','focus.exam_sub':'Quedan {0} tarjetas hasta entonces — prepárate ya.','focus.exam_cta':'Estudiar para el examen','focus.due_title':'{0} tarjetas tocan hoy','focus.due_sub':'Un repaso rápido mantiene fresco tu conocimiento.','focus.due_cta':'Estudiar ahora','focus.empty_title':'¿Listo para empezar?','focus.empty_sub':'Crea tus primeras tarjetas — con una foto es lo más rápido.','focus.empty_cta':'Crear tarjetas','focus.done_title':'¡Todo hecho por hoy!','focus.done_sub':'Nada pendiente. ¿Te apetece una ronda libre?','focus.done_cta':'Seguir practicando',
     'dash.xp':'Puntos XP','dash.streak':'Racha de días','dash.due_cards':'Tarjetas pendientes',
     'dash.open_tasks':'Tareas abiertas','dash.tasks':'📋 Tareas','dash.all':'Todo →',
     'dash.no_tasks':'Sin tareas abiertas 🎉','dash.due':'vence',
@@ -2299,6 +2303,36 @@ function goPage(page, params={}) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAGE: DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Bestimmt den EINEN wichtigsten nächsten Lernschritt fürs Dashboard (Choice-Reduction, #8).
+ * Priorität: bevorstehende Prüfung → fällige Karten → noch keine Karten → alles erledigt.
+ * @returns {{icon:string, kind:string, title:string, sub:string, cta:string, onclick:string}}
+ */
+function _todayFocus() {
+  const dueCards = Object.values(D.cards || {}).flat().filter(c => (c.due || 0) <= Date.now()).length;
+  const exam = _exams().find(e => e.daysLeft <= 7 && e.mastered < e.total);
+  if (exam) {
+    const daysTxt = exam.daysLeft === 0 ? t('exam.today') : t('exam.days_left', exam.daysLeft);
+    return { icon: '📝', kind: 'exam',
+      title: t('focus.exam_title', safe(exam.name), daysTxt),
+      sub: t('focus.exam_sub', exam.total - exam.mastered),
+      cta: t('focus.exam_cta'), onclick: `prepExam('${safe(exam.key)}')` };
+  }
+  if (dueCards > 0) {
+    return { icon: '🃏', kind: 'due',
+      title: t('focus.due_title', dueCards), sub: t('focus.due_sub'),
+      cta: t('focus.due_cta'), onclick: `goPage('flashcards')` };
+  }
+  if (!Object.values(D.cards || {}).flat().length) {
+    return { icon: '✨', kind: 'empty',
+      title: t('focus.empty_title'), sub: t('focus.empty_sub'),
+      cta: t('focus.empty_cta'), onclick: `goPage('flashcards')` };
+  }
+  return { icon: '🎉', kind: 'done',
+    title: t('focus.done_title'), sub: t('focus.done_sub'),
+    cta: t('focus.done_cta'), onclick: `goPage('flashcards')` };
+}
+
 function dashboard(el) {
   const dueCards = Object.values(D.cards).flat().filter(c => (c.due||0) <= Date.now()).length;
   const openTasks = (D.tasks||[]).filter(t => !t.completed).length;
@@ -2308,26 +2342,36 @@ function dashboard(el) {
   const todayCount = (D.sessions||[]).filter(s => s.session_type === 'flashcard' && new Date(s.created_at).getTime() >= _t0.getTime()).length;
   const goalPct = Math.min(100, Math.round(goal ? todayCount/goal*100 : 0));
   const exams = _exams();
+  const focus = _todayFocus();
 
   el.innerHTML = `
     <div class="page-header">
       <h1>${t('dash.greeting', safe((U.full_name||U.email||'').split(' ')[0]))}</h1>
       <p>${t('dash.subtitle')}</p>
     </div>
-    <div class="card" style="margin-bottom:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,var(--pri-l),var(--bg-card));border:1px solid var(--pri);">
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+        <div style="font-size:40px;line-height:1;" aria-hidden="true">${focus.icon}</div>
         <div style="flex:1;min-width:200px;">
-          <div style="font-weight:600;margin-bottom:8px;">🎯 ${t('goal.today')}: ${todayCount}/${goal} ${t('goal.cards')} ${todayCount>=goal?'✅':''}</div>
-          <div style="height:8px;background:var(--bg-2);border-radius:99px;overflow:hidden;" role="progressbar" aria-valuenow="${todayCount}" aria-valuemin="0" aria-valuemax="${goal}">
-            <div style="height:100%;width:${goalPct}%;background:var(--pri);transition:width .3s var(--ease);"></div>
-          </div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--pri);">🎯 ${t('focus.label')}</div>
+          <div style="font-size:18px;font-weight:800;margin:3px 0;">${focus.title}</div>
+          <div style="font-size:13px;color:var(--t2);">${focus.sub}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:14px;">
-          ${('Notification' in window && Notification.permission !== 'granted' && U.role !== 'parent') ? `<button class="btn btn-secondary btn-sm" onclick="enableReminders()" title="${t('notify.enable_btn')}" aria-label="${t('notify.enable_btn')}">🔔</button>` : ''}
-          <span title="${t('goal.freezes')}" style="font-size:14px;">🧊 ${D.freezes||0}</span>
-          <label style="font-size:12px;color:var(--t3);display:flex;align-items:center;gap:6px;">${t('goal.set')}
-            <input type="number" min="1" max="50" value="${goal}" onchange="setDailyGoal(this.value)" aria-label="${t('goal.set')}" style="width:60px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--r-sm);">
-          </label>
+        <button class="btn btn-primary" onclick="${focus.onclick}" style="font-size:15px;padding:12px 22px;">${focus.cta} →</button>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--t2);margin-bottom:5px;">
+          <span style="font-weight:600;">${t('goal.today')}: ${todayCount}/${goal} ${t('goal.cards')} ${todayCount>=goal?'✅':''}</span>
+          <span style="display:flex;align-items:center;gap:12px;">
+            ${('Notification' in window && Notification.permission !== 'granted' && U.role !== 'parent') ? `<button class="btn btn-secondary btn-sm" onclick="enableReminders()" title="${t('notify.enable_btn')}" aria-label="${t('notify.enable_btn')}">🔔</button>` : ''}
+            <span title="${t('goal.freezes')}">🧊 ${D.freezes||0}</span>
+            <label style="color:var(--t3);display:flex;align-items:center;gap:6px;">${t('goal.set')}
+              <input type="number" min="1" max="50" value="${goal}" onchange="setDailyGoal(this.value)" aria-label="${t('goal.set')}" style="width:56px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--r-sm);">
+            </label>
+          </span>
+        </div>
+        <div style="height:8px;background:var(--bg-2);border-radius:99px;overflow:hidden;" role="progressbar" aria-valuenow="${todayCount}" aria-valuemin="0" aria-valuemax="${goal}">
+          <div style="height:100%;width:${goalPct}%;background:var(--pri);transition:width .3s var(--ease);"></div>
         </div>
       </div>
     </div>
