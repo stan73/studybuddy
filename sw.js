@@ -21,7 +21,7 @@
  */
 
 /** @type {string} Cache-Name — bei Asset-Änderungen inkrementieren */
-const CACHE_NAME = 'studybuddy-v4';
+const CACHE_NAME = 'studybuddy-v5';
 
 /**
  * HTML-Dateien (App-Entry-Points), die IMMER Network-First geladen werden.
@@ -58,11 +58,11 @@ const PRECACHE = [
  * @type {string[]}
  */
 const NEVER_CACHE = [
-  'supabase.co',
+  'neon.tech',            // Neon Data API + Managed Better Auth (JWT-behaftet)
+  '/.netlify/functions/', // Netlify Functions (ai-proxy etc.)
   'anthropic.com',
   'openai.com',
   'generativelanguage.googleapis.com',
-  'functions/v1/',
 ];
 
 // ── Installation ─────────────────────────────────────────────────────────

@@ -1,8 +1,9 @@
 /**
  * StudyBuddy Pro — Authentication
  *
- * Phase 2: Supabase Auth (echte Nutzerkonten).
- * Fallback: Demo-Modus wenn Supabase nicht konfiguriert.
+ * Phase 2: Neon Auth (Managed Better Auth, echte Nutzerkonten) über die
+ * Supabase-kompatible Client-Fassade (window.supabase, siehe
+ * js/vendor/neon-client.js). Fallback: Demo-Modus, wenn kein Client geladen.
  *
  * CRA-Anforderung: Sichere Authentifizierung, keine Default-Passwörter,
  * Passwort-Stärke-Validierung, Session-Management.
@@ -13,20 +14,17 @@ import { state } from './state.js';
 import { validateEmail, validatePassword, sanitizeText } from './utils/sanitize.js';
 import { storeSave, storeGet, storeRemove, storeClear, setApiKey } from './utils/storage.js';
 
-// Prüft ob Supabase konfiguriert ist
-const SUPABASE_READY = (
-  CONFIG.SUPABASE_URL !== 'https://DEIN_PROJEKT.supabase.co' &&
-  CONFIG.SUPABASE_ANON_KEY !== 'DEIN_ANON_KEY'
-);
+// Neon-Backend ist konfiguriert, wenn die Data-API-/Auth-URLs gesetzt sind.
+const SUPABASE_READY = !!(CONFIG.NEON_DATA_API_URL && CONFIG.NEON_AUTH_URL);
 
-// Supabase Client (wird erst bei Bedarf initialisiert)
+// Neon-Client (Supabase-kompatible Fassade; erst bei Bedarf initialisiert)
 let supabase = null;
 
 function getSupabase() {
   if (!SUPABASE_READY) return null;
   if (supabase) return supabase;
   if (typeof window.supabase === 'undefined') return null;
-  supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  supabase = window.supabase.createClient();
   return supabase;
 }
 
@@ -117,10 +115,12 @@ export async function signUp({ email, password, full_name, role, grade, school, 
     return { user, error: null };
   }
 
-  // Supabase Auth
+  // Neon Auth (Managed Better Auth) — name top-level für Better Auth,
+  // zusätzlich options.data für Supabase-kompatible Weitergabe.
   const { data, error } = await sb.auth.signUp({
     email: emailCheck.value,
     password,
+    name,
     options: {
       data: { full_name: name, role, grade, school },
     },

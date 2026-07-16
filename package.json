@@ -1,0 +1,10 @@
+{
+  "name": "studybuddy",
+  "version": "2.0.0",
+  "private": true,
+  "description": "StudyBuddy Pro — Netlify Functions (Neon backend)",
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0",
+    "jose": "^5.9.6"
+  }
+}

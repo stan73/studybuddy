@@ -20,8 +20,8 @@
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('sb_theme')||'system';}catch(e){}</script>
 <!-- DOMPurify XSS-Schutz (lokal gebündelt für CDN-Ausfallsicherheit) -->
 <script src="js/vendor/purify.min.js"></script>
-<!-- Supabase JS Client (lokal gebündelt) -->
-<script src="js/vendor/supabase.js"></script>
+<!-- Neon-Client (Data API + Managed Better Auth), ersetzt Supabase; Supabase-kompatible Fassade -->
+<script type="module" src="js/vendor/neon-client.js"></script>
 <!-- Chart.js für Eltern-Dashboard (lokal gebündelt) -->
 <script src="js/vendor/chart.umd.min.js"></script>
 <!-- SheetJS für XLSX-Export (Feature #14) — lokal gebündelt (CSP-konform, kein CDN) -->
@@ -232,7 +232,7 @@
 const CFG = {
   CLAUDE_MODEL: 'claude-haiku-4-5-20251001',
   CLAUDE_API: 'https://api.anthropic.com/v1/messages',
-  AI_PROXY: 'https://qzmviwrpyfpjahcmbjoy.supabase.co/functions/v1/ai-proxy',
+  AI_PROXY: '/.netlify/functions/ai-proxy',
   GRADES: [5,6,7,8,9,10,11,12,13],
   SCHOOL_TYPES: ['Gymnasium','Realschule','Gesamtschule','Hauptschule'],
   SUBJECTS: {
@@ -1368,12 +1368,37 @@ function hasActiveKey() {
     || !!(U?.isChild && U?.id);                                          // Kind: Proxy holt Parent-Key aus DB
 }
 
-// ── Supabase ─────────────────────────────────────────────────────────────────
-const SB_URL = 'https://qzmviwrpyfpjahcmbjoy.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXZpd3JweWZwamFoY21iam95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTg5NTcsImV4cCI6MjA5MDg3NDk1N30.BT2iRuWdI33yigziU3kicb-GQT14IHe3WU8JxFlQG0M';
-const sb = (typeof window.supabase !== 'undefined')
-  ? window.supabase.createClient(SB_URL, SB_KEY)
+// ── Neon (Data API + Managed Better Auth) ────────────────────────────────────
+// Der Neon-Client wird vom ESM-Bootstrap (js/vendor/neon-client.js) als
+// window.supabase-Fassade bereitgestellt. Da Module deferred laufen, ist
+// window.supabase zur Parse-Zeit ggf. noch nicht da → sb wird lazy erzeugt.
+// init() wartet auf window.neonReady, bevor sb zum ersten Mal genutzt wird.
+let sb = (typeof window.supabase !== 'undefined')
+  ? window.supabase.createClient()
   : null;
+
+/** Stellt sicher, dass der Neon-Client geladen und sb gesetzt ist. */
+async function ensureSb() {
+  if (sb) return sb;
+  try { if (window.neonReady) await window.neonReady; } catch(e) {}
+  if (!sb && typeof window.supabase !== 'undefined') {
+    sb = window.supabase.createClient();
+  }
+  return sb;
+}
+
+/**
+ * Liefert das aktuelle Better-Auth-JWT (für Neon Data API und Netlify Functions).
+ * Leerer String, wenn kein angemeldeter Nutzer bzw. kein Token verfügbar ist.
+ * @returns {Promise<string>}
+ */
+async function neonJwt() {
+  try {
+    if (!sb) return '';
+    const { data } = await sb.auth.getSession();
+    return data?.session?.access_token || '';
+  } catch(e) { return ''; }
+}
 
 // ── Microsoft Schul-Anbindung (Entra + Graph Education API) ─────────────────
 // Phase 1: Public-Client OAuth Auth-Code + PKCE im Browser (nur Client-ID, kein Secret).
@@ -1902,8 +1927,10 @@ async function ai(messages, system, maxTok=400, useCache=true, image=null) {
   const payload = { provider: prov, messages, system, maxTok };
   if (image) payload.image = image; // { mime, data } für Vision/PDF
 
-  // Supabase-Gateway benötigt immer Bearer-Token — SB_KEY (anon JWT)
-  headers['Authorization'] = 'Bearer ' + SB_KEY;
+  // Netlify Function: Bearer-Token nur wenn angemeldet (Neon-Auth-JWT).
+  // Nicht-angemeldete (Kind/Demo) senden kein Bearer; Key/childId liegt im Body.
+  const jwt = await neonJwt();
+  if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
 
   const ramKey = activeKey();
 
@@ -1965,6 +1992,9 @@ async function ai(messages, system, maxTok=400, useCache=true, image=null) {
  */
 async function init() {
   load();
+
+  // Neon-Client (ESM, deferred) bereitstellen, bevor Auth/DB genutzt werden.
+  await ensureSb();
 
   // PIN aus Kind-Session wiederherstellen (auch nach Reload, wenn U aus localStorage kommt)
   try {
@@ -4422,15 +4452,15 @@ async function saveProviderKey(providerKey) {
  * @returns {Promise<{ok:boolean, error?:string}>}
  */
 /**
- * Testet einen API Key durch einen Minimal-Aufruf über den Supabase-Proxy.
+ * Testet einen API Key durch einen Minimal-Aufruf über die Netlify Function.
  *
  * Warum Proxy statt direktem Aufruf?
  *   Anthropic, OpenAI und Gemini blockieren direkte Browser-Anfragen via CORS.
- *   Der Proxy läuft serverseitig (Deno) und hat keine CORS-Beschränkung.
+ *   Der Proxy läuft serverseitig und hat keine CORS-Beschränkung.
  *
  * Auth-Strategie:
- *   1. Nutzer ist eingeloggt → User-JWT als Bearer
- *   2. Kein JWT vorhanden  → SB_KEY (Anon-JWT) als Bearer
+ *   1. Nutzer ist eingeloggt → Neon-Auth-JWT als Bearer
+ *   2. Kein JWT vorhanden  → kein Authorization-Header
  *   Zusätzlich: apiKey im Body → Proxy liest Key direkt, KEIN DB-Lookup.
  *
  * @async
@@ -4440,16 +4470,11 @@ async function saveProviderKey(providerKey) {
  */
 async function testKeyConnection(providerKey, key) {
   try {
-    // Schritt 1: Bearer-Token bestimmen (User-JWT > Anon-JWT)
+    // Schritt 1: Bearer-Token bestimmen — Neon-Auth-JWT nur wenn angemeldet.
+    // Der Key wird ohnehin im Body mitgegeben (kein DB-Lookup im Proxy nötig).
     const headers = { 'Content-Type': 'application/json' };
-    let bearerToken = SB_KEY; // Anon-JWT als Fallback — gültig für Edge-Function-Gateway
-    if (sb) {
-      try {
-        const { data: { session } } = await sb.auth.getSession();
-        if (session?.access_token) bearerToken = session.access_token;
-      } catch {}
-    }
-    headers['Authorization'] = 'Bearer ' + bearerToken;
+    const bearerToken = await neonJwt();
+    if (bearerToken) headers['Authorization'] = 'Bearer ' + bearerToken;
 
     // Schritt 2: Proxy aufrufen — apiKey im Body → kein DB-Lookup im Proxy
     const r = await fetch(CFG.AI_PROXY, {

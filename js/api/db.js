@@ -1,16 +1,16 @@
 /**
- * StudyBuddy Pro — Datenbank-Layer (Supabase)
- * Alle CRUD-Operationen an einem Ort.
- * Fallback auf localStorage wenn Supabase nicht konfiguriert.
+ * StudyBuddy Pro — Datenbank-Layer (Neon Data API)
+ * Alle CRUD-Operationen an einem Ort. PostgREST-kompatibel über die
+ * Supabase-kompatible Client-Fassade (window.supabase).
+ * Fallback auf localStorage, wenn kein Client konfiguriert/geladen ist.
  */
 
-import { CONFIG } from '../config.js';
 import { state } from '../state.js';
 import { SUPABASE_READY } from '../auth.js';
 
 function sb() {
   return SUPABASE_READY && window.supabase
-    ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
+    ? window.supabase.createClient()
     : null;
 }
 

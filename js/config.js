@@ -2,15 +2,20 @@
  * StudyBuddy Pro — App-Konfiguration
  * Zentrale Stelle für alle Konstanten und Einstellungen.
  *
- * WICHTIG: Supabase-Credentials hier eintragen nach Projekterstellung.
- * Nie sensible Secrets (Service Role Key, DB-Passwort) hier speichern —
- * nur den öffentlichen "anon" Key.
+ * Backend: Neon (Data API + Managed Better Auth). Kein Anon-Key nötig —
+ * die Data API vergibt für nicht-angemeldete Anfragen ein kurzlebiges
+ * anonymous-JWT (Managed Better Auth, allowAnonymous). Angemeldete Anfragen
+ * senden das Better-Auth-JWT automatisch als Bearer.
  */
 
 export const CONFIG = {
-  // ── Supabase ────────────────────────────────────
-  SUPABASE_URL: 'https://qzmviwrpyfpjahcmbjoy.supabase.co',
-  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXZpd3JweWZwamFoY21iam95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTg5NTcsImV4cCI6MjA5MDg3NDk1N30.BT2iRuWdI33yigziU3kicb-GQT14IHe3WU8JxFlQG0M',
+  // ── Neon Backend ─────────────────────────────────
+  // Data API (PostgREST-kompatibel, ersetzt Supabase REST/RPC)
+  NEON_DATA_API_URL:
+    'https://ep-royal-dew-asrz7sl6.apirest.c-4.eu-central-1.aws.neon.tech/neondb/rest/v1',
+  // Neon Auth (Better Auth, ersetzt Supabase Auth)
+  NEON_AUTH_URL:
+    'https://ep-royal-dew-asrz7sl6.neonauth.c-4.eu-central-1.aws.neon.tech/neondb/auth',
 
   // ── Claude API ──────────────────────────────────
   // Modell: Haiku ist am günstigsten (ca. 80% günstiger als Sonnet)

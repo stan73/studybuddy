@@ -19,8 +19,8 @@
 <link rel="stylesheet" href="css/layout.css">
 <!-- DOMPurify für XSS-Schutz (lokal gebündelt) -->
 <script src="js/vendor/purify.min.js"></script>
-<!-- Supabase JS Client (lokal gebündelt) -->
-<script src="js/vendor/supabase.js"></script>
+<!-- Neon-Client (Data API + Managed Better Auth), ersetzt Supabase; Supabase-kompatible Fassade -->
+<script type="module" src="js/vendor/neon-client.js"></script>
 <style>
 /* Landing-spezifische Styles */
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
@@ -399,12 +399,21 @@ function renderRegStep() {
   setTimeout(() => document.getElementById('r-fn')?.focus(), 50);
 }
 
-// ── Supabase Client ──────────────────────────────────────────────────────
-const SB_URL  = 'https://qzmviwrpyfpjahcmbjoy.supabase.co';
-const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bXZpd3JweWZwamFoY21iam95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTg5NTcsImV4cCI6MjA5MDg3NDk1N30.BT2iRuWdI33yigziU3kicb-GQT14IHe3WU8JxFlQG0M';
-const sb = (typeof window.supabase !== 'undefined')
-  ? window.supabase.createClient(SB_URL, SB_KEY)
+// ── Neon-Client (Data API + Managed Better Auth) ─────────────────────────
+// Der ESM-Bootstrap (js/vendor/neon-client.js) stellt window.supabase als
+// Supabase-kompatible Fassade bereit. Module laufen deferred, daher wird der
+// Client lazy erzeugt; alle Auth-Handler unten laufen ohnehin erst per Klick.
+let _sb = (typeof window.supabase !== 'undefined')
+  ? window.supabase.createClient()
   : null;
+async function getSb() {
+  if (_sb) return _sb;
+  try { if (window.neonReady) await window.neonReady; } catch(e) {}
+  if (!_sb && typeof window.supabase !== 'undefined') {
+    _sb = window.supabase.createClient();
+  }
+  return _sb;
+}
 
 // ── Passwort vergessen ────────────────────────────────────────────────────
 function showForgotPassword() {
@@ -423,14 +432,22 @@ function hideForgotPassword() {
 async function doResetPassword() {
   const em = document.getElementById('reset-em')?.value.trim();
   if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return toast('Gültige E-Mail eingeben!');
+  const sb = await getSb();
   if (!sb) return toast('Keine Verbindung zur Datenbank');
 
   const btn = document.querySelector('#forgot-pw-box .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Sende…'; }
 
-  const { error } = await sb.auth.resetPasswordForEmail(em, {
-    redirectTo: window.location.origin + '/app.html#reset-password',
-  });
+  // Supabase-kompatibel via Adapter; Fallback auf Better-Auth requestPasswordReset.
+  const redirectTo = window.location.origin + '/app.html#reset-password';
+  let error;
+  if (typeof sb.auth.resetPasswordForEmail === 'function') {
+    ({ error } = await sb.auth.resetPasswordForEmail(em, { redirectTo }));
+  } else if (typeof sb.auth.requestPasswordReset === 'function') {
+    ({ error } = await sb.auth.requestPasswordReset({ email: em, redirectTo }));
+  } else {
+    error = { message: 'Passwort-Reset wird von diesem Backend nicht unterstützt' };
+  }
 
   if (btn) { btn.disabled = false; btn.textContent = 'Reset-Link senden'; }
 
@@ -447,6 +464,7 @@ async function doLogin() {
   const pw = document.getElementById('l-pw')?.value;
   if (!em || !pw) return toast('⚠️ E-Mail und Passwort eingeben!');
 
+  const sb = await getSb();
   if (!sb) return toast('❌ Keine Verbindung zur Datenbank — bitte Seite neu laden');
 
   toast('Wird angemeldet…');
@@ -480,6 +498,7 @@ async function doChildLogin() {
   if (!/[A-Za-z]/.test(pin)) return toast('❌ PIN muss mindestens einen Buchstaben enthalten!');
   if (!/[0-9]/.test(pin))    return toast('❌ PIN muss mindestens eine Zahl enthalten!');
 
+  const sb = await getSb();
   if (!sb) return toast('❌ Keine Verbindung zur Datenbank — bitte Seite neu laden');
 
   const btn = document.querySelector('#auth-body .btn-primary');
@@ -506,6 +525,7 @@ async function doChildLogin() {
 }
 
 async function doRegister() {
+  const sb = await getSb();
   if (!sb) return toast('❌ Keine Verbindung zur Datenbank — bitte Seite neu laden');
 
   // Eltern-Daten direkt aus dem DOM lesen (Single-Step Flow)
@@ -524,19 +544,30 @@ async function doRegister() {
   toast('Konto wird erstellt…');
   const fullName = (fn + ' ' + (ln || '')).trim();
 
+  // Neon Managed Better Auth verlangt einen name; wir geben ihn zusätzlich
+  // top-level mit (der SupabaseAuthAdapter reicht options.data weiter).
   const { data, error } = await sb.auth.signUp({
     email: em,
     password: pw,
+    name: fullName,
     options: { data: { full_name: fullName, role: 'parent' } },
   });
 
   if (error) return toast('❌ ' + error.message);
 
-  // Profil anlegen
-  await sb.from('profiles').upsert({
-    id: data.user.id, email: em, full_name: fullName,
-    role: 'parent', subscription: 'free',
-  });
+  // Neue Neon-Auth-User-ID ermitteln (kein handle_new_user-Trigger mehr).
+  let newUserId = data?.user?.id;
+  if (!newUserId) {
+    try { const s = await sb.auth.getSession(); newUserId = s?.data?.session?.user?.id; } catch(e) {}
+  }
+
+  // Profil anlegen — der frühere Supabase-Trigger existiert unter Neon nicht.
+  if (newUserId) {
+    await sb.from('profiles').upsert({
+      id: newUserId, email: em, full_name: fullName,
+      role: 'parent', subscription: 'free',
+    });
+  }
 
   // Kinder werden NICHT hier angelegt — das macht der Elternteil später
   // im Eltern-Dashboard. (Backlog: Kind-Account nur über bestehendes Eltern-Login)

@@ -256,9 +256,9 @@ test('T8.6', 'testKeyConnection: sendet apiKey im Body (kein DB-Lookup)', () => 
   const fn = js.match(/async function testKeyConnection[\s\S]*?(?=\nfunction resetData)/)?.[0] || '';
   return fn.includes("apiKey:   key") || fn.includes("apiKey: key") ? true : 'apiKey-Body-Parameter fehlt';
 });
-test('T8.7', 'testKeyConnection: sendet Authorization Bearer (User-JWT oder Anon-JWT)', () => {
+test('T8.7', 'testKeyConnection: sendet Authorization Bearer (Neon-Auth-JWT wenn angemeldet)', () => {
   const fn = js.match(/async function testKeyConnection[\s\S]*?(?=\nfunction resetData)/)?.[0] || '';
-  return fn.includes("'Authorization'") && fn.includes('SB_KEY') ? true : 'Bearer-Token-Logik fehlt';
+  return fn.includes("'Authorization'") && (fn.includes('neonJwt') || fn.includes('bearerToken')) ? true : 'Bearer-Token-Logik fehlt';
 });
 test('T8.8', '"Aktiv"-Badge nur nach erfolgreichem Test gesetzt', () => {
   const fn = js.match(/async function saveProviderKey[\s\S]*?(?=\nasync function testKeyConnection)/)?.[0] || '';
