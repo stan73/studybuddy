@@ -483,6 +483,10 @@ async function doLogin() {
     return toast('❌ ' + (msgs[error.message] || error.message));
   }
 
+  // Migrierte Nutzer: Profil serverseitig verknüpfen/anlegen, falls noch nicht
+  // geschehen (idempotent — bei bereits verknüpften Accounts ein No-op).
+  await linkProfile(sb, '', em);
+
   // Profil laden
   const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
   sessionStorage.setItem('sb_session', JSON.stringify({ user: data.user, profile }));
@@ -555,19 +559,12 @@ async function doRegister() {
 
   if (error) return toast('❌ ' + error.message);
 
-  // Neue Neon-Auth-User-ID ermitteln (kein handle_new_user-Trigger mehr).
-  let newUserId = data?.user?.id;
-  if (!newUserId) {
-    try { const s = await sb.auth.getSession(); newUserId = s?.data?.session?.user?.id; } catch(e) {}
-  }
-
-  // Profil anlegen — der frühere Supabase-Trigger existiert unter Neon nicht.
-  if (newUserId) {
-    await sb.from('profiles').upsert({
-      id: newUserId, email: em, full_name: fullName,
-      role: 'parent', subscription: 'free',
-    });
-  }
+  // Profil serverseitig anlegen bzw. verknüpfen. Für aus Supabase migrierte
+  // Nutzer hängt link-profile die alte profiles-Zeile (samt Kindern/Keys) auf
+  // die neue Auth-ID um — das kann der Client per RLS nicht selbst. Fehler
+  // werden sichtbar gemeldet (kein stiller Fehlschlag wie beim alten upsert).
+  const linkErr = await linkProfile(sb, fullName, em);
+  if (linkErr) return toast('❌ Profil konnte nicht angelegt werden: ' + linkErr);
 
   // Kinder werden NICHT hier angelegt — das macht der Elternteil später
   // im Eltern-Dashboard. (Backlog: Kind-Account nur über bestehendes Eltern-Login)
@@ -581,6 +578,22 @@ async function doRegister() {
     // Ins Eltern-Dashboard → Kinder-Bereich (direkter Sprung zur Kinder-Anlage)
     window.location.href = '/app.html#children';
   }
+}
+
+// Ruft die serverseitige Profil-Verknüpfung auf. Liefert null bei Erfolg,
+// sonst eine Fehlermeldung. Idempotent — nach Signup UND Login aufrufbar.
+async function linkProfile(sb, fullName, email) {
+  try {
+    let token = null;
+    try { const s = await sb.auth.getSession(); token = s?.data?.session?.access_token || null; } catch (e) {}
+    const res = await fetch('/.netlify/functions/link-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+      body: JSON.stringify({ full_name: fullName || '', email: email || '' }),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); return e.error || ('HTTP ' + res.status); }
+    return null;
+  } catch (e) { return 'Netzwerkfehler bei der Profil-Verknüpfung'; }
 }
 
 function showPolicy(type) {
