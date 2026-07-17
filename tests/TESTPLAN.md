@@ -14,7 +14,7 @@
 | Neue Funktion / neues Feature | ✅ Pflicht + neue Tests hinzufügen | Vollständige Sektion |
 | Funktion entfernt | ✅ Pflicht + Test entfernen | Alle abhängigen Sektionen |
 | CSS/Style-Änderung | – | T10 (Struktur) |
-| Supabase-Schema-Änderung | ✅ T11 | T-M7 (Auth) |
+| Neon-Schema-Änderung | ✅ T11 | T-M7 (Auth) |
 
 ---
 
@@ -27,7 +27,7 @@
 
 ### M1.2 Registrierung
 1. "Konto erstellen" → Formular ausfüllen → Absenden
-2. **Erwartet:** Bestätigungsmail oder Direktanmeldung (je nach Supabase-Config)
+2. **Erwartet:** Direktanmeldung (bzw. Bestätigungsmail — je nach Neon-Auth-Config)
 
 ### M1.3 Demo-Modus
 1. "Demo ausprobieren" klicken

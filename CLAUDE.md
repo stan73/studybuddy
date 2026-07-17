@@ -2,6 +2,8 @@
 
 Dieses Dokument legt fest, **was Claude in diesem Repo autark entscheiden und ausführen darf** — und wo eine Rückfrage Pflicht ist.
 
+> **Backend: Neon (seit 2026-07-16).** Das Backend wurde von Supabase auf **Neon** (Serverless Postgres, `eu-central-1`/Frankfurt, DSGVO) migriert — Neon Auth, Neon Data API und Netlify Functions. Der Ordner `supabase/migrations/` ist ab jetzt **nur noch historisch**.
+
 ---
 
 ## 1. Autark erlaubt (kein Rückfragen nötig)
@@ -15,7 +17,7 @@ Claude darf ohne Nachfrage:
 - Tests laufen lassen (`npm test`, `./tests/run.sh`, o. ä.)
 - i18n-Keys in allen 4 Sprachen (de / en / fr / es) hinzufügen
 - CSS-/Tooltip-/UX-Verbesserungen, die das bestehende Design respektieren
-- Supabase-Schema-Änderungen via `apply_migration` in `development`-Branch (NICHT in Prod ohne Freigabe)
+- Neon-Schema-Änderungen via Neon MCP (`prepare_database_migration` / `run_sql`) auf einem **dev-Branch** (NICHT auf Prod ohne Freigabe)
 - Backlog-Items abarbeiten, die in `BACKLOG.md` bereits freigegeben sind
 
 ## 2. Freigabe-Pflicht (Rückfrage zwingend)

@@ -7,10 +7,10 @@ StudyBuddy Pro ist nach den Anforderungen des EU Cyber Resilience Act (CRA 2024/
 ## Sicherheitsmaßnahmen
 
 ### Authentifizierung & Autorisierung
-- Supabase Auth mit bcrypt-Passwort-Hashing
+- **Neon Auth** (Better-Auth-kompatibel; seit 2026-07-16, zuvor Supabase Auth)
 - Mindest-Passwortanforderungen: 8 Zeichen, 1 Zahl, 1 Großbuchstabe
-- Row Level Security (RLS) auf Datenbankebene
-- API Keys nur im Browser-Memory, nie persistiert
+- Row Level Security (RLS) auf Datenbankebene, durchgesetzt über `auth.uid()` (nativ via Neon Auth `pg_session_jwt`)
+- KI-Provider-Keys nie im Browser: gekapselt in der Netlify Function `ai-proxy` (`netlify/functions/ai-proxy.mjs`); der Client sieht die Keys nie
 
 ### Netzwerksicherheit
 - HTTPS-Only (HSTS)
@@ -19,8 +19,8 @@ StudyBuddy Pro ist nach den Anforderungen des EU Cyber Resilience Act (CRA 2024/
 - Referrer-Policy: strict-origin-when-cross-origin
 
 ### Datenschutz (DSGVO)
-- Serverstandort: EU (Frankfurt, eu-central-1)
-- Verschlüsselung at-rest (Supabase)
+- Serverstandort: EU (Frankfurt, `eu-central-1`) — **Neon** Serverless Postgres
+- Verschlüsselung at-rest (Neon)
 - Recht auf Löschung implementiert
 - Keine Weitergabe an Dritte
 
@@ -45,11 +45,12 @@ Bitte keine öffentliche Offenlegung vor Bestätigung des Fixes.
 
 - Zahlungsabwicklung noch nicht aktiv (Phase 3)
 - Keine 2-Faktor-Authentifizierung (geplant für Phase 3)
-- API Keys im Browser-Memory (bewusste Entscheidung: kein Backend-Proxy in Phase 2)
+- KI-Provider-Keys serverseitig gekapselt in der Netlify Function `ai-proxy` (nicht mehr im Browser-Memory)
 
 ## Versionsverlauf
 
 | Version | Datum | Änderungen |
 |---------|-------|-----------|
+| 2.1.0 | 2026-07-16 | Backend-Migration Supabase → Neon (Neon Auth, Neon Data API, Netlify Functions; EU/Frankfurt) |
 | 2.0.0 | 2026-04-04 | Phase 2: Multi-File-Struktur, Security Headers, RLS |
 | 1.0.0 | 2026-03-01 | Phase 1: Initial Release |

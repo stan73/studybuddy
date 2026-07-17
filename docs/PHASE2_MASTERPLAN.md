@@ -2,12 +2,24 @@
 **Erstellt:** 2026-04-04
 **Status:** In Arbeit
 **Repo:** github.com/stan73/studybuddy
-**Live:** gleaming-gaufre-b15c11.netlify.app
+**Live:** gleaming-gaufre-b15c11.netlify.app (Backend: **Neon**)
+
+---
+
+> ## ⚠️ Backend-Migration Supabase → Neon (2026-07-16)
+> Das gesamte Backend wurde von **Supabase** auf **Neon** (Serverless Postgres, `eu-central-1`/Frankfurt, DSGVO) migriert. Konkret:
+> - **Auth:** Supabase Auth → **Neon Auth** (Better-Auth-kompatibel). Bestehende User registrieren sich neu (Supabase-Passwort-Hashes lassen sich nicht migrieren); die Netlify Function `link-profile` verknüpft die Daten eines migrierten Users beim ersten Login/Signup per E-Mail automatisch mit der neuen Neon-Auth-ID.
+> - **Datenzugriff:** Supabase-Client → **Neon Data API** (PostgREST-kompatibel) via `@neondatabase/neon-js`, hinter einer Supabase-kompatiblen Fassade in `js/vendor/neon-client.js` — Aufrufstellen (`sb.from()/.rpc()/.auth.*`) bleiben unverändert. RLS weiterhin über `auth.uid()` (nativ via Neon Auth `pg_session_jwt`).
+> - **Serverless-Funktionen:** Supabase Edge Functions → **Netlify Functions** (`netlify/functions/ai-proxy.mjs`, `netlify/functions/link-profile.mjs`). Die ungenutzte Edge Function `bright-worker` ist entfallen.
+> - **Env-Vars (Netlify):** `DATABASE_URL` (Neon-Owner-Conn) + `NEON_JWKS_URL`; kein `SUPABASE_URL`/`SUPABASE_ANON_KEY` mehr.
+> - Schema/RPCs/RLS (10 Tabellen, 10 RPCs) wurden **1:1 auf Neon re-portiert**. Der Ordner `supabase/migrations/` ist ab jetzt **nur noch historisch**. Das alte Supabase-Projekt `qzmviwrpyfpjahcmbjoy` bleibt nur als ruhendes Backup bestehen.
+>
+> Die untenstehenden Supabase-Passagen (Stufe 3 etc.) bleiben als **historischer Umsetzungsstand** erhalten und sind entsprechend gekennzeichnet.
 
 ---
 
 ## Ziel
-Phase 2 transformiert das Single-HTML-SPA in eine professionelle, sicherheitskonforme Multi-File-Architektur mit echtem Backend (Supabase), Cyber Resilience Act (CRA)-konformer Absicherung und erweitertem Eltern-Dashboard.
+Phase 2 transformiert das Single-HTML-SPA in eine professionelle, sicherheitskonforme Multi-File-Architektur mit echtem Backend (**Neon** — Serverless Postgres, Frankfurt; ursprünglich Supabase, migriert 2026-07-16), Cyber Resilience Act (CRA)-konformer Absicherung und erweitertem Eltern-Dashboard.
 
 ---
 
@@ -75,7 +87,7 @@ Content-Security-Policy:
   script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' https://api.anthropic.com https://*.supabase.co;
+  connect-src 'self' https://api.anthropic.com https://*.neon.tech https://esm.sh /.netlify/functions/;
   img-src 'self' data: https:;
   frame-ancestors 'none';
 
@@ -91,6 +103,8 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 ---
 
 ## STUFE 3 — Supabase Backend
+
+> **Historisch — jetzt auf Neon.** Dieses Schema/RLS wurde 1:1 nach Neon re-portiert (siehe Migrations-Hinweis oben); die folgenden Supabase-Schritte dokumentieren nur den ursprünglichen Umsetzungsstand.
 
 ### 3.1 Benutzer-Aktion erforderlich (einmalig)
 Der User muss:
@@ -327,4 +341,4 @@ CREATE POLICY "Parents can read children data"
 3. SQL aus supabase/schema.sql im Supabase SQL Editor ausführen
 
 ---
-*Letzter Update: 2026-04-04*
+*Letzter Update: 2026-07-16 (Backend-Migration Supabase → Neon; ursprünglich erstellt 2026-04-04)*
