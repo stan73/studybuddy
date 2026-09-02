@@ -1,0 +1,29 @@
+# Prettier-Geltungsbereich — Stand 2026-09-02
+# Stil: .prettierrc (Projektstil = .vscode/settings.json: singleQuote, semi,
+# printWidth 100, trailingComma es5, 2 Spaces, LF).
+
+# Fremdcode / generiert / Build-Artefakte
+node_modules/
+js/vendor/
+*.min.js
+package-lock.json
+tests/last_report.json
+docs/SBOM.json
+.netlify/
+.gstack/
+
+# HTML bewusst nicht formatiert: .vscode setzt formatOnSave für html aus;
+# app.html (~300 KB, Inline-JS) würde eine Massen-Neuformatierung erfahren.
+*.html
+
+# Prosa — Markdown wird nicht maschinell formatiert.
+*.md
+
+# --- Formatierungsschuld -------------------------------------------------
+# Diese Dateien entsprechen dem Projektstil NOCH nicht (Functions wurden von
+# Anfang an mit doppelten Quotes geschrieben; Tests/CSS haben Zeilen > 100).
+# Regel: jede Datei in einem eigenen, reinen Format-Commit auf Stil bringen
+# und dann HIER streichen. Nicht in Feature-Commits mischen.
+tests/run_tests.js
+netlify/functions/
+css/

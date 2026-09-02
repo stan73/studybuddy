@@ -27,7 +27,7 @@
  */
 
 /** @type {string} Cache-Name — bei Asset-Änderungen inkrementieren */
-const CACHE_NAME = "studybuddy-v6";
+const CACHE_NAME = 'studybuddy-v6';
 
 /** @type {number} Maximales Alter eines Cache-First-Eintrags (7 Tage) — danach Netz bevorzugen */
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -41,18 +41,18 @@ const NETWORK_TIMEOUT_MS = 4000;
  * @type {string[]}
  */
 const PRECACHE = [
-  "/",
-  "/index.html",
-  "/app.html",
-  "/css/variables.css",
-  "/css/base.css",
-  "/css/components.css",
-  "/css/layout.css",
-  "/js/vendor/neon-client.js",
-  "/js/vendor/purify.min.js",
-  "/manifest.json",
-  "/icons/icon-192.svg",
-  "/icons/icon-512.svg",
+  '/',
+  '/index.html',
+  '/app.html',
+  '/css/variables.css',
+  '/css/base.css',
+  '/css/components.css',
+  '/css/layout.css',
+  '/js/vendor/neon-client.js',
+  '/js/vendor/purify.min.js',
+  '/manifest.json',
+  '/icons/icon-192.svg',
+  '/icons/icon-512.svg',
 ];
 
 /**
@@ -66,17 +66,17 @@ const PRECACHE = [
  * @type {string[]}
  */
 const PRECACHE_OPTIONAL = [
-  "/js/vendor/neon-js.bundle.js",
-  "/js/vendor/chart.umd.min.js",
-  "/js/vendor/xlsx.full.min.js",
+  '/js/vendor/neon-js.bundle.js',
+  '/js/vendor/chart.umd.min.js',
+  '/js/vendor/xlsx.full.min.js',
 ];
 
 /** Versionsgepinnte Vendor-Bibliotheken → Cache First mit TTL. */
 const VENDOR_CACHE_FIRST = [
-  "/js/vendor/neon-js.bundle.js",
-  "/js/vendor/chart.umd.min.js",
-  "/js/vendor/xlsx.full.min.js",
-  "/js/vendor/purify.min.js",
+  '/js/vendor/neon-js.bundle.js',
+  '/js/vendor/chart.umd.min.js',
+  '/js/vendor/xlsx.full.min.js',
+  '/js/vendor/purify.min.js',
 ];
 
 /**
@@ -85,13 +85,13 @@ const VENDOR_CACHE_FIRST = [
  * @type {string[]}
  */
 const NEVER_CACHE = [
-  "neon.tech", // Neon Data API + Managed Better Auth (JWT-behaftet)
-  "/.netlify/functions/", // Netlify Functions (ai-proxy, link-profile, child-token …)
-  "anthropic.com",
-  "openai.com",
-  "generativelanguage.googleapis.com",
-  "login.microsoftonline.com", // Schul-Login (Entra ID)
-  "graph.microsoft.com",
+  'neon.tech', // Neon Data API + Managed Better Auth (JWT-behaftet)
+  '/.netlify/functions/', // Netlify Functions (ai-proxy, link-profile, child-token …)
+  'anthropic.com',
+  'openai.com',
+  'generativelanguage.googleapis.com',
+  'login.microsoftonline.com', // Schul-Login (Entra ID)
+  'graph.microsoft.com',
 ];
 
 // ── Installation ─────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ const NEVER_CACHE = [
  * Install-Event: App-Shell zwingend, große Vendor-Dateien best-effort vorcachen.
  * skipWaiting() aktiviert den neuen SW sofort (kein Warten auf Tab-Schließen).
  */
-self.addEventListener("install", (e) => {
+self.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(CACHE_NAME)
@@ -107,15 +107,11 @@ self.addEventListener("install", (e) => {
         await c.addAll(PRECACHE);
         await Promise.allSettled(
           PRECACHE_OPTIONAL.map((p) =>
-            c
-              .add(p)
-              .catch((err) =>
-                console.warn("[SW] Optionales Precache übersprungen:", p, err),
-              ),
-          ),
+            c.add(p).catch((err) => console.warn('[SW] Optionales Precache übersprungen:', p, err))
+          )
         );
       })
-      .then(() => self.skipWaiting()),
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -124,16 +120,14 @@ self.addEventListener("install", (e) => {
  * Activate-Event: Löscht alle Caches außer dem aktuellen CACHE_NAME.
  * clients.claim() übernimmt sofort die Kontrolle über alle offenen Tabs.
  */
-self.addEventListener("activate", (e) => {
+self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
       .then((keys) =>
-        Promise.all(
-          keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)),
-        ),
+        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
       )
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
   );
 });
 
@@ -153,13 +147,13 @@ async function putInCache(request, response) {
     const c = await caches.open(CACHE_NAME);
     await c.put(request, clone);
   } catch (err) {
-    console.warn("[SW] Cache-Put fehlgeschlagen:", request.url, err);
+    console.warn('[SW] Cache-Put fehlgeschlagen:', request.url, err);
   }
 }
 
 /** Ist ein Cache-Eintrag älter als CACHE_TTL_MS (anhand des Date-Headers)? */
 function isExpired(cached) {
-  const d = cached && cached.headers.get("date");
+  const d = cached && cached.headers.get('date');
   if (!d) return false; // ohne Datum: als frisch behandeln
   const age = Date.now() - new Date(d).getTime();
   return Number.isFinite(age) && age > CACHE_TTL_MS;
@@ -168,7 +162,7 @@ function isExpired(cached) {
 /** fetch mit Timeout — bricht ab, wenn das Netz zu lange braucht. */
 function fetchWithTimeout(request, ms) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
     fetch(request).then(
       (res) => {
         clearTimeout(timer);
@@ -177,18 +171,15 @@ function fetchWithTimeout(request, ms) {
       (err) => {
         clearTimeout(timer);
         reject(err);
-      },
+      }
     );
   });
 }
 
 /** Offline-Shell für eine Navigation: /app.html für App-Routen, sonst /index.html. */
 function shellFor(pathname) {
-  const isApp =
-    pathname === "/app.html" ||
-    pathname === "/app" ||
-    pathname.startsWith("/app/");
-  return isApp ? "/app.html" : "/index.html";
+  const isApp = pathname === '/app.html' || pathname === '/app' || pathname.startsWith('/app/');
+  return isApp ? '/app.html' : '/index.html';
 }
 
 /** Network First: frische Antwort bevorzugen, Cache als Offline-Fallback. */
@@ -241,9 +232,9 @@ async function cacheFirstWithTtl(request) {
  *   5. Manifest / Icons                        → Cache First mit TTL
  *   6. Sonstige                                → nicht abfangen
  */
-self.addEventListener("fetch", (e) => {
+self.addEventListener('fetch', (e) => {
   const req = e.request;
-  if (req.method !== "GET") return;
+  if (req.method !== 'GET') return;
   if (NEVER_CACHE.some((n) => req.url.includes(n))) return;
 
   let url;
@@ -257,10 +248,7 @@ self.addEventListener("fetch", (e) => {
 
   // 2. Navigationen und HTML-Entry-Points
   const isHtml =
-    req.mode === "navigate" ||
-    path === "/" ||
-    path === "/index.html" ||
-    path === "/app.html";
+    req.mode === 'navigate' || path === '/' || path === '/index.html' || path === '/app.html';
   if (isHtml) {
     e.respondWith(networkFirst(req, shellFor(path)));
     return;
@@ -273,13 +261,13 @@ self.addEventListener("fetch", (e) => {
   }
 
   // 4. Eigene Assets (ändern sich mit Deploys)
-  if (path.startsWith("/css/") || path.startsWith("/js/")) {
+  if (path.startsWith('/css/') || path.startsWith('/js/')) {
     e.respondWith(networkFirst(req, null));
     return;
   }
 
   // 5. Manifest / Icons
-  if (path === "/manifest.json" || path.startsWith("/icons/")) {
+  if (path === '/manifest.json' || path.startsWith('/icons/')) {
     e.respondWith(cacheFirstWithTtl(req));
   }
 });
