@@ -15,7 +15,8 @@
  * window.neonReady (Promise), bevor er auf window.supabase zugreift.
  */
 
-import { createClient, SupabaseAuthAdapter } from 'https://esm.sh/@neondatabase/neon-js@latest';
+// Lokal gebündelt (npm run build:neon) — @neondatabase/neon-js 0.7.0-beta, gepinnt, kein CDN.
+import { createClient, SupabaseAuthAdapter } from './neon-js.bundle.js';
 
 // Zwei-URL-Objektform (die in npm veröffentlichte Beta akzeptiert nur diese Form).
 const AUTH_URL = 'https://ep-royal-dew-asrz7sl6.neonauth.c-4.eu-central-1.aws.neon.tech/neondb/auth';

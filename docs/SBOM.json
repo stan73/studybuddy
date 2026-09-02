@@ -51,13 +51,13 @@
     {
       "type": "library",
       "name": "@neondatabase/neon-js",
-      "version": "latest",
-      "description": "Neon Data API client (PostgREST-compatible); Supabase-compatible facade in js/vendor/neon-client.js",
+      "version": "0.7.0-beta",
+      "description": "Neon Data API + Managed Better Auth client (Supabase-compatible facade in js/vendor/neon-client.js); pinned and bundled locally to js/vendor/neon-js.bundle.js via esbuild (npm run build:neon)",
       "licenses": [{ "license": { "id": "MIT" } }],
-      "purl": "pkg:npm/@neondatabase/neon-js",
+      "purl": "pkg:npm/@neondatabase/neon-js@0.7.0-beta",
       "externalReferences": [
         { "type": "website", "url": "https://neon.tech" },
-        { "type": "distribution", "url": "https://esm.sh/@neondatabase/neon-js@latest" }
+        { "type": "distribution", "url": "https://registry.npmjs.org/@neondatabase/neon-js/-/neon-js-0.7.0-beta.tgz" }
       ]
     },
     {
