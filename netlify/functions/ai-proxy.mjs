@@ -1,6 +1,7 @@
 /**
  * ai-proxy — StudyBuddy KI-Proxy (Netlify Function, Neon-Backend)
- * Sicherer Proxy für KI-Anfragen. API-Keys verlassen den Server nie.
+ * Sicherer Proxy für KI-Anfragen. Gespeicherte API-Keys werden nur hier
+ * serverseitig aufgelöst; der Client kann sie nicht aus der DB lesen.
  * Ersetzt die frühere Supabase Edge Function 1:1 (Neon statt Supabase,
  * JWT-Verifikation gegen die Neon-Auth-JWKS, Free-Tier-Tageslimit).
  */
@@ -57,7 +58,12 @@ export default async (req) => {
     }
 
     if (!apiKey) {
-      return err(400, `Kein ${provider}-API-Key konfiguriert — Elternteil muss Key in den Einstellungen hinterlegen`);
+      return err(
+        400,
+        childId
+          ? `Kein ${provider}-API-Key hinterlegt — der Elternteil muss ihn in den Einstellungen eintragen`
+          : `Kein ${provider}-API-Key hinterlegt — bitte in den Einstellungen eintragen`,
+      );
     }
 
     // Free-Tier-Limit

@@ -1928,31 +1928,23 @@ async function ai(messages, system, maxTok=400, useCache=true, image=null) {
   if (image) payload.image = image; // { mime, data } für Vision/PDF
 
   // Netlify Function: Bearer-Token nur wenn angemeldet (Neon-Auth-JWT).
-  // Nicht-angemeldete (Kind/Demo) senden kein Bearer; Key/childId liegt im Body.
+  // Nicht-angemeldete (Kind/Demo) senden kein Bearer; childId bzw. der
+  // gerade eingegebene Key liegt im Body.
   const jwt = await neonJwt();
   if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
 
   const ramKey = activeKey();
 
   if (ramKey) {
-    // Pfad 1: Key im RAM (gerade eingegeben oder noch nicht aus DB gelöscht)
+    // Pfad 1: Key im RAM (gerade eingegeben, noch nicht im Backend)
     payload.apiKey = ramKey;
   } else if (U?.isChild && U?.id) {
     // Pfad 2: Kind → Proxy holt Parent-Key aus DB anhand childId
     payload.childId = U.id;
-  } else if (sb && U?.id && !U?.isChild) {
-    // Pfad 3: Authentifizierter Elternteil → Key aus DB laden und im Body senden
-    // (User-JWT vom Gateway für Edge Functions abgelehnt → Key client-seitig aus DB holen)
-    const { data: keyRow } = await sb.from('api_keys')
-      .select('api_key')
-      .eq('user_id', U.id)
-      .eq('provider', prov)
-      .maybeSingle();
-    if (keyRow?.api_key) {
-      payload.apiKey = keyRow.api_key;
-    } else {
-      throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — bitte in Einstellungen eintragen`);
-    }
+  } else if (jwt && U?.id && !U?.isChild) {
+    // Pfad 3: Angemeldeter Elternteil → nur das JWT geht mit. Der Proxy löst
+    // den Key serverseitig aus api_keys auf; der Client hat kein SELECT-Recht
+    // auf api_keys und sieht den Key nach dem Speichern nie wieder.
   } else {
     throw new Error(`${PROVIDERS[prov]?.name||prov} API Key fehlt — Elternteil trägt ihn in Einstellungen ein`);
   }

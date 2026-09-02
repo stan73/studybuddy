@@ -274,7 +274,7 @@ footer a:hover { color: white; }
 // ── FAQ Daten ────────────────────────────────────────────────────────────────
 const FAQS = [
   { q: 'Brauche ich einen Claude API Key?', a: 'Der API Key ist optional. Alle Grundfunktionen (Karteikarten, Lernplan, Pomodoro) funktionieren ohne API Key. Der Key wird nur für KI-generierte Inhalte (Tutor, automatische Kartenerstellung, Prüfungsfragen) benötigt.' },
-  { q: 'Wo werden meine Daten gespeichert?', a: 'Alle Daten werden DSGVO-konform auf EU-Servern in Frankfurt gespeichert. Passwörter werden verschlüsselt, API Keys nie auf dem Server gespeichert.' },
+  { q: 'Wo werden meine Daten gespeichert?', a: 'Alle Daten werden DSGVO-konform auf EU-Servern in Frankfurt gespeichert. Passwörter werden nur als Hash gespeichert. KI-API-Keys liegen serverseitig in der EU-Datenbank (verschlüsselt at-rest) und werden ausschließlich von unserem Server an den KI-Anbieter weitergereicht — der Browser kann sie nach dem Speichern nicht mehr auslesen.' },
   { q: 'Kann ich mehrere Kinder anlegen?', a: 'Mit Family Plus bis zu 3 Kinder, mit Family Pro bis zu 6 Kinder — alle mit eigenem Schüler-Account und Lernprofil.' },
   { q: 'Wie melden sich Kinder an?', a: 'Eltern richten den Account ein und vergeben für jedes Kind einen persönlichen alphanumerischen PIN (mind. 8 Zeichen). Kinder loggen sich dann mit der E-Mail des Elternteils und ihrem PIN ein — ganz einfach, ohne eigene E-Mail-Adresse.' },
 ];

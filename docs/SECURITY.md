@@ -10,7 +10,8 @@ StudyBuddy Pro ist nach den Anforderungen des EU Cyber Resilience Act (CRA 2024/
 - **Neon Auth** (Better-Auth-kompatibel; seit 2026-07-16, zuvor Supabase Auth)
 - Mindest-Passwortanforderungen: 8 Zeichen, 1 Zahl, 1 Großbuchstabe
 - Row Level Security (RLS) auf Datenbankebene, durchgesetzt über `auth.uid()` (nativ via Neon Auth `pg_session_jwt`)
-- KI-Provider-Keys nie im Browser: gekapselt in der Netlify Function `ai-proxy` (`netlify/functions/ai-proxy.mjs`); der Client sieht die Keys nie
+- KI-Provider-Keys (Claude/OpenAI/Gemini): Der Elternteil trägt den Key einmalig in den Einstellungen ein; der Browser testet ihn über den Proxy und legt ihn per Data-API in `api_keys` ab (RLS: Client-Rollen dürfen nur INSERT/UPDATE/DELETE auf eigene Zeilen, **kein SELECT**). Danach kann der Browser den Key nicht mehr aus der Datenbank lesen — jede KI-Anfrage schickt nur das Auth-JWT, und die Netlify Function `ai-proxy` (`netlify/functions/ai-proxy.mjs`) löst den Key serverseitig auf und reicht ihn an den Anbieter weiter
+- Bekannte Einschränkung (Stand 2026-09): Der eingegebene Key wird zusätzlich in `localStorage` des Eltern-Geräts abgelegt, damit Kind-Profile auf demselben Gerät ihn erben können. Diese Ablage wird in einer späteren Härtungsstufe abgelöst
 
 ### Netzwerksicherheit
 - HTTPS-Only (HSTS)
