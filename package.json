@@ -14,9 +14,10 @@
     "vitest": "4.1.11"
   },
   "scripts": {
-    "test": "npm run test:legacy && npm run test:unit",
+    "test": "npm run test:legacy && npm run test:unit && npm run test:db",
     "test:legacy": "node tests/run_tests.js",
     "test:unit": "vitest run tests/unit",
+    "test:db": "vitest run tests/db",
     "lint": "npm run lint:format && npm run lint:syntax && npm run lint:version",
     "lint:format": "prettier --check .",
     "lint:syntax": "node scripts/check-syntax.mjs app.html index.html sw.js netlify/functions scripts tests",

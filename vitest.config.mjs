@@ -15,6 +15,8 @@ export default defineConfig({
       DATABASE_URL: 'postgres://unit-test@localhost/unit-test',
       NEON_JWKS_URL: 'https://jwks.invalid/.well-known/jwks.json',
     },
+    // DB-/API-Tests teilen sich einen Dev-Branch — Dateien nacheinander, nicht parallel.
+    fileParallelism: false,
     testTimeout: 30_000,
     hookTimeout: 60_000,
     reporters: process.env.CI ? ['default', 'github-actions'] : ['default'],
