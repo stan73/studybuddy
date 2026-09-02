@@ -485,7 +485,10 @@ async function doLogin() {
 
   // Migrierte Nutzer: Profil serverseitig verknüpfen/anlegen, falls noch nicht
   // geschehen (idempotent — bei bereits verknüpften Accounts ein No-op).
-  await linkProfile(sb, '', em);
+  // Ein Fehler (z. B. E-Mail noch nicht bestätigt → alte Daten noch nicht
+  // verknüpft) wird angezeigt, blockiert den Login aber nicht.
+  const linkErr = await linkProfile(sb, '', em);
+  if (linkErr) toast('⚠️ ' + linkErr, 8000);
 
   // Profil laden
   const { data: profile } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
@@ -564,7 +567,7 @@ async function doRegister() {
   // die neue Auth-ID um — das kann der Client per RLS nicht selbst. Fehler
   // werden sichtbar gemeldet (kein stiller Fehlschlag wie beim alten upsert).
   const linkErr = await linkProfile(sb, fullName, em);
-  if (linkErr) return toast('❌ Profil konnte nicht angelegt werden: ' + linkErr);
+  if (linkErr) return toast('❌ ' + linkErr, 8000);
 
   // Kinder werden NICHT hier angelegt — das macht der Elternteil später
   // im Eltern-Dashboard. (Backlog: Kind-Account nur über bestehendes Eltern-Login)

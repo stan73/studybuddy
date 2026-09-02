@@ -9,6 +9,8 @@ StudyBuddy Pro ist nach den Anforderungen des EU Cyber Resilience Act (CRA 2024/
 ### Authentifizierung & Autorisierung
 - **Neon Auth** (Better-Auth-kompatibel; seit 2026-07-16, zuvor Supabase Auth)
 - Mindest-Passwortanforderungen: 8 Zeichen, 1 Zahl, 1 Großbuchstabe
+- Profil-Verknüpfung (`netlify/functions/link-profile.mjs`): Die E-Mail stammt ausschließlich aus `neon_auth."user"` (kein Client-Wert); ein bestehendes Profil wird nur dann auf eine neue Auth-ID umgehängt, wenn die E-Mail des Auth-Kontos verifiziert ist (sonst 403)
+- Offen (Stand 2026-09-02): `require_email_verification`/`verify_email_on_sign_up` in der Neon-Auth-Config sind noch aus; Voraussetzung dafür ist eine OTP-Eingabe im Client (`email_verification_method: otp`). Bis dahin verifiziert der Betreiber migrierte Konten manuell (`neon/migrations/003_…`)
 - Row Level Security (RLS) auf Datenbankebene, durchgesetzt über `auth.uid()` (nativ via Neon Auth `pg_session_jwt`)
 - KI-Provider-Keys (Claude/OpenAI/Gemini): Der Elternteil trägt den Key einmalig in den Einstellungen ein; der Browser testet ihn über den Proxy und legt ihn per Data-API in `api_keys` ab (RLS: Client-Rollen dürfen nur INSERT/UPDATE/DELETE auf eigene Zeilen, **kein SELECT**). Danach kann der Browser den Key nicht mehr aus der Datenbank lesen — jede KI-Anfrage schickt nur das Auth-JWT, und die Netlify Function `ai-proxy` (`netlify/functions/ai-proxy.mjs`) löst den Key serverseitig auf und reicht ihn an den Anbieter weiter
 - Bekannte Einschränkung (Stand 2026-09): Der eingegebene Key wird zusätzlich in `localStorage` des Eltern-Geräts abgelegt, damit Kind-Profile auf demselben Gerät ihn erben können. Diese Ablage wird in einer späteren Härtungsstufe abgelöst
