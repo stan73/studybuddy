@@ -35,15 +35,21 @@
     # Content Security Policy
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.neon.tech https://login.microsoftonline.com https://graph.microsoft.com; img-src 'self' data: https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; worker-src 'self';"
 
+# /js/* und /css/* tragen keinen Datei-Hash in der URL. Mit max-age=3600 lief
+# bis zu 1 h eine neue app.html gegen alte Assets. max-age=0 + must-revalidate:
+# der Browser (bzw. der Service Worker) fragt bei jedem Zugriff per ETag nach
+# und bekommt ein billiges 304, solange sich nichts geändert hat — nach einem
+# Deploy sofort die neue Datei. Die großen Vendor-Bibliotheken hält sw.js
+# ohnehin Cache First (mit TTL), die trifft dieser Header kaum.
 [[headers]]
   for = "/js/*"
   [headers.values]
-    Cache-Control = "public, max-age=3600, must-revalidate"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/css/*"
   [headers.values]
-    Cache-Control = "public, max-age=3600, must-revalidate"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/sw.js"
