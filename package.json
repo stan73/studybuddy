@@ -22,7 +22,7 @@
     "test:e2e": "playwright test",
     "lint": "npm run lint:format && npm run lint:syntax && npm run lint:version",
     "lint:format": "prettier --check .",
-    "lint:syntax": "node scripts/check-syntax.mjs app.html index.html sw.js netlify/functions scripts tests",
+    "lint:syntax": "node scripts/check-syntax.mjs app.html index.html sw.js js/sync-merge.js netlify/functions scripts tests",
     "lint:version": "node scripts/check-version.mjs",
     "format": "prettier --write .",
     "build:neon": "esbuild scripts/neon-bundle/entry.mjs --bundle --format=esm --platform=browser --target=es2020 --minify --legal-comments=none --alias:@neondatabase/auth/react/adapters=./scripts/neon-bundle/empty.mjs --outfile=js/vendor/neon-js.bundle.js"
