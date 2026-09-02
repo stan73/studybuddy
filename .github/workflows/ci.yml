@@ -1,0 +1,46 @@
+name: CI
+
+# Deploy-Tor: Netlify baut main automatisch — dieser Lauf macht Fehler vor/beim Push sichtbar.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least Privilege: nur Lesen; Actions sind auf Commit-SHAs gepinnt (Dependabot hält sie aktuell).
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint · Syntax · Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Node 22 (Netlify-Functions-Runtime)
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Abhängigkeiten (lockfile, ohne Install-Skripte)
+        run: npm ci --ignore-scripts
+
+      - name: Lint — Prettier-Check, Inline-JS/.mjs-Syntax, Versionsgleichstand
+        run: npm run lint
+
+      - name: Tests — tests/run_tests.js
+        run: npm test
+
+      - name: Formatierungsschuld (nicht blockierend, siehe .prettierignore)
+        continue-on-error: true
+        run: npx prettier --check --ignore-path .gitignore tests/run_tests.js netlify/functions css

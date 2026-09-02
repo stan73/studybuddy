@@ -3,7 +3,7 @@
  * @description PWA-Offline-Support und Caching-Strategie.
  *              Ermöglicht das Öffnen der App ohne Internetverbindung (App-Shell).
  *              API-Anfragen (Neon, Netlify Functions, KI-Provider) werden nie gecacht.
- * @version 2.1.0
+ * @version 2.2.0
  *
  * @caching_strategy
  *   HTML-Entry-Points (/, index.html, app.html, /app/*)

@@ -1,6 +1,6 @@
 {
   "name": "studybuddy",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "private": true,
   "description": "StudyBuddy Pro — Netlify Functions (Neon backend)",
   "dependencies": {
@@ -9,10 +9,16 @@
   },
   "devDependencies": {
     "@neondatabase/neon-js": "0.7.0-beta",
-    "esbuild": "0.25.9"
+    "esbuild": "0.25.9",
+    "prettier": "3.8.1"
   },
   "scripts": {
-    "build:neon": "esbuild scripts/neon-bundle/entry.mjs --bundle --format=esm --platform=browser --target=es2020 --minify --legal-comments=none --alias:@neondatabase/auth/react/adapters=./scripts/neon-bundle/empty.mjs --outfile=js/vendor/neon-js.bundle.js",
-    "test": "node tests/run_tests.js"
+    "test": "node tests/run_tests.js",
+    "lint": "npm run lint:format && npm run lint:syntax && npm run lint:version",
+    "lint:format": "prettier --check .",
+    "lint:syntax": "node scripts/check-syntax.mjs app.html index.html sw.js netlify/functions scripts",
+    "lint:version": "node scripts/check-version.mjs",
+    "format": "prettier --write .",
+    "build:neon": "esbuild scripts/neon-bundle/entry.mjs --bundle --format=esm --platform=browser --target=es2020 --minify --legal-comments=none --alias:@neondatabase/auth/react/adapters=./scripts/neon-bundle/empty.mjs --outfile=js/vendor/neon-js.bundle.js"
   }
 }

@@ -67,6 +67,7 @@ Bitte keine öffentliche Offenlegung vor Bestätigung des Fixes.
 
 | Version | Datum | Änderungen |
 |---------|-------|-----------|
+| 2.2.0 | 2026-09-02 | Härtung Stufe 0/1: Konto-Übernahme via link-profile geschlossen, KI-Keys nur serverseitig, Kind-Token im ai-proxy, Session-Gate, Passwort-Reset, Eltern-Persistenz repariert (SECURITY DEFINER), search_path bei allen DEFINER-Funktionen, toter Parallelcode entfernt, CI als Deploy-Tor. Versionsquelle: package.json |
 | 2.1.0 | 2026-07-16 | Backend-Migration Supabase → Neon (Neon Auth, Neon Data API, Netlify Functions; EU/Frankfurt) |
 | 2.0.0 | 2026-04-04 | Phase 2: Multi-File-Struktur, Security Headers, RLS |
 | 1.0.0 | 2026-03-01 | Phase 1: Initial Release |

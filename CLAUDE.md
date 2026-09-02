@@ -14,7 +14,7 @@ Claude darf ohne Nachfrage:
 - `git add / commit / push` auf `main` ausführen
 - Netlify-Auto-Deploy triggern (passiert automatisch nach Push)
 - Abhängigkeiten via `npm install` hinzufügen, wenn sie den aktuellen Test-Durchlauf nicht brechen
-- Tests laufen lassen (`npm test`, `./tests/run.sh`, o. ä.)
+- Tests und Lint laufen lassen (`npm test`, `npm run lint`)
 - i18n-Keys in allen 4 Sprachen (de / en / fr / es) hinzufügen
 - CSS-/Tooltip-/UX-Verbesserungen, die das bestehende Design respektieren
 - Neon-Schema-Änderungen via Neon MCP (`prepare_database_migration` / `run_sql`) auf einem **dev-Branch** (NICHT auf Prod ohne Freigabe)
@@ -38,11 +38,14 @@ Claude fragt IMMER nach, bevor:
 
 ## 4. Test-Pflicht
 
-Vor jedem Push gegen `main`:
+Vor jedem Push gegen `main` (dasselbe läuft in CI: `.github/workflows/ci.yml` bei Push und PR auf `main`; Netlify deployt unabhängig davon — CI ist das Sichtbarkeits-Tor, kein Blocker):
 
-1. `node --check app.html index.html` (JS-Syntax-Sanity, wenn inline-JS)
-2. Manueller Smoke-Test im Browser-Tab (mittels Netlify-Preview oder Live-Server)
-3. Falls vorhanden: `tests/last_report.json` auf 100 % prüfen
+1. `npm run lint` — Prettier-Check (`.prettierrc`, Ausnahmen in `.prettierignore`), Syntax-Check des Inline-JS von `app.html`/`index.html` sowie aller `.js`/`.mjs` (`scripts/check-syntax.mjs` extrahiert die `<script>`-Blöcke; `node --check app.html` direkt schlägt bei HTML immer fehl), Versionsgleichstand (`scripts/check-version.mjs`)
+2. `npm test` — `tests/run_tests.js`, muss 156/156 liefern (Exit-Code ≠ 0 bricht CI)
+3. Manueller Smoke-Test im Browser-Tab (Netlify-Preview oder Live-Server); Live-Site per `curl` → HTTP 200 + Titel „StudyBuddy Pro"
+4. Bei DB-Änderungen: Round-Trip gegen Produktion nachweisen und als `neon/migrations/NNN_….sql` ablegen (siehe §8)
+
+**Version — eine Quelle der Wahrheit:** `package.json` (`npm version <x.y.z> --no-git-tag-version`). Nachzuziehen: `app.html` (Sidebar-Badge `v<x.y>` + `@version`), `sw.js` (`@version`), `docs/SBOM.json` (`metadata.component.version`) und eine neue oberste Zeile im Versionsverlauf von `docs/SECURITY.md` — `npm run lint:version` erzwingt den Gleichstand.
 
 ## 5. Git-Lock-Workaround
 
