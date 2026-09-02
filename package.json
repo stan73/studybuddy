@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@neondatabase/neon-js": "0.7.0-beta",
+    "@playwright/test": "1.62.1",
     "esbuild": "0.25.9",
     "prettier": "3.8.1",
     "vitest": "4.1.11"
@@ -18,6 +19,7 @@
     "test:legacy": "node tests/run_tests.js",
     "test:unit": "vitest run tests/unit",
     "test:db": "vitest run tests/db",
+    "test:e2e": "playwright test",
     "lint": "npm run lint:format && npm run lint:syntax && npm run lint:version",
     "lint:format": "prettier --check .",
     "lint:syntax": "node scripts/check-syntax.mjs app.html index.html sw.js netlify/functions scripts tests",

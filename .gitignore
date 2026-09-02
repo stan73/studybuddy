@@ -33,3 +33,8 @@ tests/last_report.json
 # Projektdokumente gehören nach docs/.
 /*.docx
 /*.pdf
+
+# Playwright: PID des lokalen E2E-Servers, Reports
+tests/e2e/.server.pid
+test-results/
+playwright-report/
