@@ -1,21 +1,55 @@
 # StudyBuddy Pro — Feature-Backlog & Roadmap
 
-Stand: 2026-06-25 | Priorisiert nach **Wirkung auf Kernschleife (Lernerfolg + Bindung) × Aufwand**
+Stand: 2026-09-02 | Priorisiert nach **Wirkung auf Kernschleife (Lernerfolg + Bindung) × Aufwand**
 Aufwand: **S** = < 1 Tag · **M** = 1–3 Tage · **L** = > 3 Tage
 
 > Grundlage: Architektur-Bewertung gegen Best-in-Class (Anki/FSRS, Quizlet, Duolingo, Khanmigo, Photomath, Knowunity/StudySmarter, simpleclub, Anton, Untis). Stärken heute: RLS-Sicherheit, gekapselte KI-Keys (`ai-proxy` Netlify Function), sauberes Token-Design-System, **Eltern-Kontrolle als echter Vorsprung**. Hauptlücken: Persistenz, Retention-Mechanik, Content-Ingestion, Accessibility.
 
 ---
 
+## 🛡️ Härtung 2026-09 — Stand (Stufe 0 komplett, Stufe 1/2 teilweise)
+
+**Kernbefund:** Die Eltern-Cloud-Persistenz war von der Neon-Migration (2026-07-16) bis zum 2026-09-02 **komplett defekt** — `sync_my_data`/`load_my_data` liefen als `SECURITY INVOKER` (Rolle `authenticated` hat kein `USAGE` auf Schema `auth`) und scheiterten bei jedem Aufruf mit 42501; die Fehler wurden von leeren `catch`-Blöcken verschluckt. Sieben Wochen lang hat kein Elternteil Karten/Aufgaben/Prüfungen geschrieben oder geladen (`cards` = 0 Zeilen). P0.1 galt in dieser Zeit fälschlich als erledigt. Der Kind-Pfad (`*_child_data`, PIN) war nicht betroffen.
+
+| Maßnahme | Commit | Nachweis |
+|---|---|---|
+| 0.1 Konto-Übernahme über `link-profile` geschlossen (E-Mail nur aus `neon_auth."user"`, Umhängen nur bei verifizierter E-Mail) | `f745d9d` | Tests 156/156; `neon/migrations/003` |
+| 0.2 KI-Key nicht mehr clientseitig aus `api_keys` lesbar (kein SELECT-Policy) | `bac3bcc` | `neon/migrations/001` |
+| 0.3 `ai-proxy` gehärtet: Kind-Token (HMAC), Limits, Timeout, CORS; `consume_ai_quota` nur Owner | `c47e34b` | Token-Roundtrip lokal; `neon/migrations/002` |
+| neon-js 0.7.0-beta gepinnt und lokal gebündelt (kein esm.sh, CSP enger) | `f1f63b1` | SBOM |
+| 1.7 Fehler sichtbar: 19 leere `catch`-Blöcke, globale Handler, `renderFatalError` | `7e92850` | Tests 156/156 |
+| 1.2 Session-Gate: `U` nur aus serverseitig geprüfter Session, Ablauf erkannt | `1f3728f` | — |
+| 1.3 Passwort-Reset in `app.html#reset-password` abgeschlossen | `cf63d52` | — |
+| **1.0 Eltern-Persistenz repariert:** `sync_my_data`/`load_my_data` als `SECURITY DEFINER` mit `search_path`, EXECUTE nur `authenticated` | `183ad4f` | **echter Round-Trip über die Data API** (204/200, 25/25 Felder); `neon/migrations/004` |
+| Service Worker v6: ein Fetch-Listener, Vendor-Precache, `/app/*`-Shell | `105ca26` | — |
+| `search_path = public, pg_temp` bei **allen** 8 `SECURITY DEFINER`-Funktionen | `64178fb` | `pg_proc.proconfig`: 0 ungehärtet; `neon/migrations/005` |
+| `.prettierrc` = Projektstil; `sw.js` zurückformatiert; Formatierungsschuld in `.prettierignore` | `2a88f13` | `prettier --check` |
+| 2.4 Toter Parallelcode gelöscht (`js/`-Module, `js/vendor/supabase.js`, `supabase/functions/`), Supabase-Reste in Kommentaren/Doku berichtigt | `2c12a66` | grep `<script src=`/`import`: nur `js/vendor/*` geladen; Tests 156/156 |
+
+**Offen (bewusst noch nicht angefasst):** 1.1 Sync-Semantik/Konflikterkennung (Whole-Replace, Last-Writer-Wins) · 1.5 Kind-PIN im Klartext in `sessionStorage` · 2.2 CI als Deploy-Tor · 2.5 Accessibility · 2.6 Lazy-Loading der Vendor-Bibliotheken · 2.7 Rechtliches (Impressum/Datenschutz/AVV).
+
+**Regel ab jetzt:** „erledigt" nur mit nachgewiesenem Round-Trip gegen Produktion. Jede DB-Änderung — auch wenn per Neon-MCP ausgeführt — wird als `neon/migrations/NNN_….sql` mit Befund, Begründung und Verifikation abgelegt.
+
+---
+
+## 🙋 Offene Nutzer-Aufgaben (nur der Betreiber kann das)
+
+- [ ] **`CHILD_TOKEN_SECRET` in Netlify setzen** (Site → Environment variables; ≥ 32 zufällige Bytes, z. B. `openssl rand -hex 32`). Bis dahin antwortet der Kind-Pfad der KI-Funktionen **bewusst mit 503** (kein Rückfall auf ungeprüfte Anfragen). Nach dem Setzen: Redeploy auslösen.
+- [ ] **Neon-Auth-Flags in der Neon-Konsole** (mit den MCP-Tools nicht setzbar): `require_email_verification` / `verify_email_on_sign_up` einschalten und `allow_localhost = false`. **Vorbedingung:** eine OTP-Eingabe im Client (`email_verification_method: otp`) — sonst sperrt man Neuregistrierungen aus. Bis dahin verifiziert der Betreiber migrierte Konten manuell (Vorlage in `neon/migrations/003`).
+- [ ] **Zwei Familienkonten neu registrieren** (die in `neon/migrations/003` genannten Adressen): Supabase-Passwort-Hashes waren nicht migrierbar; `link-profile` hängt die alten Profile samt Kindern nach der Neuregistrierung automatisch um — dafür muss die E-Mail als verifiziert markiert sein (siehe Vorlage). Bis dahin existieren diese Familien in Neon Auth nicht.
+
+---
+
 ## 🔴 P0 — Fundament & Compliance (zuerst — sonst trägt der Rest nicht)
 
-### [x] P0.1 · Persistenz vollständig migrieren — **ERLEDIGT (2026-06-25, Commit `0f04379`, live) · jetzt auf Neon (2026-07-16)**
-Karten/Aufgaben/Prüfungen werden geräteübergreifend in der DB gespeichert (Migration 008: `child_id` + PIN-/RLS-RPCs `sync_my_data`/`load_my_data`/`sync_child_data`/`load_child_data`). localStorage nur noch Offline-Cache + einmalige Migration. Verifiziert: DB-Round-Trip + Browser-Smoke-Test (Schreiben + Cross-Device-Laden). **Backend seit 2026-07-16 auf Neon** (Neon Data API statt Supabase-Client); Schema/RPCs/RLS 1:1 re-portiert, Zugriff via `js/vendor/neon-client.js` (Supabase-kompatible Fassade), RLS weiterhin über `auth.uid()`.
-- **Akzeptanz:**
-  - Karteikarten, `tasks`, `exams`, `sessions`, `user_stats` werden ausschließlich in der Neon-DB gelesen/geschrieben (kein `localStorage` als Quelle der Wahrheit).
-  - Login auf zweitem Gerät zeigt identischen Stand (Karten, Streak, XP, Aufgaben).
-  - **Streak-Bug behoben:** `update_child_stats` speichert zuverlässig (PIN-in-Session-Workaround dokumentiert/gelöst).
-  - Offline erstellte Daten syncen beim nächsten Online-Gang (PWA).
+### [x] P0.1 · Persistenz vollständig migrieren — **ERLEDIGT auf Supabase (2026-06-25, `0f04379`) · nach der Neon-Migration für Eltern DEFEKT (2026-07-16 → 2026-09-02) · repariert `183ad4f`**
+Karten/Aufgaben/Prüfungen werden geräteübergreifend in der DB gespeichert (historische Migration 008: `child_id` + PIN-/RLS-RPCs `sync_my_data`/`load_my_data`/`sync_child_data`/`load_child_data`). localStorage nur Offline-Cache + einmalige Migration.
+**Korrektur der Historie:** Der Eintrag „jetzt auf Neon (2026-07-16)" war **unwahr**. Die Schema-Portierung ließ `sync_my_data`/`load_my_data` als `SECURITY INVOKER` zurück; auf Neon hat die Rolle `authenticated` kein `USAGE` auf Schema `auth`, also scheiterte `auth.uid()` mit 42501 — bei jedem Laden und jedem Speichern, still. Der E2E-Test vom 2026-07-18 hatte das bereits gezeigt, es wurde aber nicht behoben. Erst `183ad4f` (`neon/migrations/004`) stellt beide RPCs auf `SECURITY DEFINER` mit `search_path` um; Nachweis per echtem Round-Trip über die Data API (siehe „Härtung 2026-09"). Zugriff weiterhin via `js/vendor/neon-client.js` (Supabase-kompatible Fassade), RLS über `auth.uid()` (`pg_session_jwt`).
+- **Akzeptanz (Stand 2026-09-02):**
+  - ✅ Karteikarten, `tasks`, `exams` werden für Eltern wieder in Neon gelesen/geschrieben (Round-Trip nachgewiesen); `sessions`, `user_stats` unverändert.
+  - ✅ Kind-Pfad (`sync_child_data`/`load_child_data`/`update_child_stats`) war nie betroffen.
+  - ⚠️ Login auf zweitem Gerät zeigt identischen Stand — gilt wieder, aber die Sync-Semantik ist Whole-Replace ohne Konflikterkennung (Härtung 1.1, offen).
+  - ⏳ Offline erstellte Daten syncen beim nächsten Online-Gang — ungetestet seit der Reparatur.
 
 ### [~] P0.2 · Accessibility auf WCAG 2.1 AA — **TEILWEISE (2026-06-25, Commit `d419114`, live)**
 Erledigt: `prefers-reduced-motion`, aria-labels auf icon-only Buttons (focus-visible/nav-aria/content-aria-live/toast-role waren bereits da). Offen (iterativ): Kontrast-Audit, Lighthouse ≥ 95, vollständige Tastatur-/Screenreader-Tests.
@@ -114,10 +148,11 @@ Erst wenn PWA-Push-Grenzen (v.a. iOS) real limitieren.
 
 ## 🐛 Bekannte Bugs / Tech-Debt
 
-- [ ] Nach Passwort-Reset landet App auf `app.html#reset-password` — Formular noch nicht implementiert.
+- [x] Passwort-Reset: Formular hinter `app.html#reset-password` umgesetzt (Better-Auth `resetPassword`, Commit `cf63d52`). *(2026-09-02)*
 - [x] Kind-Streak-Bug behoben (P0.1): PIN bleibt im Speicher → `sync_child_data` schreibt Kind-Stats zuverlässig. *(2026-06-25)*
-- [ ] `js/api/claude.js.DELETE` — toten Datei-Rest entfernen.
+- [x] Tote `js/`-Module (`config/auth/state/router/api/utils`), `js/vendor/supabase.js` und `supabase/functions/` entfernt — waren nie eingebunden, mit abweichender Logik (Commit `2c12a66`). *(2026-09-02)*
+- [ ] **Formatierungsschuld** (`.prettierignore`): `tests/run_tests.js`, `netlify/functions/`, `css/` entsprechen dem `.prettierrc`-Stil noch nicht — je Datei ein reiner Format-Commit, danach aus `.prettierignore` streichen.
 - [ ] Rate-Limiting in der `ai-proxy` Netlify Function pro User statt pro Browser-Tab → mit P0.3 zusammenlegen.
 - [ ] Automatische Session-Verlängerung (Neon Auth Session-Refresh, konfigurierbar via `configure_neon_auth` / Neon-Konsole).
-- [ ] E-Mail-Bestätigung nach Registrierung aktivieren (Neon Auth Config via `configure_neon_auth` / Neon-Konsole).
+- [ ] E-Mail-Bestätigung nach Registrierung aktivieren — Neon-Konsole, siehe „Offene Nutzer-Aufgaben"; Vorbedingung ist eine OTP-Eingabe im Client.
 - [ ] **Quick-Wins aus `StudyBuddy_old` prüfen/portieren** — #9/#14/#16/#1 + XLSX-Export wurden versehentlich im archivierten Single-File-Repo umgesetzt.

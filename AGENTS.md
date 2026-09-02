@@ -1,6 +1,7 @@
-# Claude-Arbeitsregeln für StudyBuddy
+<!-- Gespiegelt aus CLAUDE.md (Codex statt Claude). Änderungen in CLAUDE.md machen und hier nachziehen: sed 's/Claude/Codex/g' CLAUDE.md -->
+# Codex-Arbeitsregeln für StudyBuddy
 
-Dieses Dokument legt fest, **was Claude in diesem Repo autark entscheiden und ausführen darf** — und wo eine Rückfrage Pflicht ist.
+Dieses Dokument legt fest, **was Codex in diesem Repo autark entscheiden und ausführen darf** — und wo eine Rückfrage Pflicht ist.
 
 > **Backend: Neon (seit 2026-07-16).** Das Backend wurde von Supabase auf **Neon** (Serverless Postgres, `eu-central-1`/Frankfurt, DSGVO) migriert — Neon Auth, Neon Data API und Netlify Functions. Der Ordner `supabase/migrations/` ist ab jetzt **nur noch historisch**.
 
@@ -8,7 +9,7 @@ Dieses Dokument legt fest, **was Claude in diesem Repo autark entscheiden und au
 
 ## 1. Autark erlaubt (kein Rückfragen nötig)
 
-Claude darf ohne Nachfrage:
+Codex darf ohne Nachfrage:
 
 - Dateien im Repo lesen, ändern, hinzufügen oder löschen
 - `git add / commit / push` auf `main` ausführen
@@ -22,7 +23,7 @@ Claude darf ohne Nachfrage:
 
 ## 2. Freigabe-Pflicht (Rückfrage zwingend)
 
-Claude fragt IMMER nach, bevor:
+Codex fragt IMMER nach, bevor:
 
 - Destruktive DB-Migrationen auf Produktion laufen (DROP, TRUNCATE)
 - Externe API-Keys / Secrets ausgetauscht werden
@@ -65,7 +66,7 @@ Der User arbeitet in VS Code mit:
 - Prettier als Formatter
 - Live-Server-Extension
 
-Daraus folgt für Claude:
+Daraus folgt für Codex:
 - Änderungen sofort speichern (kein Staging im Kopf)
 - Formatierung Prettier-konform halten (2-Space-Indent, LF, Semikolons)
 - Nach Abschluss einer Task: Commit + Push, damit VS-Code-Sync-Button beim User grün bleibt
@@ -73,7 +74,7 @@ Daraus folgt für Claude:
 
 ## 7. Eskalations-Pfad
 
-Wenn Claude in einer 3-Versuche-Schleife hängt (z. B. Test schlägt fehl, Build bricht ab):
+Wenn Codex in einer 3-Versuche-Schleife hängt (z. B. Test schlägt fehl, Build bricht ab):
 1. Stop.
 2. Kurzbericht an User: Was versucht, was gescheitert, Hypothese, Vorschlag.
 3. User entscheidet.
@@ -88,4 +89,4 @@ Wenn Claude in einer 3-Versuche-Schleife hängt (z. B. Test schlägt fehl, Build
 
 ---
 
-**Stand: 2026-09-02 · Autor: Claude + Fatmir**
+**Stand: 2026-09-02 · Autor: Codex + Fatmir**

@@ -15,6 +15,12 @@ StudyBuddy Pro ist nach den Anforderungen des EU Cyber Resilience Act (CRA 2024/
 - KI-Provider-Keys (Claude/OpenAI/Gemini): Der Elternteil trägt den Key einmalig in den Einstellungen ein; der Browser testet ihn über den Proxy und legt ihn per Data-API in `api_keys` ab (RLS: Client-Rollen dürfen nur INSERT/UPDATE/DELETE auf eigene Zeilen, **kein SELECT**). Danach kann der Browser den Key nicht mehr aus der Datenbank lesen — jede KI-Anfrage schickt nur das Auth-JWT, und die Netlify Function `ai-proxy` (`netlify/functions/ai-proxy.mjs`) löst den Key serverseitig auf und reicht ihn an den Anbieter weiter
 - Bekannte Einschränkung (Stand 2026-09): Der eingegebene Key wird zusätzlich in `localStorage` des Eltern-Geräts abgelegt, damit Kind-Profile auf demselben Gerät ihn erben können. Diese Ablage wird in einer späteren Härtungsstufe abgelöst
 
+### Datenbank-Funktionen (Neon, Schema `public`)
+- Alle 8 `SECURITY DEFINER`-Funktionen (`auth_child`, `consume_ai_quota`, `get_configured_providers`, `load_child_data`, `load_my_data`, `sync_child_data`, `sync_my_data`, `update_child_stats`) tragen `SET search_path = public, pg_temp` — `pg_temp` explizit am Ende, damit temporäre Objekte des Aufrufers die Tabellenauflösung nicht kapern können (`neon/migrations/004`, `005`)
+- `SECURITY DEFINER` umgeht RLS; die Rümpfe der Eltern-RPCs sind deshalb strikt auf `auth.uid()` eingegrenzt (kein `user_id` aus dem Payload), EXECUTE nur für `authenticated`
+- Kind-RPCs (`auth_child`, `*_child_data`, `update_child_stats`) sind für `anonymous` ausführbar (PIN-Login ohne Konto) — PIN-Handling ist ein offener Härtungspunkt (1.5)
+- Vorfall 2026-07-16 → 2026-09-02: `sync_my_data`/`load_my_data` liefen nach der Neon-Migration als `SECURITY INVOKER` und scheiterten mit 42501 — die Eltern-Persistenz war in dieser Zeit ohne Fehlermeldung außer Betrieb (`neon/migrations/004`)
+
 ### KI-Proxy (`netlify/functions/ai-proxy.mjs`)
 - Kind-Pfad nur mit HMAC-SHA256-signiertem, 12 h gültigem Kind-Token (`netlify/functions/child-token.mjs`, ausgestellt nach PIN-Prüfung via `auth_child`); Schlüssel `CHILD_TOKEN_SECRET` liegt ausschließlich in der Netlify-Umgebung. Fehlt er, verweigert der Kind-Pfad den Dienst — kein Rückfall auf ungeprüfte Anfragen
 - Serverseitige Grenzen unabhängig vom Client: `max_tokens` ≤ 2000, ≤ 40 Nachrichten / 60 000 Zeichen, Bilder/PDF ≤ 4 MB (Base64 ≤ 5,6 M Zeichen, MIME-Allowlist), 20 s Upstream-Timeout (AbortController)

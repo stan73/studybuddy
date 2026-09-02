@@ -1,6 +1,6 @@
 # StudyBuddy Pro — Phase 2 Masterplan
 **Erstellt:** 2026-04-04
-**Status:** In Arbeit
+**Status:** Archiviert (2026-09-02) — siehe Hinweis unten; aktueller Stand in `BACKLOG.md`
 **Repo:** github.com/stan73/studybuddy
 **Live:** gleaming-gaufre-b15c11.netlify.app (Backend: **Neon**)
 
@@ -229,7 +229,10 @@ CREATE POLICY "Parents can read children data"
 
 ---
 
-## STUFE 4 — JavaScript Module
+## STUFE 4 — JavaScript Module — **NICHT UMGESETZT, verworfen 2026-09-02**
+
+> Die Module `js/config.js`, `js/auth.js`, `js/state.js`, `js/router.js`, `js/api/db.js`, `js/utils/*` wurden zwar angelegt, aber **nie in `app.html`/`index.html` eingebunden**. Sie existierten als toter Parallelcode mit abweichender Logik (andere Streak-Regel, andere Schulformenliste, anderer Weg der Profilanlage) und wurden in Commit `2c12a66` gelöscht. Die App bleibt bewusst zweidateig (`index.html` + `app.html`) mit Vendor-Bibliotheken unter `js/vendor/`. Der folgende Abschnitt ist nur noch Planungshistorie.
+
 
 ### 4.1 js/config.js
 - Supabase URL + anon key

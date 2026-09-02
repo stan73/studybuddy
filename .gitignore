@@ -28,3 +28,8 @@ tests/last_report.json
 
 # gstack (lokale Tooling-Artefakte, nicht ins Repo)
 .gstack/
+
+# Lokale Arbeitsdokumente im Repo-Root (Recherche, Notizen) — nicht committen.
+# Projektdokumente gehören nach docs/.
+/*.docx
+/*.pdf
