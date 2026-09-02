@@ -1440,6 +1440,11 @@ let _childPin = null;
 let _dataLoaded = false;
 /** @type {number} Debounce-Timer-Handle für syncData() */
 let _syncTimer = 0;
+/** @type {number|null} Zuletzt vom Server bestätigte Datenversion (sync_state.data_version); null = unbekannt */
+let _syncVersion = null;
+/** @type {'idle'|'syncing'|'synced'|'pending'|'offline'|'failed'|'conflict'} Sichtbarer Sync-Zustand */
+let _syncState = 'idle';
+let _syncBusy = false, _syncAgain = false;
 
 /** @type {string} Aktuell angezeigte Seite (für Pomodoro-Timer-Check) */
 let _page = 'dashboard';
@@ -1723,7 +1728,7 @@ async function msSyncAssignments() {
     let n = 0;
     (d.value || []).forEach(a => {
       const id = 'ms_' + a.id;
-      if ((D.tasks || []).some(tk => tk.id === id)) return; // schon importiert
+      if ((D.tasks || []).some(tk => tk.id === id || tk.ext === id)) return; // schon importiert (ext = Kennung vor der UUID-Vergabe)
       D.tasks = [...(D.tasks || []), {
         id, title: a.displayName || 'Aufgabe', subject: 'Schule',
         due: a.dueDateTime ? a.dueDateTime.slice(0, 10) : '',
@@ -1936,44 +1941,123 @@ async function syncSession(subject, type, durationMin, xpEarned) {
   } catch(e) { reportError('Session-Sync', e, { level: 'warning' }); }
 }
 
-// ── Cloud-Persistenz: Karten/Aufgaben/Prüfungen ⇄ Neon ──────────────────
-// Eltern/Schüler: über RLS (auth.uid()). Kinder: über PIN-verifizierte RPCs.
-// Persistenz folgt der save()-Semantik (Ganz-Ersetzen) und läuft transaktional in den RPCs.
+// ── Cloud-Persistenz: Karten/Aufgaben/Prüfungen ⇄ Neon (Härtung 1.1) ────────
+// Eltern/Schüler: load_my_data/sync_my_data (auth.uid()). Kinder: PIN-verifizierte RPCs.
+//
+// Seit 1.1 KEIN Ganz-Ersetzen mehr: Der Server führt je Datensatz eine Version
+// (sync_state.data_version). sync_* nimmt die zuletzt geladene Version entgegen
+// und lehnt ab, wenn der Server inzwischen weiter ist (Fehlercode PT409
+// „sync_conflict“). Dann lädt der Client den Serverstand, führt ihn PRO ENTITÄT
+// mit dem lokalen Stand zusammen (js/sync-merge.js: Drei-Wege-Merge gegen die
+// zuletzt bestätigte Basis, Änderungserkennung über Inhalts-Hashes — keine
+// Geräteuhren) und schreibt erneut.
+//
+// Merge-Regeln (Kopfkommentar js/sync-merge.js, Tests in tests/unit/sync-merge.test.mjs):
+//   · nur lokal geändert  → lokal gewinnt; lokal Gelöschtes bleibt gelöscht
+//   · nur remote geändert → remote gewinnt; fremde Neuanlagen bleiben; remote
+//                           Gelöschtes wird lokal entfernt
+//   · beidseitig verschieden geändert → Konflikt → Dialog mit Vorwahl (Karte mit
+//     mehr Wiederholungen, sonst Serverfassung; Löschen vs. Bearbeiten → die
+//     bearbeitete Fassung), nichts wird still geraten
+//   · ohne Basis (Erstlauf, neues Gerät) → Vereinigung, nichts wird gelöscht
+//
+// Offline-Warteschlange: Der lokale Stand IST die Warteschlange. Schlägt ein
+// Sync fehl, wird „pending“ persistiert (sb_sync_<uid>) und beim online-Event,
+// beim Sichtbarwerden des Tabs oder beim nächsten Start erneut gesendet; beim
+// Start wird die Cloud nie blind übernommen, sondern zusammengeführt.
+//
+// Basis = Inhalts-Hashes des zuletzt mit dem Server gemeinsamen Standes:
+// nach erfolgreichem Laden der Serverstand, nach erfolgreichem Schreiben der
+// gesendete Stand. Persistiert pro Nutzer in localStorage 'sb_sync_<uid>'.
 
 const _UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Gibt id zurück, wenn sie eine UUID ist — sonst undefined (DB generiert dann eine). */
+/** Gibt id zurück, wenn sie eine UUID ist — sonst undefined. */
 function _uid(id) { return _UUID_RE.test(id || '') ? id : undefined; }
+function _newUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+/** ISO-Zeitstempel aus ms (ungültig/leer → Epoche 0 = „sofort fällig“). Deterministisch — der Merge hasht diese Zeilen. */
+function _isoMs(v) {
+  const n = Number(v);
+  return new Date(Number.isFinite(n) && n > 0 ? n : 0).toISOString();
+}
 
-/** D.cards (Objekt subject→Array) → flaches Zeilen-Array für die DB. */
-function _cardsToRows() {
-  const rows = [];
+/**
+ * Stabile UUIDs für alle Entitäten (Merge-Schlüssel). Ältere Kennungen
+ * ('c1727…', 't…', 'e…', 'ms_…') werden einmalig ersetzt; Prüfungen ohne Datum
+ * bekommen eines, damit ihre Zeile deterministisch bleibt.
+ */
+function _ensureIds() {
+  let changed = false;
   for (const subj in (D.cards || {})) {
-    for (const c of (D.cards[subj] || [])) {
-      rows.push({
-        id: _uid(c.id), subject: subj, front: c.front, back: c.back,
-        level: c.level || 0,
-        due_at: new Date(c.due || Date.now()).toISOString(),
-        ease: c.ease || 2.5, reps: c.reps || 0, interval_days: c.interval || 0,
-        topic: c.topic || null,
-        exam_name: c.examName || null, exam_date: c.examDate || null,
-        explain: c.explain || null,
-      });
-    }
+    for (const c of (D.cards[subj] || [])) { if (c && !_uid(c.id)) { c.id = _newUuid(); changed = true; } }
   }
-  return rows;
+  for (const tk of (D.tasks || [])) {
+    if (tk && !_uid(tk.id)) { if (tk.id) tk.ext = tk.id; tk.id = _newUuid(); changed = true; }
+  }
+  for (const ex of (D.exams || [])) {
+    if (!ex) continue;
+    if (!_uid(ex.id)) { ex.id = _newUuid(); changed = true; }
+    if (!ex.date) { ex.date = new Date().toISOString(); changed = true; }
+  }
+  if (changed) { try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch (e) { console.warn('[Sync] IDs nicht persistiert:', e.message); } }
+  return changed;
 }
-function _tasksToRows() {
-  return (D.tasks || []).map(t => ({
-    id: _uid(t.id), title: t.title, subject: t.subject || null,
-    due_at: t.due || null, completed: !!t.completed,
-  }));
+
+// D-Objekt → DB-Zeile (deterministisch; Feldsatz = load_*_data ohne Metadaten)
+function _cardRow(subj, c) {
+  return {
+    id: c.id, subject: subj, front: c.front, back: c.back,
+    level: c.level || 0, due_at: _isoMs(c.due),
+    ease: c.ease || 2.5, reps: c.reps || 0, interval_days: c.interval || 0,
+    topic: c.topic || null, exam_name: c.examName || null, exam_date: c.examDate || null,
+    explain: c.explain || null,
+  };
 }
-function _examsToRows() {
-  return (D.exams || []).map(e => ({
-    id: _uid(e.id), subject: e.subject, score: e.score, total: e.total,
-    created_at: e.date ? new Date(e.date).toISOString() : new Date().toISOString(),
-  }));
+function _taskRow(tk) {
+  return { id: tk.id, title: tk.title, subject: tk.subject || null, due_at: tk.due || null, completed: !!tk.completed };
 }
+function _examRow(ex) {
+  const d = new Date(ex.date);
+  return { id: ex.id, subject: ex.subject, score: ex.score, total: ex.total, created_at: isNaN(d) ? new Date(0).toISOString() : d.toISOString() };
+}
+// DB-Zeile → D-Objekt
+function _cardFromRow(c) {
+  return {
+    id: c.id, front: c.front, back: c.back,
+    level: c.level || 0,
+    due: c.due_at ? new Date(c.due_at).getTime() : 0,
+    ease: c.ease != null ? Number(c.ease) : 2.5,
+    reps: c.reps || 0,
+    interval: c.interval_days || 0,
+    topic: c.topic || null,
+    examName: c.exam_name || null, examDate: c.exam_date || null,
+    explain: c.explain || null,
+  };
+}
+function _taskFromRow(tk) { return { id: tk.id, title: tk.title, subject: tk.subject || '', due: tk.due_at || '', completed: !!tk.completed }; }
+function _examFromRow(ex) { return { id: ex.id, subject: ex.subject, score: ex.score, total: ex.total, date: ex.created_at }; }
+
+/** Lokaler Stand als Zeilen + Zuordnung id → Original-Objekt (bleibt beim Merge erhalten). */
+function _localRows() {
+  _ensureIds();
+  const objs = { cards: new Map(), tasks: new Map(), exams: new Map() };
+  const rows = { cards: [], tasks: [], exams: [] };
+  for (const subj in (D.cards || {})) {
+    for (const c of (D.cards[subj] || [])) { if (!c) continue; objs.cards.set(c.id, { subject: subj, obj: c }); rows.cards.push(_cardRow(subj, c)); }
+  }
+  for (const tk of (D.tasks || [])) { if (!tk) continue; objs.tasks.set(tk.id, tk); rows.tasks.push(_taskRow(tk)); }
+  for (const ex of (D.exams || [])) { if (!ex) continue; objs.exams.set(ex.id, ex); rows.exams.push(_examRow(ex)); }
+  return { rows, objs };
+}
+function _cardsToRows() { return _localRows().rows.cards; }
+function _tasksToRows() { return _localRows().rows.tasks; }
+function _examsToRows() { return _localRows().rows.exams; }
+
 /** Wöchentliche XP aus D.sessions (für Kind-Stats / Eltern-Chart). */
 function _weekly() {
   const days = Array(7).fill(0);
@@ -1983,116 +2067,282 @@ function _weekly() {
   });
   return days;
 }
-/** DB-Daten { cards:[], tasks:[], exams:[] } in den State D übernehmen. */
-function _applyCloudData(d) {
+
+/** Merge-Ergebnis in den State D übernehmen: lokale Fassungen bleiben dieselben Objekte, Server-Fassungen werden konvertiert. */
+function _applyMerge(m, objs) {
   const cards = {};
-  (d.cards || []).forEach(c => {
-    (cards[c.subject] = cards[c.subject] || []).push({
-      id: c.id, front: c.front, back: c.back,
-      level: c.level || 0,
-      due: c.due_at ? new Date(c.due_at).getTime() : Date.now(),
-      ease: c.ease != null ? Number(c.ease) : 2.5,
-      reps: c.reps || 0,
-      interval: c.interval_days || 0,
-      topic: c.topic || null,
-      examName: c.exam_name || null, examDate: c.exam_date || null,
-      explain: c.explain || null,
+  for (const r of m.cards) {
+    const loc = r.source === 'local' ? objs.cards.get(r.id) : null;
+    const subj = loc ? loc.subject : r.row.subject;
+    const obj = loc ? loc.obj : _cardFromRow(r.row);
+    (cards[subj] = cards[subj] || []).push(obj);
+  }
+  D.cards = cards;
+  D.tasks = m.tasks.map(r => (r.source === 'local' && objs.tasks.get(r.id)) || _taskFromRow(r.row));
+  D.exams = m.exams.map(r => (r.source === 'local' && objs.exams.get(r.id)) || _examFromRow(r.row));
+}
+
+// ── Sync-Speicher (Version, Basis, ausstehend) ────────────────────────────
+function _syncKey() { return 'sb_sync_' + (U?.id || 'anon'); }
+function _syncStore() {
+  try {
+    const st = JSON.parse(localStorage.getItem(_syncKey()) || 'null');
+    if (st && typeof st === 'object') return st;
+  } catch (e) { console.warn('[Sync] Zustand nicht lesbar:', e.message); }
+  return { version: null, base: null, pending: false };
+}
+function _syncSave(patch) {
+  const st = { ..._syncStore(), ...patch, at: Date.now() };
+  try { localStorage.setItem(_syncKey(), JSON.stringify(st)); }
+  catch (e) { reportError('Sync-Zustand speichern', e, { level: 'warning' }); }
+  return st;
+}
+
+// ── Sichtbarer Sync-Zustand ───────────────────────────────────────────────
+const _SYNC_LABELS = {
+  syncing: ['⏳', 'sync.state.syncing'], synced: ['☁️', 'sync.state.synced'],
+  pending: ['📴', 'sync.state.pending'], offline: ['📴', 'sync.state.pending'],
+  failed: ['⚠️', 'sync.state.failed'], conflict: ['⚠️', 'sync.state.conflict'],
+};
+function _setSyncState(state) { _syncState = state; _renderSyncState(); }
+function _renderSyncState() {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const lbl = (sb && U && !U.isDemo) ? _SYNC_LABELS[_syncState] : null;
+  if (!lbl) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.dataset.state = _syncState;
+  el.textContent = lbl[0] + ' ' + t(lbl[1]);
+  el.title = t(lbl[1]);
+}
+/** Manueller Anstoß (Klick auf die Statusanzeige). */
+function syncNow() { clearTimeout(_syncTimer); _syncDataNow(); }
+function _isSyncConflict(e) { return !!e && (e.code === 'PT409' || /sync_conflict/.test(String(e.message || ''))); }
+
+// ── Konfliktdialog: zeigen statt raten ────────────────────────────────────
+function _conflictLabel(c) {
+  const r = c.local || c.remote || {};
+  if (c.type === 'cards') return `${t('sync.conflict.card')}: ${safe(r.front || '')}`;
+  if (c.type === 'tasks') return `${t('sync.conflict.task')}: ${safe(r.title || '')}`;
+  return `${t('sync.conflict.exam')}: ${safe(r.subject || '')}`;
+}
+function _conflictSide(c, side) {
+  const r = side === 'local' ? c.local : c.remote;
+  if (!r) return `<i>${t('sync.conflict.deleted')}</i>`;
+  if (c.type === 'cards') return `${safe(r.front || '')} → ${safe(r.back || '')} · ${t('sync.conflict.progress', r.level || 0, r.reps || 0)}`;
+  if (c.type === 'tasks') return `${safe(r.title || '')} · ${r.completed ? t('sync.conflict.done') : t('sync.conflict.open')}${r.due_at ? ' · ' + safe(String(r.due_at)) : ''}`;
+  return `${safe(r.subject || '')} · ${safe(String(r.score))}/${safe(String(r.total))}`;
+}
+/** Zeigt beidseitig geänderte Einträge und wartet auf die Entscheidung des Nutzers. */
+function _resolveConflictsUI(m) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.id = 'sync-conflicts';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:var(--z-overlay,400);display:flex;align-items:center;justify-content:center;padding:20px;';
+    const items = m.conflicts.map((c, i) => {
+      const when = c.remote && c.remote.updated_at ? ` <span style="color:var(--t3);">(${safe(new Date(c.remote.updated_at).toLocaleString())})</span>` : '';
+      return `<div style="border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:10px;margin-bottom:8px;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px;">${_conflictLabel(c)}</div>
+        <label style="display:block;font-size:13px;margin:4px 0;cursor:pointer;"><input type="radio" name="cf${i}" value="local"${c.choice === 'local' ? ' checked' : ''}> <b>${t('sync.conflict.this_device')}</b>: ${_conflictSide(c, 'local')}</label>
+        <label style="display:block;font-size:13px;margin:4px 0;cursor:pointer;"><input type="radio" name="cf${i}" value="remote"${c.choice === 'remote' ? ' checked' : ''}> <b>${t('sync.conflict.other_device')}</b>: ${_conflictSide(c, 'remote')}${when}</label>
+      </div>`;
+    }).join('');
+    ov.innerHTML = `<div class="card" style="max-width:560px;width:100%;max-height:90vh;overflow:auto;">
+      <h2 style="margin:0 0 6px;">${t('sync.conflict.title')}</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.5;margin:0 0 14px;">${t('sync.conflict.intro', m.conflicts.length)}</p>
+      ${items}
+      <button class="btn btn-primary btn-full" id="sync-conflicts-apply">${t('sync.conflict.apply')}</button>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#sync-conflicts-apply').addEventListener('click', () => {
+      const choices = {};
+      m.conflicts.forEach((c, i) => {
+        const v = ov.querySelector(`input[name="cf${i}"]:checked`);
+        choices[c.id] = v ? v.value : c.choice;
+      });
+      SBSync.applyChoices(m, choices);
+      ov.remove();
+      resolve(m);
     });
   });
-  D.cards = cards;
-  D.tasks = (d.tasks || []).map(t => ({
-    id: t.id, title: t.title, subject: t.subject || '',
-    due: t.due_at || '', completed: !!t.completed,
-  }));
-  D.exams = (d.exams || []).map(e => ({
-    id: e.id, subject: e.subject, score: e.score, total: e.total, date: e.created_at,
-  }));
+}
+
+// ── Laden + Zusammenführen ────────────────────────────────────────────────
+function _applyChildStats(st) {
+  if (!st) return;
+  D.xp = st.xp || 0; D.streak = st.streak || 0;
+  D.correct = st.correct || 0; D.total = st.total || 0;
+  if (st.lastStudy) D.lastStudy = new Date(st.lastStudy).getTime();
+  if (st.dailyGoal) D.dailyGoal = st.dailyGoal;
+  D.freezes = st.freezes || 0;
+  if (st.lastFreezeGrant) D.lastFreezeGrant = st.lastFreezeGrant;
+}
+async function _loadParentStats() {
+  const { data: stats, error: sErr } = await sb.from('user_stats').select('*').eq('user_id', U.id).single();
+  if (sErr && sErr.code !== 'PGRST116') reportError('Statistiken laden', sErr, { level: 'warning' }); // PGRST116 = noch keine Zeile (neuer Nutzer)
+  if (stats) {
+    D.xp = stats.xp || 0; D.streak = stats.streak || 0;
+    D.correct = stats.total_correct || 0; D.total = stats.total_answered || 0;
+    if (stats.last_study_at) D.lastStudy = new Date(stats.last_study_at).getTime();
+    if (stats.daily_goal) D.dailyGoal = stats.daily_goal;
+    D.freezes = stats.freezes || 0;
+    if (stats.last_freeze_grant) D.lastFreezeGrant = Number(stats.last_freeze_grant);
+  }
 }
 
 /**
- * Lädt Karten/Aufgaben/Prüfungen (+ Stats) aus Neon in D.
- * Cloud hat Vorrang; ist die Cloud leer, aber lokal Daten vorhanden, wird einmalig
- * lokal → Cloud migriert (Rückgabe true). Offline-Fehler lassen lokale Daten unangetastet.
- * @returns {Promise<boolean>} true, wenn lokale Daten in die (leere) Cloud hochzuladen sind
+ * Serverstand laden und mit dem lokalen Stand zusammenführen (Konflikte → Dialog).
+ * Setzt _syncVersion und die Basis. Wirft bei Netz-/Serverfehlern.
+ * @param {boolean} withStats — Kind-Stats aus der Antwort übernehmen (nur beim Start)
+ * @returns {Promise<{ok:boolean, changed:boolean}>} changed = lokaler Stand weicht vom Server ab → Sync nötig
+ */
+async function _pullAndMerge(withStats) {
+  if (!sb || !U || U.isDemo) return { ok: false, changed: false };
+  let cloud = null;
+  if (U.isChild) {
+    if (!U.id || !_childPin) return { ok: false, changed: false };
+    const { data, error } = await sb.rpc('load_child_data', { p_child_id: U.id, p_pin: _childPin });
+    if (error) throw error;
+    if (data && data.error) {
+      reportError('Cloud-Daten laden', data.error === 'pin' ? 'PIN ungültig' : data.error, { toast: data.error === 'pin' ? t('err.child_pin') : t('err.cloud_load') });
+      return { ok: false, changed: false };
+    }
+    cloud = data;
+    if (withStats) _applyChildStats(data && data.stats);
+  } else {
+    const { data, error } = await sb.rpc('load_my_data');
+    if (error) throw error;
+    cloud = data;
+  }
+  if (!cloud) return { ok: false, changed: false };
+  const st = _syncStore();
+  const local = _localRows();
+  const m = SBSync.merge(local.rows, cloud, st.base);
+  if (m.conflicts.length) { _setSyncState('conflict'); await _resolveConflictsUI(m); }
+  // Übernommene Fremdänderungen zählen (nur mit Basis aussagekräftig)
+  let applied = 0;
+  if (m.hasBase) {
+    for (const type of SBSync.TYPES) {
+      const b = (st.base && st.base[type]) || {};
+      applied += m[type].filter(r => r.source === 'remote' && b[r.id] !== SBSync.rowHash(type, r.row)).length;
+      applied += Object.keys(b).filter(id => local.objs[type].has(id) && !m[type].some(r => r.id === id) && !m.conflicts.some(c => c.id === id)).length; // remote gelöscht
+    }
+  }
+  _applyMerge(m, local.objs);
+  _syncVersion = Number(cloud.version) || 0;
+  _syncSave({ version: _syncVersion, base: SBSync.baseFrom(cloud), pending: m.changed || !!st.pending });
+  try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch (e) { reportError('Offline-Cache', e, { level: 'warning' }); }
+  if (applied > 0) toast(t('sync.merged', applied));
+  return { ok: true, changed: m.changed };
+}
+
+/**
+ * Lädt Karten/Aufgaben/Prüfungen (+ Stats) aus Neon und führt sie mit dem
+ * lokalen Stand zusammen. Die Cloud gewinnt NICHT blind: lokale, noch nicht
+ * gesendete Änderungen (offline) bleiben erhalten und werden hochgeladen.
+ * Netz-/Serverfehler lassen den lokalen Stand samt gespeicherter Basis unangetastet.
+ * @returns {Promise<boolean>} true, wenn nach dem Merge ein Sync nötig ist
  */
 async function loadCloudData() {
-  if (!sb || !U) return false;
+  if (!sb || !U || U.isDemo) return false;
   try {
-    let cloud = null;
-    if (U.isChild) {
-      if (!U.id || !_childPin) return false;
-      const { data, error } = await sb.rpc('load_child_data', { p_child_id: U.id, p_pin: _childPin });
-      if (error) reportError('Cloud-Daten laden', error, { toast: t('err.cloud_load') });
-      else if (data && data.error) reportError('Cloud-Daten laden', data.error === 'pin' ? 'PIN ungültig' : data.error, { toast: data.error === 'pin' ? t('err.child_pin') : t('err.cloud_load') });
-      if (data && !data.error) {
-        cloud = data;
-        const st = data.stats;
-        if (st) {
-          D.xp = st.xp || 0; D.streak = st.streak || 0;
-          D.correct = st.correct || 0; D.total = st.total || 0;
-          if (st.lastStudy) D.lastStudy = new Date(st.lastStudy).getTime();
-          if (st.dailyGoal) D.dailyGoal = st.dailyGoal;
-          D.freezes = st.freezes || 0;
-          if (st.lastFreezeGrant) D.lastFreezeGrant = st.lastFreezeGrant;
-        }
-      }
-    } else {
-      const { data: stats, error: sErr } = await sb.from('user_stats').select('*').eq('user_id', U.id).single();
-      if (sErr && sErr.code !== 'PGRST116') reportError('Statistiken laden', sErr, { level: 'warning' }); // PGRST116 = noch keine Zeile (neuer Nutzer)
-      if (stats) {
-        D.xp = stats.xp || 0; D.streak = stats.streak || 0;
-        D.correct = stats.total_correct || 0; D.total = stats.total_answered || 0;
-        if (stats.last_study_at) D.lastStudy = new Date(stats.last_study_at).getTime();
-        if (stats.daily_goal) D.dailyGoal = stats.daily_goal;
-        D.freezes = stats.freezes || 0;
-        if (stats.last_freeze_grant) D.lastFreezeGrant = Number(stats.last_freeze_grant);
-      }
-      const { data, error } = await sb.rpc('load_my_data');
-      if (error) reportError('Cloud-Daten laden', error, { toast: t('err.cloud_load') });
-      if (data) cloud = data;
+    if (!U.isChild) await _loadParentStats();
+    const { ok, changed } = await _pullAndMerge(true);
+    if (ok) {
+      _setSyncState(changed || _syncStore().pending ? 'pending' : 'synced');
+      return changed;
     }
-    if (cloud) {
-      const hasCloud = (cloud.cards && cloud.cards.length) ||
-                       (cloud.tasks && cloud.tasks.length) ||
-                       (cloud.exams && cloud.exams.length);
-      const hasLocal = Object.keys(D.cards || {}).length ||
-                       (D.tasks || []).length || (D.exams || []).length;
-      if (hasCloud) { _applyCloudData(cloud); }
-      else if (hasLocal) { return true; } // Cloud leer → lokale Daten migrieren
-    }
-  } catch(e) { reportError('Cloud-Daten laden', e, { toast: t('err.cloud_load') }); } // lokale Daten bleiben Quelle der Wahrheit
+  } catch (e) {
+    reportError('Cloud-Daten laden', e, { toast: t('err.cloud_load') });
+    _setSyncState(_isNetworkError(e) ? 'offline' : 'failed');
+  }
+  const st = _syncStore();
+  _syncVersion = st.version == null ? null : Number(st.version); // Cloud nicht erreichbar: gespeicherte Version/Basis weiterverwenden
   return false;
 }
 
-/** Stößt einen debounced Cloud-Sync an (coalesct schnelle save()-Folgen). */
+// ── Schreiben ────────────────────────────────────────────────────────────
+/** Stößt einen debounced Cloud-Sync an (coalesct schnelle save()-Folgen) und merkt die Änderung als ausstehend. */
 function syncData() {
-  if (!sb || !U || !_dataLoaded) return;
+  if (!sb || !U || !_dataLoaded || U.isDemo) return;
+  _syncSave({ pending: true }); // überlebt Neustart/Offline — wird beim nächsten online-Event oder Start gesendet
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(_syncDataNow, 1200);
 }
+function _rpcSync(rows) {
+  if (U.isChild) {
+    return sb.rpc('sync_child_data', {
+      p_child_id: U.id, p_pin: _childPin,
+      p_cards: rows.cards, p_tasks: rows.tasks, p_exams: rows.exams,
+      p_xp: D.xp || 0, p_streak: D.streak || 0,
+      p_correct: D.correct || 0, p_total: D.total || 0,
+      p_weekly: _weekly(),
+      p_daily_goal: D.dailyGoal || 5, p_freezes: D.freezes || 0, p_lfg: D.lastFreezeGrant || null,
+      p_base_version: _syncVersion,
+    });
+  }
+  return sb.rpc('sync_my_data', { p_cards: rows.cards, p_tasks: rows.tasks, p_exams: rows.exams, p_base_version: _syncVersion });
+}
+/**
+ * Schreibt den lokalen Stand mit der zuletzt bestätigten Version. Bei PT409
+ * (Server ist weiter): laden, zusammenführen, erneut schreiben (max. 3 Runden).
+ * Netzfehler → „ausstehend“ (Warteschlange), andere Fehler → „fehlgeschlagen“.
+ */
 async function _syncDataNow() {
-  if (!sb || !U || !_dataLoaded) return;
+  if (!sb || !U || !_dataLoaded || U.isDemo) return;
+  if (U.isChild && (!U.id || !_childPin)) return;
+  if (_syncBusy) { _syncAgain = true; return; }
+  _syncBusy = true;
   try {
-    if (U.isChild) {
-      if (!U.id || !_childPin) return;
-      const { data, error } = await sb.rpc('sync_child_data', {
-        p_child_id: U.id, p_pin: _childPin,
-        p_cards: _cardsToRows(), p_tasks: _tasksToRows(), p_exams: _examsToRows(),
-        p_xp: D.xp || 0, p_streak: D.streak || 0,
-        p_correct: D.correct || 0, p_total: D.total || 0,
-        p_weekly: _weekly(),
-        p_daily_goal: D.dailyGoal || 5, p_freezes: D.freezes || 0, p_lfg: D.lastFreezeGrant || null,
-      });
-      if (error) reportError('Cloud-Sync', error, { toast: t('err.sync_data') });
-      else if (data && data.error) reportError('Cloud-Sync', data.error === 'pin' ? 'PIN ungültig' : data.error, { toast: data.error === 'pin' ? t('err.child_pin') : t('err.sync_data') });
-    } else {
-      const { data, error } = await sb.rpc('sync_my_data', {
-        p_cards: _cardsToRows(), p_tasks: _tasksToRows(), p_exams: _examsToRows(),
-      });
-      if (error) reportError('Cloud-Sync', error, { toast: t('err.sync_data') });
-      else if (data === false) reportError('Cloud-Sync', 'Server hat nichts gespeichert (Nutzer unbekannt)', { toast: t('err.sync_noop') });
+    _setSyncState('syncing');
+    for (let round = 1; round <= 3; round++) {
+      if (_syncVersion == null) {
+        const r = await _pullAndMerge(false);
+        if (!r.ok) throw new Error('Datenversion unbekannt — Cloud nicht ladbar');
+      }
+      const local = _localRows();
+      const { data, error } = await _rpcSync(local.rows);
+      if (error) {
+        if (_isSyncConflict(error)) { // Server ist weiter → zusammenführen und erneut
+          const r = await _pullAndMerge(false);
+          if (!r.ok) throw error;
+          continue;
+        }
+        throw error;
+      }
+      if (data && data.error) {
+        reportError('Cloud-Sync', data.error === 'pin' ? 'PIN ungültig' : data.error, { toast: data.error === 'pin' ? t('err.child_pin') : t('err.sync_data') });
+        _setSyncState('failed');
+        return;
+      }
+      _syncVersion = data && data.version != null ? Number(data.version) : _syncVersion + 1;
+      _syncSave({ version: _syncVersion, base: SBSync.baseFrom(local.rows), pending: false });
+      _setSyncState('synced');
+      return;
     }
-  } catch(e) { reportError('Cloud-Sync', e, { toast: t('err.sync_data') }); } // lokale Daten bleiben erhalten
+    reportError('Cloud-Sync', 'Konflikt nach 3 Runden nicht aufgelöst', { toast: t('err.sync_conflict') });
+    _syncSave({ pending: true });
+    _setSyncState('conflict');
+  } catch (e) {
+    _syncSave({ pending: true }); // Warteschlange: lokaler Stand bleibt, wird später erneut gesendet
+    const offline = _isNetworkError(e);
+    reportError('Cloud-Sync', e, { level: offline ? 'warning' : 'error', toast: offline ? false : t('err.sync_data') });
+    _setSyncState(offline ? 'offline' : 'failed');
+  } finally {
+    _syncBusy = false;
+    if (_syncAgain) { _syncAgain = false; syncData(); }
+  }
+}
+
+// ── Warteschlange abarbeiten: online-Event, Tab sichtbar ─────────────────
+function _onOnlineSync() { if (_syncStore().pending || _syncState === 'offline' || _syncState === 'failed') _syncDataNow(); }
+function _onVisibleSync() { if (document.visibilityState === 'visible' && _syncStore().pending && !_syncBusy) syncData(); }
+function _startSyncWatch() {
+  window.removeEventListener('online', _onOnlineSync);
+  window.addEventListener('online', _onOnlineSync);
+  document.removeEventListener('visibilitychange', _onVisibleSync);
+  document.addEventListener('visibilitychange', _onVisibleSync);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2351,12 +2601,15 @@ async function init() {
   // Wird geawaitert damit hasActiveKey() sofort korrekt ist (z.B. in Prüfungsmodus)
   await loadConfiguredProviders();
 
-  // Daten für aktuellen User laden: erst lokal (Offline-Cache), dann Cloud (Quelle der Wahrheit)
+  // Daten für aktuellen User laden: erst lokal (Offline-Cache), dann mit der Cloud ZUSAMMENFÜHREN
+  // (Härtung 1.1: die Cloud gewinnt nicht blind — ausstehende lokale Änderungen überleben den Neustart)
   loadDataForUser(U.id);
-  const migrate = await loadCloudData();
+  const needsSync = await loadCloudData();
   _dataLoaded = true;                 // ab jetzt dürfen save()/sync* in die Cloud schreiben
-  try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch(e) { reportError('Offline-Cache', e, { level: 'warning' }); } // Cloud-Daten in Offline-Cache spiegeln
-  if (migrate) _syncDataNow();        // lokale Bestandsdaten einmalig in die leere Cloud hochladen
+  try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch(e) { reportError('Offline-Cache', e, { level: 'warning' }); } // zusammengeführten Stand in Offline-Cache spiegeln
+  _startSyncWatch();                  // online-Event / Tab sichtbar → Warteschlange senden
+  if (needsSync || _syncStore().pending) _syncDataNow(); // Merge-Ergebnis bzw. ausstehende Offline-Änderungen hochladen
+  _renderSyncState();
 
   _startSessionWatch();               // Ablauf/Abmeldung erkennen statt tote Schreibvorgänge (Härtung 1.2)
   document.getElementById('app').style.display = 'flex';
