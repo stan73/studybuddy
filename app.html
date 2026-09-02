@@ -233,6 +233,7 @@ const CFG = {
   CLAUDE_MODEL: 'claude-haiku-4-5-20251001',
   CLAUDE_API: 'https://api.anthropic.com/v1/messages',
   AI_PROXY: '/.netlify/functions/ai-proxy',
+  CHILD_TOKEN: '/.netlify/functions/child-token',
   GRADES: [5,6,7,8,9,10,11,12,13],
   SCHOOL_TYPES: ['Gymnasium','Realschule','Gesamtschule','Hauptschule'],
   SUBJECTS: {
@@ -1400,6 +1401,33 @@ async function neonJwt() {
   } catch(e) { return ''; }
 }
 
+/**
+ * Liefert ein gültiges Kind-Token für den KI-Proxy (HMAC-signiert, serverseitig
+ * von /.netlify/functions/child-token nach PIN-Prüfung ausgestellt). Wird in der
+ * Kind-Session (sessionStorage 'sb_child_session') gecacht und kurz vor Ablauf
+ * mit dem PIN erneuert. Wirft einen sprechenden Fehler, wenn kein Token möglich ist.
+ * @returns {Promise<string>} Token oder '' (kein Kind angemeldet)
+ */
+async function ensureChildToken() {
+  if (!U?.isChild || !U?.id) return '';
+  let cs = {};
+  try { cs = JSON.parse(sessionStorage.getItem('sb_child_session') || '{}') || {}; } catch(e) { cs = {}; }
+  const now = Math.floor(Date.now() / 1000);
+  if (cs.child_token && cs.child_token_exp && cs.child_token_exp - 60 > now) return cs.child_token;
+  if (!U.parentEmail || !_childPin) throw new Error('Kind-Sitzung abgelaufen — bitte neu einloggen');
+  const r = await fetch(CFG.CHILD_TOKEN, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parentEmail: U.parentEmail, pin: _childPin }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || !data.token) throw new Error(data?.error || 'Kind-Token konnte nicht ausgestellt werden — bitte neu einloggen');
+  cs.child_token = data.token;
+  cs.child_token_exp = data.exp;
+  try { sessionStorage.setItem('sb_child_session', JSON.stringify(cs)); } catch(e) {}
+  return data.token;
+}
+
 // ── Microsoft Schul-Anbindung (Entra + Graph Education API) ─────────────────
 // Phase 1: Public-Client OAuth Auth-Code + PKCE im Browser (nur Client-ID, kein Secret).
 // Token pro Profil in localStorage. Holt Schul-Aufgaben (delegiert, schüler-zustimmbar).
@@ -1939,8 +1967,9 @@ async function ai(messages, system, maxTok=400, useCache=true, image=null) {
     // Pfad 1: Key im RAM (gerade eingegeben, noch nicht im Backend)
     payload.apiKey = ramKey;
   } else if (U?.isChild && U?.id) {
-    // Pfad 2: Kind → Proxy holt Parent-Key aus DB anhand childId
-    payload.childId = U.id;
+    // Pfad 2: Kind → signiertes Kind-Token; der Proxy prüft es und holt den
+    // Key des Elternteils aus der DB (nackte childId wird nicht mehr akzeptiert)
+    payload.childToken = await ensureChildToken();
   } else if (jwt && U?.id && !U?.isChild) {
     // Pfad 3: Angemeldeter Elternteil → nur das JWT geht mit. Der Proxy löst
     // den Key serverseitig aus api_keys auf; der Client hat kein SELECT-Recht
@@ -2076,6 +2105,10 @@ async function init() {
   } else {
     loadAIKeys(U.email);
   }
+
+  // Kind-Token für den KI-Proxy direkt beim Login ausstellen (fire-and-forget;
+  // bei Fehlern holt ai() es beim ersten KI-Aufruf mit sprechender Meldung nach)
+  if (U.isChild) ensureChildToken().catch(() => {});
 
   // Konfigurierte Provider aus Supabase DB laden (Auth-Nutzer)
   // Wird geawaitert damit hasActiveKey() sofort korrekt ist (z.B. in Prüfungsmodus)
@@ -3041,7 +3074,8 @@ async function genCardsFromImage(input) {
   const isPdf = file.type === 'application/pdf';
   if (!/^image\//.test(file.type) && !isPdf) { input.value=''; return toast('❌ Nur Bilder (JPG/PNG) oder PDF'); }
   if (isPdf && AI.provider !== 'claude') { input.value=''; return toast('❌ PDF nur mit Claude — sonst bitte ein Foto verwenden'); }
-  if (file.size > 6*1024*1024) { input.value=''; return toast('❌ Datei zu groß (max. 6 MB)'); }
+  // Base64 bläht um ~33 % auf; Netlify-Function-Limit ist 6 MB Body → 4 MB Datei
+  if (file.size > 4*1024*1024) { input.value=''; return toast('❌ Datei zu groß (max. 4 MB) — bitte ein kleineres Foto machen oder das PDF aufteilen', 7000); }
 
   const userTopic = _newTopic(); const ex = _newExam();
   toast('🤖 KI liest die Datei…');
@@ -3052,7 +3086,7 @@ async function genCardsFromImage(input) {
     // Foto = alle erkennbaren Aufgaben erfassen (KEINE feste Anzahl — die 3/5/8-Auswahl ist nur fürs Üben)
     const topicHint = userTopic ? '' : ' Ordne jede Karte einem kurzen Lernthema/Kapitel zu (Feld "topic").';
     const prompt = `Erstelle aus dieser Seite Karteikarten für das Fach ${FC.subj}: für JEDE erkennbare Aufgabe, jeden Begriff bzw. jedes Frage-Antwort-/Vokabel-Paar genau EINE Karte. Erfasse ALLE, lass nichts aus, fasse nichts zusammen.${topicHint} Vorderseite = Aufgabe/Frage, Rückseite = Lösung/Antwort. Ergänze je Karte eine kurze kindgerechte Begründung/Merkhilfe (Feld "explain", 1 Satz, WARUM die Antwort stimmt). Antworte NUR mit einem JSON-Array: [{"front":"...","back":"...","topic":"Thema","explain":"Begründung"}]`;
-    const r = await ai([{role:'user',content:prompt}], sys, 4000, false, { mime: isPdf?'application/pdf':file.type, data: b64 });
+    const r = await ai([{role:'user',content:prompt}], sys, 2000, false, { mime: isPdf?'application/pdf':file.type, data: b64 });
     const parsed = JSON.parse(r.match(/\[[\s\S]*\]/)?.[0]||'[]');
     if (!parsed.length) throw new Error('Keine Karten erkannt — anderes Foto versuchen');
     if (!D.cards[FC.subj]) D.cards[FC.subj] = [];

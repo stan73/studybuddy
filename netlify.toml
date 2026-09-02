@@ -1,6 +1,12 @@
 [build]
   publish = "."
 
+[functions]
+  # esbuild bündelt die relativen Imports aus netlify/functions/_lib zuverlässig.
+  # Hinweis: Das Function-Timeout (Default 10 s) lässt sich nicht in dieser
+  # Datei setzen, sondern nur über Netlify UI/CLI/API (siehe docs/SECURITY.md).
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/app/*"
   to = "/app.html"

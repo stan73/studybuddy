@@ -13,6 +13,13 @@ StudyBuddy Pro ist nach den Anforderungen des EU Cyber Resilience Act (CRA 2024/
 - KI-Provider-Keys (Claude/OpenAI/Gemini): Der Elternteil trägt den Key einmalig in den Einstellungen ein; der Browser testet ihn über den Proxy und legt ihn per Data-API in `api_keys` ab (RLS: Client-Rollen dürfen nur INSERT/UPDATE/DELETE auf eigene Zeilen, **kein SELECT**). Danach kann der Browser den Key nicht mehr aus der Datenbank lesen — jede KI-Anfrage schickt nur das Auth-JWT, und die Netlify Function `ai-proxy` (`netlify/functions/ai-proxy.mjs`) löst den Key serverseitig auf und reicht ihn an den Anbieter weiter
 - Bekannte Einschränkung (Stand 2026-09): Der eingegebene Key wird zusätzlich in `localStorage` des Eltern-Geräts abgelegt, damit Kind-Profile auf demselben Gerät ihn erben können. Diese Ablage wird in einer späteren Härtungsstufe abgelöst
 
+### KI-Proxy (`netlify/functions/ai-proxy.mjs`)
+- Kind-Pfad nur mit HMAC-SHA256-signiertem, 12 h gültigem Kind-Token (`netlify/functions/child-token.mjs`, ausgestellt nach PIN-Prüfung via `auth_child`); Schlüssel `CHILD_TOKEN_SECRET` liegt ausschließlich in der Netlify-Umgebung. Fehlt er, verweigert der Kind-Pfad den Dienst — kein Rückfall auf ungeprüfte Anfragen
+- Serverseitige Grenzen unabhängig vom Client: `max_tokens` ≤ 2000, ≤ 40 Nachrichten / 60 000 Zeichen, Bilder/PDF ≤ 4 MB (Base64 ≤ 5,6 M Zeichen, MIME-Allowlist), 20 s Upstream-Timeout (AbortController)
+- CORS nur für eigene Origins (`netlify/functions/_lib/cors.mjs`, erweiterbar per Env `ALLOWED_ORIGINS`)
+- `consume_ai_quota()` ist nur noch für den DB-Owner ausführbar (kein `PUBLIC`/`anonymous`/`authenticated`)
+- Function-Timeout: Netlify-Default 10 s; ein höheres Limit ist nicht in `netlify.toml` konfigurierbar, sondern nur über Netlify UI/Support (Pro-Plan, bis 26 s)
+
 ### Netzwerksicherheit
 - HTTPS-Only (HSTS)
 - Content Security Policy (CSP)
