@@ -1,6 +1,6 @@
 # StudyBuddy Pro — Testplan
 > **Version:** 2.0 · **Erstellt:** 2026-04-05
-> **Automatische Tests:** `npm test` = Text-Suite (`tests/run_tests.js`, 156 Prüfungen) + Vitest `tests/unit` (70) + Vitest `tests/db` (21, nur mit Dev-Branch); `npm run test:e2e` = Playwright `tests/e2e` (3) — siehe Abschnitt „Tests, die Code ausführen“
+> **Automatische Tests:** `npm test` = Text-Suite (`tests/run_tests.js`, 156 Prüfungen) + Vitest `tests/unit` (89) + Vitest `tests/db` (33, nur mit Dev-Branch); `npm run test:e2e` = Playwright `tests/e2e` (5) — siehe Abschnitt „Tests, die Code ausführen“
 > **Manueller Test:** Diese Datei, Schritt für Schritt im Browser
 > **URL:** https://gleaming-gaufre-b15c11.netlify.app
 
@@ -312,13 +312,15 @@ Die Text-Suite `tests/run_tests.js` prüft nur, ob Zeichenketten in `app.html` v
 
 | Ebene | Befehl | Was läuft wirklich | Voraussetzung |
 |---|---|---|---|
-| **Functions** (`tests/unit`, 70 Tests) | `npm run test:unit` | `ai-proxy`, `link-profile`, `child-token`, `_lib/*` mit echten `Request`-Objekten; gemockt sind nur DB (`fakeSql` protokolliert jede Abfrage), JWKS (lokales Key-Set, `jwtVerify` bleibt echt) und der KI-Upstream | keine |
-| **SQL/RLS** (`tests/db`, 21 Tests) | `npm run test:db` | echte SQL gegen einen **Neon-Dev-Branch**: SECURITY-DEFINER-/`search_path`-Struktur, Rollenrechte (`SET LOCAL ROLE authenticated/anonymous`), Kind-RPCs; plus der Produktionspfad Neon Auth → `link-profile` → Data API `sync_my_data`/`load_my_data`, Fremdzugriff, `api_keys`, `consume_ai_quota` | `TEST_DATABASE_URL`, `TEST_NEON_AUTH_URL`, `TEST_DATA_API_URL` (sonst übersprungen; Produktions-Endpunkte werden verweigert) |
-| **Browser** (`tests/e2e`, 3 Tests) | `npm run test:e2e` | Chromium gegen `tests/e2e/server.mjs` (statisch + echte Functions in-process): Registrieren → Karte → Reload ohne Cache → zweite Session; `#reset-password`; abgelaufene Sitzung | `E2E_DATABASE_URL`, `E2E_NEON_AUTH_URL`, `E2E_NEON_DATA_API_URL`; einmalig `npx playwright install chromium` |
+| **Functions + Merge-Modul** (`tests/unit`, 89 Tests) | `npm run test:unit` | `ai-proxy`, `link-profile`, `child-token`, `_lib/*` mit echten `Request`-Objekten; gemockt sind nur DB (`fakeSql` protokolliert jede Abfrage), JWKS (lokales Key-Set, `jwtVerify` bleibt echt) und der KI-Upstream. Dazu `js/sync-merge.js` (19): jede Merge-Regel der Härtung 1.1 als Fall | keine |
+| **SQL/RLS** (`tests/db`, 33 Tests) | `npm run test:db` | echte SQL gegen einen **Neon-Dev-Branch**: SECURITY-DEFINER-/`search_path`-Struktur, Rollenrechte (`SET LOCAL ROLE authenticated/anonymous`), Kind-RPCs inkl. Versionierung (PT428/PT409, `updated_at`-Stempel, fremde id); plus der Produktionspfad Neon Auth → `link-profile` → Data API `sync_my_data`/`load_my_data`, Fremdzugriff, `api_keys`, `consume_ai_quota`; `sync-conflict.test.mjs`: Szenario A (50 + 1 Karten, zwei Sitzungen) über die Data API mit Client-Merge, Löschen/Neuanlage, Round-Trip-Hash, Kind-Pfad anonym | `TEST_DATABASE_URL`, `TEST_NEON_AUTH_URL`, `TEST_DATA_API_URL` (sonst übersprungen; Produktions-Endpunkte werden verweigert) |
+| **Browser** (`tests/e2e`, 5 Tests) | `npm run test:e2e` | Chromium gegen `tests/e2e/server.mjs` (statisch + echte Functions in-process): Registrieren → Karte → Reload ohne Cache → zweite Session; `#reset-password`; abgelaufene Sitzung; `sync.spec.mjs`: Szenario B (Offline-Änderung überlebt Neustart, online-Event sendet) und Szenario A (zwei Geräte, 3 + 1 Karten, Konflikt → Merge) | `E2E_DATABASE_URL`, `E2E_NEON_AUTH_URL`, `E2E_NEON_DATA_API_URL`; einmalig `npx playwright install chromium` |
 
 **Dauerhafter Test-Branch (angelegt 2026-09-02):** `test-2-1b-rls` = `br-still-wildflower-ashei77e` (Projekt `misty-breeze-43189479`, Kind von `production`, Endpoint `ep-damp-leaf-as12ntgc`). Er ist nach den Läufen sauber (nur die Kopie der Produktionsdaten, 0 Testkonten) und kann jederzeit mit `reset_from_parent` auf den Produktionsstand zurückgesetzt oder gelöscht werden (`delete_branch`; CI legt sich ohnehin pro Lauf einen eigenen an). Connection-String per `mcp__neon__get_connection_string` (Owner-Passwort nie ins Repo); Auth `https://ep-damp-leaf-as12ntgc.neonauth.c-4.eu-central-1.aws.neon.tech/neondb/auth`, Data API `https://ep-damp-leaf-as12ntgc.apirest.c-4.eu-central-1.aws.neon.tech/neondb/rest/v1`.
 
 **Neuen Dev-Branch anlegen:** per Neon-MCP (`create_branch` vom `production`-Branch `br-spring-brook-as21q475`) oder Konsole anlegen; Owner-Connection-String ohne `-pooler`, Auth-URL `https://<ep-id>.neonauth.<region>.aws.neon.tech/neondb/auth`, Data API `https://<ep-id>.apirest.<region>.aws.neon.tech/neondb/rest/v1`. Testkonten (`@studybuddy-test.invalid`, `@studybuddy-e2e.invalid`) werden von den Tests selbst gelöscht und die Löschung geprüft. **Niemals gegen Produktion.**
+
+**Härtung 1.1 (Sync mit Konflikterkennung, 2026-09-02):** Server `neon/migrations/006` (Versionszähler `sync_state`, `updated_at`, PT428/PT409), Client-Merge `js/sync-merge.js`, Offline-Warteschlange in `app.html`. **Rot-Nachweise:** (a) Merge-Modul auf „Cloud gewinnt“ zurückgedreht → 10 von 19 Unit-Tests rot (Szenario A, Löschen, Neuanlage, Konflikte); (b) Versionsprüfung in `sync_my_data`/`sync_child_data` auf dem Dev-Branch abgeschaltet → 4 DB-Tests rot — der veraltete Schreibvorgang wurde angenommen (Version 3 statt PT409) und von 50 Karten blieb **eine** übrig, exakt der Datenverlust; (c) `_pullAndMerge` im Client auf „Cloud gewinnt blind“ → Playwright Szenario B rot („0 fällig · 0 gesamt“ nach dem Neustart, Offline-Karte weg) und Szenario A rot. Jeweils zurückgebaut: 19/19, 9/9, 2/2. **Migrationsablauf, der sich bewährt hat:** Datei per Owner-Verbindung anwenden → **Schema-Cache der Data API neu laden** (Neon-Konsole „Refresh schema cache“ oder MCP `update_data_api`; `NOTIFY pgrst` wirkt nicht; Propagation ≈ 1–3 min) → Round-Trip über die Data API. Ohne Refresh antwortet die Data API auf die neue Signatur mit 404 „Could not find the function … in the schema cache“. Alter Client (3 Argumente) bekommt PT428 = sichtbarer Toast „Cloud-Sync fehlgeschlagen — Änderungen vorerst nur auf diesem Gerät“, nichts wird geschrieben.
 
 **Rot-Nachweis (2026-09-02):** mit zurückgedrehten Fixes fallen die Tests — `childId` ohne Token / 503-Pfad / `verified`-Check / Auth-E-Mail → 8 Function-Tests rot; `SECURITY INVOKER` an `load_my_data`/`sync_my_data`, `search_path` an `auth_child` entfernt, SELECT-Policy auf `api_keys`, EXECUTE auf `consume_ai_quota` → 12 DB-Tests rot; ohne SECURITY DEFINER bzw. mit dem alten `_probeSession` → Playwright „Karte nicht in der Cloud“ bzw. „Sitzung läuft still weiter“ rot.
 
@@ -332,7 +334,7 @@ Die Text-Suite `tests/run_tests.js` prüft nur, ob Zeichenketten in `app.html` v
 Datum: ___________  Tester: ___________  Version/Commit: ___________
 
 Automatische Tests: npm test (Text-Suite + Vitest) · npm run test:db · npm run test:e2e
-→ Ergebnis: ___/156 · ___/70 · ___/21 · ___/3 bestanden
+→ Ergebnis: ___/156 · ___/89 · ___/33 · ___/5 bestanden
 
 Manuelle Tests:
 [ ] M1 Auth          ✅ / ❌ / ⚠️  Anmerkung: ___

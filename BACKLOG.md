@@ -29,10 +29,11 @@ Aufwand: **S** = < 1 Tag · **M** = 1–3 Tage · **L** = > 3 Tage
 
 | **2.1 Tests, die Code ausführen:** Vitest für die Netlify Functions (70), SQL-/RLS-Tests gegen Neon-Dev-Branch inkl. Sieben-Wochen-Test (21), Playwright-Smoke Registrieren→Karte→Reload→zweite Session (3); CI-Stufe `db-e2e` mit Wegwerf-Branch (Secret `NEON_API_KEY`) | `3dcf56c`, `dc234c6`, `f5f8bc4`, `ci.yml` (db-e2e) | Rot-Nachweise in `tests/TESTPLAN.md`; Text-Suite bleibt Kanarienvogel |
 | 1.2 Nachbesserung: `_probeSession` fragte im Rückfall den Better-Auth-Client-**Cache** — eine serverseitig beendete Sitzung wurde nie erkannt. Jetzt echter Request (`$fetch /get-session`) | `716a776` | Playwright „abgelaufene Sitzung“ rot mit altem Code, grün mit Fix |
+| **1.1 Sync mit Konflikterkennung statt Ganz-Ersetzen:** Server führt je Datensatz eine Version (`sync_state`), `sync_my_data`/`sync_child_data` verlangen `p_base_version` (fehlt → PT428, veraltet → PT409, nichts wird geschrieben), Upsert je Zeile mit serverseitigem `updated_at`; Client führt per Drei-Wege-Merge (`js/sync-merge.js`, Inhalts-Hashes gegen die zuletzt bestätigte Basis) zusammen — lokal Gelöschtes bleibt gelöscht, fremde Neuanlagen bleiben, beidseitige Änderungen im Dialog; Offline-Warteschlange (`sb_sync_<uid>`, online-Event), Sync-Zustand in der Sidebar | `4fe4c82`, `e3311e9`, `2fd0468`, `8b483d4`, `35f4115`; `neon/migrations/006` | Unit 19, DB 12 (Szenario A über die Data API: 50 + 1 → PT409 → Merge → 51), Playwright Szenario A/B; Rot-Nachweise in `tests/TESTPLAN.md`; **Round-Trip gegen Produktion** (428/200/409, 12/12 Felder, Testkonto restlos entfernt) |
 
-**Offen (bewusst noch nicht angefasst):** 1.1 Sync-Semantik/Konflikterkennung (Whole-Replace, Last-Writer-Wins) · 1.5 Kind-PIN im Klartext in `sessionStorage` · 2.5 Accessibility · 2.6 Lazy-Loading der Vendor-Bibliotheken · 2.7 Rechtliches (Impressum/Datenschutz/AVV).
+**Offen (bewusst noch nicht angefasst):** 1.5 Kind-PIN im Klartext in `sessionStorage` · 2.5 Accessibility · 2.6 Lazy-Loading der Vendor-Bibliotheken · 2.7 Rechtliches (Impressum/Datenschutz/AVV). Sync-Merge (1.1): Konflikte werden gezeigt, nicht geraten — ein Feld-genauer Merge derselben Karte (Inhalt hier, Lernfortschritt dort) ist bewusst nicht gebaut.
 
-**Regel ab jetzt:** „erledigt" nur mit nachgewiesenem Round-Trip gegen Produktion. Jede DB-Änderung — auch wenn per Neon-MCP ausgeführt — wird als `neon/migrations/NNN_….sql` mit Befund, Begründung und Verifikation abgelegt.
+**Regel ab jetzt:** „erledigt" nur mit nachgewiesenem Round-Trip gegen Produktion. Jede DB-Änderung — auch wenn per Neon-MCP ausgeführt — wird als `neon/migrations/NNN_….sql` mit Befund, Begründung und Verifikation abgelegt. **Nach jeder Funktions-/Schemaänderung den Schema-Cache der Data API neu laden** (Konsole „Refresh schema cache“ / MCP `update_data_api`), sonst kennt die Data API neue Signaturen nicht (404 „Could not find the function“).
 
 ---
 
@@ -52,8 +53,8 @@ Karten/Aufgaben/Prüfungen werden geräteübergreifend in der DB gespeichert (hi
 - **Akzeptanz (Stand 2026-09-02):**
   - ✅ Karteikarten, `tasks`, `exams` werden für Eltern wieder in Neon gelesen/geschrieben (Round-Trip nachgewiesen); `sessions`, `user_stats` unverändert.
   - ✅ Kind-Pfad (`sync_child_data`/`load_child_data`/`update_child_stats`) war nie betroffen.
-  - ⚠️ Login auf zweitem Gerät zeigt identischen Stand — gilt wieder, aber die Sync-Semantik ist Whole-Replace ohne Konflikterkennung (Härtung 1.1, offen).
-  - ⏳ Offline erstellte Daten syncen beim nächsten Online-Gang — ungetestet seit der Reparatur.
+  - ✅ Login auf zweitem Gerät zeigt identischen Stand; seit Härtung 1.1 mit Versionierung + Merge statt Whole-Replace (Playwright Szenario A: zwei Geräte, 3 + 1 Karten, alle erhalten).
+  - ✅ Offline erstellte Daten syncen beim nächsten Online-Gang und überleben den Neustart (Playwright Szenario B, Härtung 1.1).
 
 ### [~] P0.2 · Accessibility auf WCAG 2.1 AA — **TEILWEISE (2026-06-25, Commit `d419114`, live)**
 Erledigt: `prefers-reduced-motion`, aria-labels auf icon-only Buttons (focus-visible/nav-aria/content-aria-live/toast-role waren bereits da). Offen (iterativ): Kontrast-Audit, Lighthouse ≥ 95, vollständige Tastatur-/Screenreader-Tests.
