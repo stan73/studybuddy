@@ -2402,16 +2402,24 @@ async function _probeSession(force) {
   } catch (e) {
     return { session: null, offline: _isNetworkError(e) };
   }
-  // Fassade sagt "keine Session" — Better-Auth-Client direkt fragen, ob es ein Netzfehler war
+  // Fassade sagt "keine Session". Den Server direkt fragen ($fetch = echter Request,
+  // kein Client-Cache): ba.getSession() liefert die Sitzung aus dem Cache des
+  // Better-Auth-Clients und würde eine serverseitig beendete Sitzung wiederbeleben —
+  // genau das darf die Sitzungsprüfung (Härtung 1.2) nicht.
   try {
     const ba = typeof sb.auth.getBetterAuthInstance === 'function' ? sb.auth.getBetterAuthInstance() : null;
-    if (ba && typeof ba.getSession === 'function') {
-      const r = await ba.getSession();
-      if (r?.error && _isNetworkError(r.error)) return { session: null, offline: true };
-      if (r?.data?.session) { // Fassade hatte veralteten Cache
-        const again = await sb.auth.getSession();
+    if (ba && typeof ba.$fetch === 'function') {
+      const r = await ba.$fetch('/get-session', { method: 'GET', query: { disableCookieCache: true } });
+      if (r?.error) return { session: null, offline: _isNetworkError(r.error) };
+      if (r?.data?.session) { // Fassade hatte veralteten Cache — jetzt frisch übernehmen
+        const again = await sb.auth.getSession({ forceFetch: true });
         if (again?.data?.session) return { session: again.data.session, offline: false };
       }
+      return { session: null, offline: false }; // Server: keine Sitzung
+    }
+    if (ba && typeof ba.getSession === 'function') { // älteres SDK ohne $fetch
+      const r = await ba.getSession();
+      if (r?.error && _isNetworkError(r.error)) return { session: null, offline: true };
     }
   } catch (e) {
     if (_isNetworkError(e)) return { session: null, offline: true };
