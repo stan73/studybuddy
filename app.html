@@ -530,6 +530,21 @@ const I18N = {
     'auth.expired':'⚠️ Deine Sitzung ist abgelaufen — du wirst zur Anmeldung weitergeleitet.',
     'auth.signed_out':'ℹ️ Du wurdest in einem anderen Tab abgemeldet — Weiterleitung zur Anmeldung.',
     'auth.offline_session':'⚠️ Server nicht erreichbar — Sitzung konnte nicht geprüft werden. Du arbeitest offline mit lokalen Daten.',
+    // Passwort-Reset (Härtung 1.3)
+    'reset.title':'Neues Passwort setzen',
+    'reset.body':'Bitte wähle ein neues Passwort (mind. 8 Zeichen, mind. 1 Zahl).',
+    'reset.new_pw':'Neues Passwort',
+    'reset.repeat_pw':'Passwort wiederholen',
+    'reset.submit':'Passwort speichern',
+    'reset.cancel':'Abbrechen',
+    'reset.weak':'Das Passwort braucht mindestens 8 Zeichen und eine Zahl.',
+    'reset.mismatch':'Die Passwörter stimmen nicht überein.',
+    'reset.invalid_title':'Reset-Link ungültig oder abgelaufen',
+    'reset.invalid_body':'Der Link ist ungültig, wurde bereits verwendet oder ist abgelaufen (gültig 15 Minuten). Bitte fordere einen neuen Link an.',
+    'reset.request_new':'Neuen Link anfordern',
+    'reset.unsupported':'Passwort-Reset wird von diesem Backend nicht unterstützt.',
+    'reset.network':'Server nicht erreichbar — bitte Verbindung prüfen und erneut versuchen.',
+    'reset.failed':'Passwort konnte nicht gesetzt werden:',
   },
   en: {
     'nav.learn':'Learning','nav.dashboard':'Dashboard','nav.subjects':'Subjects',
@@ -670,6 +685,20 @@ const I18N = {
     'auth.expired':'⚠️ Your session has expired — redirecting to sign-in.',
     'auth.signed_out':'ℹ️ You were signed out in another tab — redirecting to sign-in.',
     'auth.offline_session':'⚠️ Server unreachable — session could not be verified. You are working offline with local data.',
+    'reset.title':'Set a new password',
+    'reset.body':'Please choose a new password (at least 8 characters, at least 1 digit).',
+    'reset.new_pw':'New password',
+    'reset.repeat_pw':'Repeat password',
+    'reset.submit':'Save password',
+    'reset.cancel':'Cancel',
+    'reset.weak':'The password needs at least 8 characters and one digit.',
+    'reset.mismatch':'The passwords do not match.',
+    'reset.invalid_title':'Reset link invalid or expired',
+    'reset.invalid_body':'The link is invalid, was already used or has expired (valid for 15 minutes). Please request a new link.',
+    'reset.request_new':'Request a new link',
+    'reset.unsupported':'Password reset is not supported by this backend.',
+    'reset.network':'Server unreachable — please check your connection and try again.',
+    'reset.failed':'The password could not be set:',
   },
   fr: {
     'nav.learn':'Apprentissage','nav.dashboard':'Tableau de bord','nav.subjects':'Matières',
@@ -810,6 +839,20 @@ const I18N = {
     'auth.expired':'⚠️ Votre session a expiré — redirection vers la connexion.',
     'auth.signed_out':'ℹ️ Vous avez été déconnecté dans un autre onglet — redirection vers la connexion.',
     'auth.offline_session':'⚠️ Serveur injoignable — la session n\'a pas pu être vérifiée. Vous travaillez hors ligne avec les données locales.',
+    'reset.title':'Définir un nouveau mot de passe',
+    'reset.body':'Choisissez un nouveau mot de passe (au moins 8 caractères, au moins 1 chiffre).',
+    'reset.new_pw':'Nouveau mot de passe',
+    'reset.repeat_pw':'Répéter le mot de passe',
+    'reset.submit':'Enregistrer le mot de passe',
+    'reset.cancel':'Annuler',
+    'reset.weak':'Le mot de passe doit contenir au moins 8 caractères et un chiffre.',
+    'reset.mismatch':'Les mots de passe ne correspondent pas.',
+    'reset.invalid_title':'Lien de réinitialisation invalide ou expiré',
+    'reset.invalid_body':'Le lien est invalide, a déjà été utilisé ou a expiré (valable 15 minutes). Veuillez demander un nouveau lien.',
+    'reset.request_new':'Demander un nouveau lien',
+    'reset.unsupported':'La réinitialisation du mot de passe n\'est pas prise en charge par ce backend.',
+    'reset.network':'Serveur injoignable — vérifiez votre connexion et réessayez.',
+    'reset.failed':'Le mot de passe n\'a pas pu être défini :',
   },
   es: {
     'nav.learn':'Aprendizaje','nav.dashboard':'Panel','nav.subjects':'Asignaturas',
@@ -950,6 +993,20 @@ const I18N = {
     'auth.expired':'⚠️ Tu sesión ha caducado — redirigiendo al inicio de sesión.',
     'auth.signed_out':'ℹ️ Has cerrado la sesión en otra pestaña — redirigiendo al inicio de sesión.',
     'auth.offline_session':'⚠️ Servidor no disponible — no se pudo verificar la sesión. Trabajas sin conexión con datos locales.',
+    'reset.title':'Establecer nueva contraseña',
+    'reset.body':'Elige una nueva contraseña (mínimo 8 caracteres, al menos 1 número).',
+    'reset.new_pw':'Nueva contraseña',
+    'reset.repeat_pw':'Repetir contraseña',
+    'reset.submit':'Guardar contraseña',
+    'reset.cancel':'Cancelar',
+    'reset.weak':'La contraseña necesita al menos 8 caracteres y un número.',
+    'reset.mismatch':'Las contraseñas no coinciden.',
+    'reset.invalid_title':'Enlace de restablecimiento no válido o caducado',
+    'reset.invalid_body':'El enlace no es válido, ya se usó o ha caducado (válido 15 minutos). Solicita un nuevo enlace.',
+    'reset.request_new':'Solicitar nuevo enlace',
+    'reset.unsupported':'Este backend no admite el restablecimiento de contraseña.',
+    'reset.network':'Servidor no disponible — comprueba la conexión e inténtalo de nuevo.',
+    'reset.failed':'No se pudo establecer la contraseña:',
   },
 };
 
@@ -2078,6 +2135,9 @@ async function ai(messages, system, maxTok=400, useCache=true, image=null) {
  * @returns {Promise<void>}
  */
 async function init() {
+  // 0. Passwort-Reset-Rückleitung (Härtung 1.3): läuft bewusst ohne Login
+  if (_isResetFlow()) { await ensureSb(); renderResetPassword(); return; }
+
   // Lokaler Speicher ist nur Cache — Legitimation kommt ausschließlich aus einer
   // gültigen Auth-Session (Elternteil/Schüler) oder Kind-Session (Härtung 1.2).
   load();
@@ -2421,6 +2481,107 @@ function _stopSessionWatch() {
   try { if (_sessionSub && typeof _sessionSub.unsubscribe === 'function') _sessionSub.unsubscribe(); }
   catch (e) { console.warn('[Auth] Unsubscribe fehlgeschlagen:', e.message); }
   _sessionSub = null;
+}
+
+// ── Passwort-Reset (Härtung 1.3) ──────────────────────────────────────────
+// index.html fordert den Link mit redirectTo = /app.html#reset-password an
+// (Better Auth requestPasswordReset). Der Mail-Link führt zum Auth-Server, der
+// den Token prüft und auf redirectTo + '?token=…' bzw. '?error=INVALID_TOKEN'
+// weiterleitet. Weil der Hash vor dem angehängten Query stehen kann, wird der
+// Token sowohl aus location.search als auch aus dem Hash gelesen. Abschluss
+// über Better Auth resetPassword({ newPassword, token }); Links verfallen laut
+// Neon-Doku nach 15 Minuten. Der Nutzer ist dabei NICHT eingeloggt.
+function _isResetFlow() { return /^#reset-password/.test(location.hash || ''); }
+
+function _resetParams() {
+  const hash = location.hash || '';
+  const fromHash = hash.includes('?') ? new URLSearchParams(hash.slice(hash.indexOf('?') + 1)) : null;
+  const fromSearch = new URLSearchParams(location.search);
+  return {
+    token: fromSearch.get('token') || (fromHash && fromHash.get('token')) || null,
+    error: fromSearch.get('error') || (fromHash && fromHash.get('error')) || null,
+  };
+}
+
+let _resetToken = null;
+
+/** Rendert das Reset-Formular (oder die Ungültig-Ansicht) als eigenständige Seite. */
+function renderResetPassword(forceInvalid) {
+  const { token, error } = _resetParams();
+  if (token) _resetToken = token;
+  // Token nicht in URL/Verlauf stehen lassen (Reload → "Link ungültig", Link ist ohnehin einmalig)
+  try { history.replaceState({}, '', '/app.html#reset-password'); } catch (e) { console.warn('[Reset] URL nicht bereinigt:', e.message); }
+  const app = document.getElementById('app');
+  if (app) app.style.display = 'none';
+  let el = document.getElementById('reset-view');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'reset-view';
+    el.setAttribute('role', 'main');
+    document.body.appendChild(el);
+  }
+  el.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg,#f8fafc);overflow:auto;';
+  if (forceInvalid || error || !_resetToken) {
+    if (error) reportError('Passwort-Reset', 'Link ungültig: ' + error, { level: 'warning' });
+    el.innerHTML = `<div class="card" style="max-width:440px;width:100%;text-align:center;">
+      <div style="font-size:40px;margin-bottom:8px;">🔗</div>
+      <h2 style="margin:0 0 8px;">${t('reset.invalid_title')}</h2>
+      <p style="color:var(--t2);font-size:14px;line-height:1.6;margin:0 0 18px;">${t('reset.invalid_body')}</p>
+      <button class="btn btn-primary btn-full" onclick="location.href='/?reason=reset_invalid'">${t('reset.request_new')}</button>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="card" style="max-width:440px;width:100%;">
+    <h2 style="margin:0 0 6px;">🔑 ${t('reset.title')}</h2>
+    <p style="color:var(--t2);font-size:13px;margin:0 0 16px;">${t('reset.body')}</p>
+    <form id="reset-form" onsubmit="submitResetPassword(event)" style="display:flex;flex-direction:column;gap:12px;">
+      <div class="field"><label for="reset-pw1">${t('reset.new_pw')}</label>
+        <input class="input" id="reset-pw1" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="reset-pw2">${t('reset.repeat_pw')}</label>
+        <input class="input" id="reset-pw2" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div id="reset-msg" role="alert" style="font-size:13px;color:var(--danger,#ef4444);min-height:18px;"></div>
+      <button class="btn btn-primary btn-full" id="reset-submit" type="submit">${t('reset.submit')}</button>
+      <button class="btn btn-ghost btn-full" type="button" onclick="location.href='/'">${t('reset.cancel')}</button>
+    </form>
+  </div>`;
+  setTimeout(() => document.getElementById('reset-pw1')?.focus(), 50);
+}
+
+/** Schließt den Better-Auth-Reset ab; Fehlerfälle werden im Formular erklärt statt ins Nichts zu leiten. */
+async function submitResetPassword(ev) {
+  if (ev) ev.preventDefault();
+  const pw1 = document.getElementById('reset-pw1')?.value || '';
+  const pw2 = document.getElementById('reset-pw2')?.value || '';
+  const msg = document.getElementById('reset-msg');
+  const btn = document.getElementById('reset-submit');
+  const fail = (m) => { if (msg) msg.textContent = m; };
+  if (pw1.length < 8 || !/[0-9]/.test(pw1)) return fail(t('reset.weak'));
+  if (pw1 !== pw2) return fail(t('reset.mismatch'));
+  if (!_resetToken) return renderResetPassword(true);
+  const client = await ensureSb();
+  const ba = (client && typeof client.auth.getBetterAuthInstance === 'function') ? client.auth.getBetterAuthInstance() : null;
+  if (!ba || typeof ba.resetPassword !== 'function') return fail(t('reset.unsupported'));
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  fail('');
+  try {
+    const r = await ba.resetPassword({ newPassword: pw1, token: _resetToken });
+    if (r && r.error) {
+      const code = String(r.error.code || r.error.message || '');
+      if (/INVALID_TOKEN|invalid|expired|not found/i.test(code)) {
+        reportError('Passwort-Reset', r.error, { level: 'warning' });
+        _resetToken = null;
+        return renderResetPassword(true);
+      }
+      throw r.error;
+    }
+    // Erfolg: Better Auth widerruft alte Sitzungen — Cache verwerfen, mit neuem Passwort anmelden
+    _clearAuthCache();
+    window.location.href = '/?reason=reset_ok';
+  } catch (e) {
+    reportError('Passwort-Reset', e, { level: 'warning' });
+    fail(_isNetworkError(e) ? t('reset.network') : (t('reset.failed') + ' ' + _errMsg(e)));
+    if (btn) { btn.disabled = false; btn.textContent = t('reset.submit'); }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

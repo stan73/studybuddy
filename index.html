@@ -439,6 +439,8 @@ async function doResetPassword() {
   if (btn) { btn.disabled = true; btn.textContent = 'Sende…'; }
 
   // Supabase-kompatibel via Adapter; Fallback auf Better-Auth requestPasswordReset.
+  // app.html rendert hinter #reset-password das Formular (Token aus ?token= bzw. Hash) und
+  // schließt den Flow über Better Auth resetPassword() ab — siehe renderResetPassword().
   const redirectTo = window.location.origin + '/app.html#reset-password';
   let error;
   if (typeof sb.auth.resetPasswordForEmail === 'function') {
@@ -627,11 +629,14 @@ function toast(msg, dur = 3500) {
   if (!reason) return;
   history.replaceState({}, '', '/');
   const msgs = {
-    expired:    '⚠️ Deine Sitzung ist abgelaufen — bitte neu anmelden.',
-    signed_out: 'ℹ️ Du wurdest abgemeldet — bitte neu anmelden.',
+    expired:       '⚠️ Deine Sitzung ist abgelaufen — bitte neu anmelden.',
+    signed_out:    'ℹ️ Du wurdest abgemeldet — bitte neu anmelden.',
+    reset_ok:      '✅ Passwort geändert — bitte mit dem neuen Passwort anmelden.',
+    reset_invalid: '❌ Reset-Link ungültig oder abgelaufen — bitte neuen Link anfordern.',
   };
   if (msgs[reason]) toast(msgs[reason], 6000);
   openAuth('login');
+  if (reason === 'reset_invalid') setTimeout(showForgotPassword, 150);
 })();
 
 // Enter-Taste für Login
