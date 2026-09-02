@@ -207,7 +207,7 @@ test('T6.5', 'XP für Tutor vergeben (CFG.XP.TUTOR)', () => has('CFG.XP.TUTOR'))
 // T7 — AUTH & SESSION
 // ══════════════════════════════════════════════════════════════════════════
 console.log('\nT7 — Auth & Session');
-test('T7.1', 'doLogout: Supabase-Abmeldung', () => has('sb.auth.signOut'));
+test('T7.1', 'doLogout: Abmeldung über die Auth-Fassade (sb.auth.signOut)', () => has('sb.auth.signOut'));
 test('T7.2', 'doLogout: AI-State wird zurückgesetzt', () => {
   const fn = js.match(/async function doLogout[\s\S]*?(?=\n\/\/|\/\*\*|\nfunction)/)?.[0] || '';
   return fn.includes('AI =') && fn.includes("provider:'claude'") ? true : 'AI-Reset fehlt';
@@ -248,7 +248,7 @@ test('T8.4', 'saveProviderKey: Key wird NICHT gespeichert wenn Test fehlschlägt
   const fn = js.match(/async function saveProviderKey[\s\S]*?(?=\nasync function testKeyConnection)/)?.[0] || '';
   return fn.includes('return; // Key NICHT') || (fn.includes('testOk') && fn.includes('return;')) ? true : 'Abbruch bei Testfehler fehlt';
 });
-test('T8.5', 'testKeyConnection: nutzt Supabase-Proxy (kein CORS-Problem)', () => {
+test('T8.5', 'testKeyConnection: nutzt Netlify Function ai-proxy (kein CORS-Problem)', () => {
   const fn = js.match(/async function testKeyConnection[\s\S]*?(?=\nfunction resetData)/)?.[0] || '';
   return fn.includes('CFG.AI_PROXY') ? true : 'Proxy-Aufruf fehlt';
 });
@@ -348,8 +348,9 @@ test('T12.5', 'API-Keys nicht in console.log', () => {
   const logMatches = js.match(/console\.log\([^)]*(?:key|Key|apiKey|AI\[)[^)]*\)/g) || [];
   return logMatches.length === 0 ? true : `Mögliche Key-Ausgabe: ${logMatches[0]}`;
 });
-test('T12.6', 'Supabase-Service-Role-Key nicht im Frontend', () => {
-  return !js.includes('service_role') ? true : '⚠️ service_role Key im Frontend gefunden!';
+test('T12.6', 'Kein Owner-/Service-Role-Zugang im Frontend', () => {
+  const leak = ['service_role', 'neondb_owner', 'postgresql://', 'DATABASE_URL'].find((s) => js.includes(s));
+  return !leak ? true : `⚠️ ${leak} im Frontend gefunden!`;
 });
 
 // ══════════════════════════════════════════════════════════════════════════

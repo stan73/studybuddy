@@ -255,13 +255,14 @@ footer a:hover { color: white; }
  *              sessionStorage.
  *
  * @auth_flows
- *   1. E-Mail/Passwort Login    → supabase.auth.signInWithPassword()
+ *   (sb = Supabase-kompatible Fassade über Neon Auth + Neon Data API, js/vendor/neon-client.js)
+ *   1. E-Mail/Passwort Login    → sb.auth.signInWithPassword() + Netlify Function link-profile
  *                                → sessionStorage 'sb_session' → /app.html
  *   2. Registrierung (2 Schritte) → Eltern-Account + Kinder mit PIN
- *                                → supabase.auth.signUp() + profiles + children insert
- *   3. Kind-Login (PIN)          → supabase RPC 'auth_child(parent_email, pin)'
+ *                                → sb.auth.signUp() + link-profile + children insert
+ *   3. Kind-Login (PIN)          → sb.rpc('auth_child', { parent_email, pin })
  *                                → sessionStorage 'sb_child_session' → /app.html
- *   4. Passwort-Reset            → supabase.auth.resetPasswordForEmail()
+ *   4. Passwort-Reset            → sb.auth.resetPasswordForEmail(); Abschluss in app.html#reset-password
  *
  * @security
  *   - Alle Nutzereingaben werden via DOMPurify bereinigt (XSS-Schutz)
@@ -269,7 +270,8 @@ footer a:hover { color: white; }
  *   - Kind-PIN-Validierung: alphanumerisch, mind. 8 Zeichen, 1 Buchstabe + 1 Zahl
  *
  * @see /app.html   — Haupt-App (nach Login)
- * @see /supabase/migrations/001_schema.sql — child_login() RPC
+ * @see /netlify/functions/link-profile.mjs — Profil anlegen/verknüpfen
+ * @see /supabase/schema.sql — historisches Ursprungsschema (RPC auth_child); heute auf Neon
  */
 // ── FAQ Daten ────────────────────────────────────────────────────────────────
 const FAQS = [

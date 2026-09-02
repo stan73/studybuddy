@@ -194,10 +194,10 @@
 /**
  * @file app.html — StudyBuddy Pro Haupt-Applikation
  * @description Single-Page-App für Schüler, Eltern und Lehrer.
- *              Authentifizierung via Supabase Auth; Datenpersistenz in
- *              Supabase PostgreSQL + localStorage-Fallback (offline-fähig).
- *              KI-Anfragen werden ausschließlich über den serverseitigen
- *              Supabase-Edge-Function-Proxy (ai-proxy) abgewickelt.
+ *              Authentifizierung via Neon Auth (Better Auth); Datenpersistenz in
+ *              Neon Postgres (Data API, RLS) + localStorage als Offline-Cache.
+ *              KI-Anfragen werden ausschließlich über die serverseitige
+ *              Netlify Function ai-proxy abgewickelt.
  * @version 2.0.0
  * @license MIT
  *
@@ -205,12 +205,16 @@
  *   Layout:  Sidebar (Navigation) + Main (Inhalt via Router)
  *   Router:  goPage(page, params) → synchrone oder asynchrone Render-Funktion
  *   State:   U (User), D (Daten), AI (Provider-Keys), PO (Pomodoro), EX (Prüfung), FC (Flashcards)
- *   Auth:    Supabase → sessionStorage → Demo → Kind-PIN (Priorität absteigend)
- *   DB:      Supabase Realtime nicht aktiv; Sync via fire-and-forget (syncStats, syncSession)
+ *   Auth:    U nur aus serverseitig geprüfter Neon-Auth-Session oder Kind-Session (PIN);
+ *            localStorage ist reiner Cache (siehe init())
+ *   DB:      Neon Data API (PostgREST-kompatibel) hinter der Supabase-kompatiblen Fassade
+ *            js/vendor/neon-client.js; Sync via fire-and-forget (syncStats, syncSession, syncData)
  *
- * @see /supabase/functions/ai-proxy/index.ts   — KI-Proxy Edge Function
- * @see /supabase/migrations/001_schema.sql     — Datenbankschema
- * @see /supabase/migrations/002_api_keys.sql   — API-Keys, Kind-Stats
+ * @see /netlify/functions/ai-proxy.mjs      — KI-Proxy (Netlify Function)
+ * @see /netlify/functions/child-token.mjs   — Kind-Token nach PIN-Prüfung
+ * @see /netlify/functions/link-profile.mjs  — Profil anlegen/verknüpfen
+ * @see /neon/migrations/                    — Neon-Migrationen (Härtung, seit 2026-09)
+ * @see /supabase/migrations/                — historische Schema-Herkunft (Supabase-Ära, bis 2026-07)
  */
 'use strict';
 
@@ -220,7 +224,8 @@
 /**
  * @constant {Object} CFG — Globale App-Konfiguration (read-only zur Laufzeit)
  * @property {string}   CLAUDE_MODEL  — Standard Claude-Modell für KI-Anfragen
- * @property {string}   AI_PROXY      — URL des Supabase Edge Function AI-Proxys
+ * @property {string}   AI_PROXY      — Pfad der Netlify Function ai-proxy (KI-Proxy)
+ * @property {string}   CHILD_TOKEN   — Pfad der Netlify Function child-token (Kind-Token nach PIN)
  * @property {number[]} GRADES        — Unterstützte Klassenstufen
  * @property {Object}   SUBJECTS      — Fächer pro Klassenstufe
  * @property {Object}   SM            — Emoji + Farbe pro Fach (Subject Map)
@@ -231,7 +236,6 @@
  */
 const CFG = {
   CLAUDE_MODEL: 'claude-haiku-4-5-20251001',
-  CLAUDE_API: 'https://api.anthropic.com/v1/messages',
   AI_PROXY: '/.netlify/functions/ai-proxy',
   CHILD_TOKEN: '/.netlify/functions/child-token',
   GRADES: [5,6,7,8,9,10,11,12,13],
@@ -356,7 +360,7 @@ const CFG = {
 // ═══════════════════════════════════════════════════════════════════════════
 /**
  * @typedef {Object} UserState
- * @property {string}   id           — UUID (Supabase) oder 'demo_<timestamp>' oder Kind-ID
+ * @property {string}   id           — UUID (Neon Auth) oder 'demo_<timestamp>' oder Kind-ID
  * @property {string}   email        — E-Mail-Adresse (leer bei Kind-Accounts)
  * @property {string}   full_name    — Anzeigename
  * @property {'student'|'parent'|'teacher'} role
@@ -364,7 +368,7 @@ const CFG = {
  * @property {string}   school       — Schulform
  * @property {string}   subscription — 'free' | 'family_plus' | 'family_pro' | 'teacher'
  * @property {Array}    children     — Kinder-Objekte (nur bei parent)
- * @property {boolean}  [isDemo]     — true = Demo-Modus (kein Supabase-Sync)
+ * @property {boolean}  [isDemo]     — true = Demo-Modus (kein Cloud-Sync)
  * @property {boolean}  [isChild]    — true = Kind-Login (PIN-Auth)
  * @property {string}   [parentEmail] — E-Mail des Elternteils (für Key-Vererbung)
  */
@@ -1265,7 +1269,7 @@ function buildExamPrompt(subject, grade, lang, num) {
 }
 
 /**
- * Speichert eine Einzel-Einstellung eines Kindes in Supabase und in U.children.
+ * Speichert eine Einzel-Einstellung eines Kindes in Neon und in U.children.
  * @param {string} childId
  * @param {object} updates — z.B. {language:'en'} oder {school_url:'https://...'}
  */
@@ -1294,7 +1298,7 @@ async function toggleChildSubject(childId, subject, add) {
 
 /**
  * Für Kind-Selbstverwaltung: Fach hinzufügen oder entfernen.
- * Aktualisiert U.subjects und Supabase, dann Settings neu rendern.
+ * Aktualisiert U.subjects und die Neon-DB, dann Settings neu rendern.
  * @param {string} subject — Fachname
  * @param {boolean} add    — true = hinzufügen, false = entfernen
  */
@@ -1364,7 +1368,7 @@ const _aiCache = new Map();
  * @property {string} claude      — Claude API Key (temporär; nach DB-Speicherung '')
  * @property {string} openai      — OpenAI API Key (temporär)
  * @property {string} gemini      — Google Gemini API Key (temporär)
- * @property {string[]} _configured — Provider mit Key im Supabase-Backend
+ * @property {string[]} _configured — Provider mit Key im Backend (Neon)
  * @property {boolean} _hasDbKey  — true wenn aktueller Provider Key im Backend hat
  */
 // Keys nur im Memory — NIEMALS persistent im localStorage!
@@ -1373,7 +1377,7 @@ let AI = {
   claude:      '',        // sk-ant-… (nur temporär, wird nach DB-Speicherung geleert)
   openai:      '',        // sk-…
   gemini:      '',        // AIza…
-  _configured: [],        // Provider-Namen mit Key im Supabase-Backend
+  _configured: [],        // Provider-Namen mit Key im Backend (Neon)
   _hasDbKey:   false,     // true wenn mind. ein Key im Backend für aktuellen Provider liegt
 };
 
@@ -1441,7 +1445,7 @@ function loadAIKeys(emailOrParent) {
 }
 
 /**
- * Lädt die im Supabase-Backend konfigurierten Provider via RPC.
+ * Lädt die im Backend (Neon) konfigurierten Provider via RPC.
  * Wird fire-and-forget nach dem Login aufgerufen. Setzt AI._configured
  * und AI._hasDbKey basierend auf dem Ergebnis der get_configured_providers()-Funktion.
  * Keine Aktion für Kinder, Demo- oder unauthentifizierte Nutzer.
@@ -1471,7 +1475,7 @@ function activeKey() { return AI[AI.provider] || ''; }
 
 /**
  * Prüft ob der aktive Provider einen verwendbaren Key hat —
- * entweder im RAM (Demo/Kind) oder sicher im Supabase-Backend (Auth-Nutzer).
+ * entweder im RAM (Demo/Kind) oder sicher im Backend (Neon; Auth-Nutzer).
  * Verwende diese Funktion für alle UI-Checks und Guards in AI-Aufrufen.
  * @returns {boolean}
  */
@@ -1706,7 +1710,7 @@ function save() {
     localStorage.setItem(_dataKey(), JSON.stringify(D));
   } catch(e) { console.warn('[Storage]', e.message); }
   syncStats(); // fire & forget — kein await, kein Fehler wenn offline
-  syncData();  // cards/tasks/exams (+ Kind-Stats) → Supabase, debounced
+  syncData();  // cards/tasks/exams (+ Kind-Stats) → Neon, debounced
 }
 
 function load() {
@@ -1729,7 +1733,7 @@ function loadDataForUser(userId) {
 
 // ── DB-Sync (fire & forget) ───────────────────────────────────────────────
 /**
- * Synchronisiert XP/Streak/Statistiken in die Supabase-Tabelle `user_stats`.
+ * Synchronisiert XP/Streak/Statistiken in die Neon-Tabelle `user_stats`.
  * Ermöglicht Cross-Device-Zugriff und Eltern-Dashboard-Daten.
  * Wird immer fire-and-forget aufgerufen; Offline-Fehler werden ignoriert.
  * Kind-Accounts übersprungen (PIN-Verifikation serverseitig nötig).
@@ -1763,7 +1767,7 @@ async function syncStats() {
 }
 
 /**
- * Speichert eine abgeschlossene Lernsession in Supabase (Tabelle `sessions`).
+ * Speichert eine abgeschlossene Lernsession in Neon (Tabelle `sessions`).
  * Wird beim Beenden des Pomodoro-Timers und nach Karteikarten-Sessions gerufen.
  * @async
  * @param {string} subject     — Fachname
@@ -1774,7 +1778,7 @@ async function syncStats() {
  */
 /**
  * Erfasst eine abgeschlossene Lerneinheit lokal in D.sessions (Basis für weeklyXP /
- * Eltern-Chart) und synchronisiert sie für Auth-Nutzer in die Supabase-sessions-Tabelle.
+ * Eltern-Chart) und synchronisiert sie für Auth-Nutzer in die Neon-Tabelle `sessions`.
  * @param {string|null} subject — Fach (oder null, z.B. Pomodoro)
  * @param {string} type — 'flashcard' | 'exam' | 'tutor' | 'pomodoro'
  * @param {number|null} durationMin — Dauer in Minuten (oder null)
@@ -1843,7 +1847,7 @@ async function syncSession(subject, type, durationMin, xpEarned) {
   } catch(e) { reportError('Session-Sync', e, { level: 'warning' }); }
 }
 
-// ── Cloud-Persistenz: Karten/Aufgaben/Prüfungen ⇄ Supabase ──────────────────
+// ── Cloud-Persistenz: Karten/Aufgaben/Prüfungen ⇄ Neon ──────────────────
 // Eltern/Schüler: über RLS (auth.uid()). Kinder: über PIN-verifizierte RPCs.
 // Persistenz folgt der save()-Semantik (Ganz-Ersetzen) und läuft transaktional in den RPCs.
 
@@ -1917,7 +1921,7 @@ function _applyCloudData(d) {
 }
 
 /**
- * Lädt Karten/Aufgaben/Prüfungen (+ Stats) aus Supabase in D.
+ * Lädt Karten/Aufgaben/Prüfungen (+ Stats) aus Neon in D.
  * Cloud hat Vorrang; ist die Cloud leer, aber lokal Daten vorhanden, wird einmalig
  * lokal → Cloud migriert (Rückgabe true). Offline-Fehler lassen lokale Daten unangetastet.
  * @returns {Promise<boolean>} true, wenn lokale Daten in die (leere) Cloud hochzuladen sind
@@ -2034,7 +2038,7 @@ function safeHTML(html) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MULTI-PROVIDER KI — via Supabase Edge Function (sicherer Proxy)
+// MULTI-PROVIDER KI — via Netlify Function ai-proxy (sicherer Proxy)
 // ═══════════════════════════════════════════════════════════════════════════
 /**
  * Sendet eine Anfrage an den KI-Provider über den serverseitigen Proxy.
@@ -2254,7 +2258,7 @@ async function init() {
   // bei Fehlern holt ai() es beim ersten KI-Aufruf mit sprechender Meldung nach)
   if (U.isChild) ensureChildToken().catch(() => {});
 
-  // Konfigurierte Provider aus Supabase DB laden (Auth-Nutzer)
+  // Konfigurierte Provider aus der Neon-DB laden (Auth-Nutzer)
   // Wird geawaitert damit hasActiveKey() sofort korrekt ist (z.B. in Prüfungsmodus)
   await loadConfiguredProviders();
 
@@ -3927,7 +3931,7 @@ function resetPomo() {
 async function parentDash(el) {
   const children = U.children||[];
 
-  // Kinder-Stats aus Supabase nachladen (falls stats-Spalte vorhanden)
+  // Kinder-Stats aus Neon nachladen (falls stats-Spalte vorhanden)
   if (sb && children.length) {
     try {
       const { data, error } = await sb.from('children')
@@ -4331,7 +4335,7 @@ async function addChildWithPin() {
   const child = { id: 'ch' + Date.now(), name, grade, pin, language: lang,
     school_id: schoolId, school_name: schoolName, class_name: className, email };
 
-  // In Supabase speichern
+  // In Neon speichern
   if (sb) {
     const insertData = {
       parent_id: U.id, name, grade: Number(grade), pin,
@@ -4342,7 +4346,7 @@ async function addChildWithPin() {
     if (email)      insertData.email      = email;
     const { error } = await sb.from('children').insert(insertData);
     if (error) { toast('❌ ' + error.message); return; }
-    // ID von Supabase holen
+    // ID aus der DB holen
     const { data } = await sb.from('children').select('id').eq('parent_id', U.id).eq('name', name).single();
     if (data) child.id = data.id;
   }
@@ -4681,7 +4685,7 @@ function saveProfile() {
     if (U.class_name !== undefined) dbUpdates.class_name = U.class_name;
   }
   save();
-  // Supabase-Update (non-blocking) — nur für Auth-Nutzer
+  // Cloud-Update (non-blocking) — nur für Auth-Nutzer
   if (sb && !U.isDemo && U.id && Object.keys(dbUpdates).length) {
     sb.from('profiles').update(dbUpdates).eq('id', U.id).then(() => {});
   }
@@ -4707,7 +4711,7 @@ let _schoolTimer = null;
 
 /**
  * Debounced Autocomplete für die Schulsuche.
- * Ruft search_schools() in Supabase auf (Postgres Volltext-Funktion).
+ * Ruft search_schools() in Neon auf (Postgres Volltext-Funktion).
  * @param {string} val — Eingabe des Nutzers
  */
 function schoolAutocomplete(val) {
@@ -4759,7 +4763,7 @@ function selectSchool(id, name, city) {
  * Ablauf für Auth-Nutzer:
  *   1. Key in AI[provider] setzen
  *   2. saveAIKeys() → localStorage (für Kind-Vererbung)
- *   3. Key per upsert in Supabase api_keys-Tabelle speichern
+ *   3. Key per upsert in der Tabelle api_keys speichern
  *   4. AI[provider] leeren (Key nur noch im Backend)
  *   5. AI._hasDbKey + AI._configured aktualisieren
  * Für Demo/Kind: nur Schritt 1–2 (kein DB-Aufruf).
@@ -4814,7 +4818,7 @@ async function saveProviderKey(providerKey) {
   AI.provider = providerKey;
   await saveAIKeys();
 
-  // Authentifizierte Nutzer: Key zusätzlich in Supabase DB speichern (sicherer)
+  // Authentifizierte Nutzer: Key zusätzlich in der Neon-DB speichern (sicherer)
   if (sb && !U?.isChild) {
     try {
       await sb.from('api_keys').upsert(

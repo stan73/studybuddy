@@ -2,7 +2,6 @@
   "recommendations": [
     "esbenp.prettier-vscode",
     "ritwickdey.liveserver",
-    "supabase.supabase-vscode",
     "dbaeumer.vscode-eslint",
     "eamodio.gitlens",
     "github.vscode-pull-request-github",

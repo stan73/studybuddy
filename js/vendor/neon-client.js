@@ -1,5 +1,5 @@
 /**
- * StudyBuddy Pro — Neon-Client-Bootstrap (ersetzt js/vendor/supabase.js)
+ * StudyBuddy Pro — Neon-Client-Bootstrap (ersetzt den früheren Supabase-Client)
  *
  * Stellt einen Supabase-kompatiblen Client auf Basis von @neondatabase/neon-js
  * bereit. Der SupabaseAuthAdapter erhält die vertraute Supabase-Auth-API
