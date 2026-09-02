@@ -621,6 +621,19 @@ function toast(msg, dur = 3500) {
   t._timer = setTimeout(() => t.classList.remove('show'), dur);
 }
 
+// ── Rückleitung aus app.html mit Grund (Sitzung abgelaufen / abgemeldet) ────
+(function handleReturnReason() {
+  const reason = new URLSearchParams(location.search).get('reason');
+  if (!reason) return;
+  history.replaceState({}, '', '/');
+  const msgs = {
+    expired:    '⚠️ Deine Sitzung ist abgelaufen — bitte neu anmelden.',
+    signed_out: 'ℹ️ Du wurdest abgemeldet — bitte neu anmelden.',
+  };
+  if (msgs[reason]) toast(msgs[reason], 6000);
+  openAuth('login');
+})();
+
 // Enter-Taste für Login
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('auth-overlay').style.display !== 'none') {

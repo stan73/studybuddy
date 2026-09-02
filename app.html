@@ -526,6 +526,10 @@ const I18N = {
     'fatal.body':'Beim Laden ist ein Fehler aufgetreten. Bitte die Seite neu laden. Bleibt das Problem bestehen, hilft ein Abmelden über die Startseite.',
     'fatal.reload':'🔄 Neu laden',
     'fatal.home':'Zur Startseite',
+    // Session-Gate (Härtung 1.2)
+    'auth.expired':'⚠️ Deine Sitzung ist abgelaufen — du wirst zur Anmeldung weitergeleitet.',
+    'auth.signed_out':'ℹ️ Du wurdest in einem anderen Tab abgemeldet — Weiterleitung zur Anmeldung.',
+    'auth.offline_session':'⚠️ Server nicht erreichbar — Sitzung konnte nicht geprüft werden. Du arbeitest offline mit lokalen Daten.',
   },
   en: {
     'nav.learn':'Learning','nav.dashboard':'Dashboard','nav.subjects':'Subjects',
@@ -663,6 +667,9 @@ const I18N = {
     'fatal.body':'An error occurred while loading. Please reload the page. If the problem persists, sign out via the start page.',
     'fatal.reload':'🔄 Reload',
     'fatal.home':'Go to start page',
+    'auth.expired':'⚠️ Your session has expired — redirecting to sign-in.',
+    'auth.signed_out':'ℹ️ You were signed out in another tab — redirecting to sign-in.',
+    'auth.offline_session':'⚠️ Server unreachable — session could not be verified. You are working offline with local data.',
   },
   fr: {
     'nav.learn':'Apprentissage','nav.dashboard':'Tableau de bord','nav.subjects':'Matières',
@@ -800,6 +807,9 @@ const I18N = {
     'fatal.body':'Une erreur est survenue au chargement. Veuillez recharger la page. Si le problème persiste, déconnectez-vous via la page d\'accueil.',
     'fatal.reload':'🔄 Recharger',
     'fatal.home':'Vers la page d\'accueil',
+    'auth.expired':'⚠️ Votre session a expiré — redirection vers la connexion.',
+    'auth.signed_out':'ℹ️ Vous avez été déconnecté dans un autre onglet — redirection vers la connexion.',
+    'auth.offline_session':'⚠️ Serveur injoignable — la session n\'a pas pu être vérifiée. Vous travaillez hors ligne avec les données locales.',
   },
   es: {
     'nav.learn':'Aprendizaje','nav.dashboard':'Panel','nav.subjects':'Asignaturas',
@@ -937,6 +947,9 @@ const I18N = {
     'fatal.body':'Se produjo un error al cargar. Recarga la página. Si el problema persiste, cierra la sesión desde la página de inicio.',
     'fatal.reload':'🔄 Recargar',
     'fatal.home':'Ir a la página de inicio',
+    'auth.expired':'⚠️ Tu sesión ha caducado — redirigiendo al inicio de sesión.',
+    'auth.signed_out':'ℹ️ Has cerrado la sesión en otra pestaña — redirigiendo al inicio de sesión.',
+    'auth.offline_session':'⚠️ Servidor no disponible — no se pudo verificar la sesión. Trabajas sin conexión con datos locales.',
   },
 };
 
@@ -2052,8 +2065,9 @@ async function ai(messages, system, maxTok=400, useCache=true, image=null) {
 // ═══════════════════════════════════════════════════════════════════════════
 /**
  * Haupt-Initialisierungsfunktion — wird beim DOMContentLoaded aufgerufen.
+ * localStorage ('sb_user') ist nur Offline-Cache, nie Legitimation (Härtung 1.2).
  * Auth-Kaskade (erste Übereinstimmung gewinnt):
- *   1. Supabase-Session (echter Login via E-Mail/OAuth)
+ *   1. Neon-Auth-Session (echter Login via E-Mail/OAuth, serverseitig geprüft)
  *   2. sessionStorage 'sb_session' (Redirect von index.html nach Login)
  *   3. sessionStorage 'sb_demo_login' (Demo-Modus)
  *   4. sessionStorage 'sb_child_session' (Kind-PIN-Login)
@@ -2064,7 +2078,11 @@ async function ai(messages, system, maxTok=400, useCache=true, image=null) {
  * @returns {Promise<void>}
  */
 async function init() {
+  // Lokaler Speicher ist nur Cache — Legitimation kommt ausschließlich aus einer
+  // gültigen Auth-Session (Elternteil/Schüler) oder Kind-Session (Härtung 1.2).
   load();
+  const cachedU = U;
+  U = null;
 
   // Neon-Client (ESM, deferred) bereitstellen, bevor Auth/DB genutzt werden.
   await ensureSb();
@@ -2075,32 +2093,41 @@ async function init() {
     if (cs) _childPin = JSON.parse(cs).pin || null;
   } catch(e) { console.warn('[Kind-Session] PIN nicht wiederherstellbar:', e.message); }
 
-  // 1. Supabase-Session prüfen (echter Login)
+  // 1. Neon-Auth-Session prüfen (echter Login) — einzige Legitimation für Konto-Nutzer
   if (sb) {
-    const { data: { session } } = await sb.auth.getSession();
+    const { session, offline } = await _probeSession(false);
     if (session) {
-      // Profil aus DB laden
-      const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+      // Cache desselben Nutzers dient nur als Fallback, falls Profil/Kinder gerade nicht ladbar sind
+      const cachedSame = (cachedU && !cachedU.isChild && cachedU.id === session.user.id) ? cachedU : null;
+      const { data: profile, error: pErr } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+      if (pErr && pErr.code !== 'PGRST116') reportError('Profil laden', pErr, { level: 'warning' });
+      const p = profile || cachedSame || {};
       // Kinder laden falls Elternteil
       let children = [];
-      if (profile?.role === 'parent') {
-        const { data: ch } = await sb.from('children').select('*').eq('parent_id', session.user.id);
-        children = ch || [];
+      if (p.role === 'parent') {
+        const { data: ch, error: cErr } = await sb.from('children').select('*').eq('parent_id', session.user.id);
+        if (cErr) reportError('Kinder laden', cErr, { level: 'warning' });
+        children = ch || (cachedSame && cachedSame.children) || [];
       }
       U = {
         id: session.user.id,
         email: session.user.email,
-        full_name: profile?.full_name || session.user.email,
-        role: profile?.role || 'student',
-        grade: profile?.grade || 9,
-        school: profile?.school || 'Gymnasium',
-        school_id:   profile?.school_id   || null,
-        class_name:  profile?.class_name  || '',
-        subscription: profile?.subscription || 'free',
-        language: profile?.language || 'de',
+        full_name: p.full_name || session.user.email,
+        role: p.role || 'student',
+        grade: p.grade || 9,
+        school: p.school || 'Gymnasium',
+        school_id:   p.school_id   || null,
+        class_name:  p.class_name  || '',
+        subscription: p.subscription || 'free',
+        language: p.language || 'de',
         children,
       };
       save();
+    } else if (offline && cachedU && !cachedU.isChild) {
+      // Server nicht erreichbar → kein Urteil möglich. Cache nur als sichtbare Überbrückung;
+      // die Sitzung wird beim nächsten Online-/Sichtbarkeits-Event serverseitig nachgeprüft.
+      U = cachedU;
+      reportError('Sitzung prüfen', 'Server nicht erreichbar — Sitzung konnte nicht geprüft werden', { level: 'warning', toast: t('auth.offline_session') });
     }
   }
 
@@ -2149,7 +2176,12 @@ async function init() {
     }
   }
 
-  if (!U) { window.location.href = '/'; return; }
+  if (!U) {
+    // Keine gültige Session: alten Cache verwerfen, mit Grund zur Anmeldung (kein stiller Weiterbetrieb)
+    _clearAuthCache();
+    window.location.href = cachedU ? '/?reason=expired' : '/';
+    return;
+  }
 
   // AI-Keys laden: Kind erbt Keys vom Elternteil, sonst eigene Keys
   if (U.isChild && U.parentEmail) {
@@ -2173,6 +2205,7 @@ async function init() {
   try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch(e) { reportError('Offline-Cache', e, { level: 'warning' }); } // Cloud-Daten in Offline-Cache spiegeln
   if (migrate) _syncDataNow();        // lokale Bestandsdaten einmalig in die leere Cloud hochladen
 
+  _startSessionWatch();               // Ablauf/Abmeldung erkennen statt tote Schreibvorgänge (Härtung 1.2)
   document.getElementById('app').style.display = 'flex';
   renderSidebar();
   _updateLogBadge(); // Fehler-Badge aus vorherigen Sessions anzeigen
@@ -2257,13 +2290,137 @@ function populateDemoData() {
 
 async function doLogout() {
   if (!confirm('Wirklich abmelden?')) return;
-  if (sb) await sb.auth.signOut();
+  _sessionLost = true; // laufende Sitzungsprüfung darf nicht mehr dazwischenfunken
+  _stopSessionWatch();
+  try { if (sb) await sb.auth.signOut(); } catch (e) { reportError('Abmelden', e, { level: 'warning' }); }
   U = null;
   D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
   AI = { provider:'claude', claude:'', openai:'', gemini:'', _configured:[], _hasDbKey:false };
   localStorage.clear();
   sessionStorage.clear();
   window.location.href = '/';
+}
+
+// ── Session-Gate & -Überwachung (Härtung 1.2) ─────────────────────────────
+// Der Auth-Adapter meldet Netzfehler bei getSession() teils nicht als error,
+// sondern als "keine Session". Deshalb wird strikt unterschieden zwischen
+// "Sitzung fehlt" (→ Abmelden + Weiterleitung) und "Server nicht erreichbar"
+// (→ kein Urteil, später erneut prüfen). Es gibt keinen Supabase-artigen
+// TOKEN_REFRESHED-Event: onAuthStateChange des Adapters feuert nur für
+// Cross-Tab-Signale — daher zusätzlich periodische, serverseitige Prüfung.
+let _sessionLost = false, _sessionTimer = null, _sessionSub = null, _sessionBusy = false, _sessionLastCheck = 0;
+const SESSION_CHECK_MS   = 5 * 60 * 1000; // periodische Prüfung
+const SESSION_MIN_GAP_MS = 60 * 1000;     // Tab-Wechsel: höchstens 1×/Minute
+
+/** Heuristik: Netz-/Serverproblem (kein Urteil über die Sitzung möglich)? */
+function _isNetworkError(e) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  if (!e) return false;
+  if (e instanceof TypeError) return true; // fetch: "Failed to fetch" / "Load failed"
+  const st = Number(e.status);
+  if (st === 0 || st === 408 || st === 429 || (st >= 500 && st < 600)) return true;
+  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|timed? ?out|ECONN|ENOTFOUND/i
+    .test(String(e.message || e.statusText || ''));
+}
+
+/**
+ * Prüft die Auth-Session. Rückgabe { session, offline }:
+ *   session — gültige Session (Supabase-Form) oder null
+ *   offline — true, wenn die Prüfung an Netz/Server scheiterte (kein Urteil)
+ * @param {boolean} force — serverseitig erzwingen statt Client-Cache
+ */
+async function _probeSession(force) {
+  if (!sb) return { session: null, offline: false };
+  try {
+    const { data, error } = await sb.auth.getSession(force ? { forceFetch: true } : undefined);
+    if (data?.session) return { session: data.session, offline: false };
+    if (error) return { session: null, offline: _isNetworkError(error) };
+  } catch (e) {
+    return { session: null, offline: _isNetworkError(e) };
+  }
+  // Fassade sagt "keine Session" — Better-Auth-Client direkt fragen, ob es ein Netzfehler war
+  try {
+    const ba = typeof sb.auth.getBetterAuthInstance === 'function' ? sb.auth.getBetterAuthInstance() : null;
+    if (ba && typeof ba.getSession === 'function') {
+      const r = await ba.getSession();
+      if (r?.error && _isNetworkError(r.error)) return { session: null, offline: true };
+      if (r?.data?.session) { // Fassade hatte veralteten Cache
+        const again = await sb.auth.getSession();
+        if (again?.data?.session) return { session: again.data.session, offline: false };
+      }
+    }
+  } catch (e) {
+    if (_isNetworkError(e)) return { session: null, offline: true };
+  }
+  return { session: null, offline: typeof navigator !== 'undefined' && navigator.onLine === false };
+}
+
+/** Auth-Cache verwerfen (localStorage bleibt Cache, nie Legitimation). */
+function _clearAuthCache() {
+  try { localStorage.removeItem('sb_user'); } catch (e) { console.warn('[Auth] Cache nicht löschbar:', e.message); }
+  try { sessionStorage.removeItem('sb_session'); sessionStorage.removeItem('sb_child_session'); }
+  catch (e) { console.warn('[Auth] Session-Cache nicht löschbar:', e.message); }
+}
+
+/** Session verloren (abgelaufen / in anderem Tab abgemeldet): Cloud-Schreibvorgänge stoppen, melden, zur Anmeldung. */
+function _onSessionLost(reason) {
+  if (_sessionLost) return;
+  _sessionLost = true;
+  _stopSessionWatch();
+  clearTimeout(_syncTimer);
+  _dataLoaded = false; // keine Cloud-Schreibvorgänge mehr ohne gültige Sitzung (lokal wird weiter gespeichert)
+  reportError('Sitzung', reason === 'signed_out' ? 'In einem anderen Tab abgemeldet' : 'Sitzung abgelaufen — Anmeldung erforderlich', { level: 'warning' });
+  _clearAuthCache();
+  _showToast(t(reason === 'signed_out' ? 'auth.signed_out' : 'auth.expired'), 5000);
+  setTimeout(() => { window.location.href = '/?reason=' + reason; }, 1500);
+}
+
+/** Serverseitige Sitzungsprüfung (nur Konto-Nutzer; Kinder haben keine Auth-Session). */
+async function _checkSession(ignoreGap) {
+  if (!sb || !U || U.isChild || _sessionLost || _sessionBusy) return;
+  const now = Date.now();
+  if (!ignoreGap && now - _sessionLastCheck < SESSION_MIN_GAP_MS) return;
+  _sessionBusy = true; _sessionLastCheck = now;
+  try {
+    const { session, offline } = await _probeSession(true);
+    if (session) return;
+    if (offline) { console.warn('[Auth] Sitzungsprüfung: Server nicht erreichbar — später erneut'); return; }
+    _onSessionLost('expired');
+  } catch (e) {
+    reportError('Sitzung prüfen', e, { level: 'warning' });
+  } finally { _sessionBusy = false; }
+}
+
+function _onVisibilityCheck() { if (document.visibilityState === 'visible') _checkSession(false); }
+function _onOnlineCheck() { _checkSession(true); }
+
+function _startSessionWatch() {
+  if (!sb || !U || U.isChild) return;
+  _stopSessionWatch();
+  _sessionLastCheck = Date.now();
+  _sessionTimer = setInterval(() => _checkSession(true), SESSION_CHECK_MS);
+  document.addEventListener('visibilitychange', _onVisibilityCheck);
+  window.addEventListener('online', _onOnlineCheck);
+  // Cross-Tab-Signale (Abmeldung in anderem Tab): serverseitig nachprüfen statt blind ausloggen
+  try {
+    if (typeof sb.auth.onAuthStateChange === 'function') {
+      let first = true;
+      const res = sb.auth.onAuthStateChange((event, session) => {
+        if (first) { first = false; return; } // INITIAL_SESSION überspringen
+        if (!session) _checkSession(true);
+      });
+      _sessionSub = res?.data?.subscription || null;
+    }
+  } catch (e) { console.warn('[Auth] onAuthStateChange nicht verfügbar:', e.message); }
+}
+
+function _stopSessionWatch() {
+  clearInterval(_sessionTimer); _sessionTimer = null;
+  document.removeEventListener('visibilitychange', _onVisibilityCheck);
+  window.removeEventListener('online', _onOnlineCheck);
+  try { if (_sessionSub && typeof _sessionSub.unsubscribe === 'function') _sessionSub.unsubscribe(); }
+  catch (e) { console.warn('[Auth] Unsubscribe fehlgeschlagen:', e.message); }
+  _sessionSub = null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
