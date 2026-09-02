@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   check:
-    name: Lint · Syntax · Tests
+    name: Lint · Syntax · Tests (ohne Secrets)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -38,9 +38,113 @@ jobs:
       - name: Lint — Prettier-Check, Inline-JS/.mjs-Syntax, Versionsgleichstand
         run: npm run lint
 
-      - name: Tests — tests/run_tests.js
+      # npm test = alte Text-Suite (tests/run_tests.js, Regressions-Kanarienvogel)
+      #          + Vitest tests/unit (Netlify Functions wirklich ausgeführt, Upstreams gemockt)
+      #          + Vitest tests/db (überspringt sich hier: keine TEST_*-Variablen)
+      - name: Tests — Text-Suite + Function-Tests
         run: npm test
 
       - name: Formatierungsschuld (nicht blockierend, siehe .prettierignore)
         continue-on-error: true
         run: npx prettier --check --ignore-path .gitignore tests/run_tests.js netlify/functions css
+
+  # Zweite Stufe: SQL-/RLS-Tests und Playwright-Smoke gegen einen Wegwerf-Branch,
+  # der pro Lauf von `production` abgezweigt und am Ende gelöscht wird.
+  # Braucht das Secret NEON_API_KEY. Fehlt es (Fork-PR, Dependabot, noch nicht
+  # gesetzt), wird die Stufe sauber übersprungen statt rot.
+  db-e2e:
+    name: DB · RLS · Playwright (Neon-Wegwerf-Branch)
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEON_PROJECT_ID: misty-breeze-43189479
+      NEON_PARENT_BRANCH: br-spring-brook-as21q475
+      NEONCTL: neonctl@4.14.0
+    steps:
+      - name: Secret vorhanden?
+        id: gate
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          if [ -n "$NEON_API_KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=DB/E2E übersprungen::Secret NEON_API_KEY fehlt — tests/db und tests/e2e laufen nicht (siehe tests/TESTPLAN.md, Abschnitt CI)."
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Node 22
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Abhängigkeiten
+        if: steps.gate.outputs.run == 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Wegwerf-Branch von production anlegen
+        if: steps.gate.outputs.run == 'true'
+        id: branch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          NAME="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          npx --yes "$NEONCTL" branches create --project-id "$NEON_PROJECT_ID" \
+            --parent "$NEON_PARENT_BRANCH" --name "$NAME" -o json > branch.json
+          BRANCH_ID=$(node -p "JSON.parse(require('fs').readFileSync('branch.json','utf8')).branch.id")
+          echo "id=$BRANCH_ID" >> "$GITHUB_OUTPUT"
+          echo "Branch $NAME ($BRANCH_ID) angelegt"
+          # Owner-Verbindung (direkter Host, nicht gepoolt) — nie ins Log
+          URI=$(npx --yes "$NEONCTL" connection-string "$BRANCH_ID" --project-id "$NEON_PROJECT_ID" \
+            --role-name neondb_owner --database-name neondb)
+          echo "::add-mask::$URI"
+          HOST=$(node -p "new URL(process.argv[1]).hostname" "$URI")
+          EP="${HOST%%.*}"; EP="${EP%-pooler}"; DOMAIN="${HOST#*.}"
+          AUTH_URL="https://$EP.neonauth.$DOMAIN/neondb/auth"
+          API_URL="https://$EP.apirest.$DOMAIN/neondb/rest/v1"
+          {
+            echo "TEST_DATABASE_URL=$URI"
+            echo "TEST_NEON_AUTH_URL=$AUTH_URL"
+            echo "TEST_DATA_API_URL=$API_URL"
+            echo "E2E_DATABASE_URL=$URI"
+            echo "E2E_NEON_AUTH_URL=$AUTH_URL"
+            echo "E2E_NEON_DATA_API_URL=$API_URL"
+          } >> "$GITHUB_ENV"
+          echo "Auth: $AUTH_URL · Data API: $API_URL"
+
+      - name: SQL-/RLS-Tests — tests/db (Vitest)
+        if: steps.gate.outputs.run == 'true'
+        run: npm run test:db
+
+      - name: Playwright-Browser (Chromium)
+        if: steps.gate.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright-Smoke — tests/e2e
+        if: steps.gate.outputs.run == 'true'
+        run: npm run test:e2e
+
+      - name: Playwright-Artefakte (Traces/Screenshots, nur bei Fehler)
+        if: steps.gate.outputs.run == 'true' && failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Wegwerf-Branch löschen
+        if: always() && steps.branch.outputs.id != ''
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: npx --yes "$NEONCTL" branches delete "${{ steps.branch.outputs.id }}" --project-id "$NEON_PROJECT_ID"

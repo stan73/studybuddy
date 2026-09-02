@@ -1,6 +1,6 @@
 # StudyBuddy Pro — Testplan
 > **Version:** 2.0 · **Erstellt:** 2026-04-05
-> **Automatischer Test:** `node tests/run_tests.js` (155 Tests)
+> **Automatische Tests:** `npm test` = Text-Suite (`tests/run_tests.js`, 156 Prüfungen) + Vitest `tests/unit` (70) + Vitest `tests/db` (21, nur mit Dev-Branch); `npm run test:e2e` = Playwright `tests/e2e` (3) — siehe Abschnitt „Tests, die Code ausführen“
 > **Manueller Test:** Diese Datei, Schritt für Schritt im Browser
 > **URL:** https://gleaming-gaufre-b15c11.netlify.app
 
@@ -304,13 +304,33 @@ Für jeden Punkt: Dashboard, Fächer, Karteikarten, KI-Tutor, Prüfungsmodus, Le
 
 ---
 
+---
+
+## Tests, die Code ausführen (Härtung 2.1, 2026-09-02)
+
+Die Text-Suite `tests/run_tests.js` prüft nur, ob Zeichenketten in `app.html` vorkommen — sie war 156/156 grün, während die Eltern-Persistenz sieben Wochen komplett ausfiel. Sie bleibt als Regressions-Kanarienvogel; die folgenden drei Ebenen führen den Code wirklich aus.
+
+| Ebene | Befehl | Was läuft wirklich | Voraussetzung |
+|---|---|---|---|
+| **Functions** (`tests/unit`, 70 Tests) | `npm run test:unit` | `ai-proxy`, `link-profile`, `child-token`, `_lib/*` mit echten `Request`-Objekten; gemockt sind nur DB (`fakeSql` protokolliert jede Abfrage), JWKS (lokales Key-Set, `jwtVerify` bleibt echt) und der KI-Upstream | keine |
+| **SQL/RLS** (`tests/db`, 21 Tests) | `npm run test:db` | echte SQL gegen einen **Neon-Dev-Branch**: SECURITY-DEFINER-/`search_path`-Struktur, Rollenrechte (`SET LOCAL ROLE authenticated/anonymous`), Kind-RPCs; plus der Produktionspfad Neon Auth → `link-profile` → Data API `sync_my_data`/`load_my_data`, Fremdzugriff, `api_keys`, `consume_ai_quota` | `TEST_DATABASE_URL`, `TEST_NEON_AUTH_URL`, `TEST_DATA_API_URL` (sonst übersprungen; Produktions-Endpunkte werden verweigert) |
+| **Browser** (`tests/e2e`, 3 Tests) | `npm run test:e2e` | Chromium gegen `tests/e2e/server.mjs` (statisch + echte Functions in-process): Registrieren → Karte → Reload ohne Cache → zweite Session; `#reset-password`; abgelaufene Sitzung | `E2E_DATABASE_URL`, `E2E_NEON_AUTH_URL`, `E2E_NEON_DATA_API_URL`; einmalig `npx playwright install chromium` |
+
+**Dev-Branch lokal:** per Neon-MCP (`create_branch` vom `production`-Branch `br-spring-brook-as21q475`) oder Konsole anlegen; Owner-Connection-String ohne `-pooler`, Auth-URL `https://<ep-id>.neonauth.<region>.aws.neon.tech/neondb/auth`, Data API `https://<ep-id>.apirest.<region>.aws.neon.tech/neondb/rest/v1`. Testkonten (`@studybuddy-test.invalid`, `@studybuddy-e2e.invalid`) werden von den Tests selbst gelöscht und die Löschung geprüft. **Niemals gegen Produktion.**
+
+**Rot-Nachweis (2026-09-02):** mit zurückgedrehten Fixes fallen die Tests — `childId` ohne Token / 503-Pfad / `verified`-Check / Auth-E-Mail → 8 Function-Tests rot; `SECURITY INVOKER` an `load_my_data`/`sync_my_data`, `search_path` an `auth_child` entfernt, SELECT-Policy auf `api_keys`, EXECUTE auf `consume_ai_quota` → 12 DB-Tests rot; ohne SECURITY DEFINER bzw. mit dem alten `_probeSession` → Playwright „Karte nicht in der Cloud“ bzw. „Sitzung läuft still weiter“ rot.
+
+**CI (`.github/workflows/ci.yml`):** Job `check` (Lint, Text-Suite, Function-Tests) läuft immer. Job `db-e2e` zweigt pro Lauf einen Wegwerf-Branch `ci-<run>` von `production` ab (neonctl), führt `tests/db` und `tests/e2e` aus und löscht den Branch wieder — nur wenn das GitHub-Secret **`NEON_API_KEY`** gesetzt ist (Neon-Konsole → Account/Project → API keys; am besten projektgebunden). Fehlt es, wird die Stufe mit Hinweis übersprungen (Fork-PRs und Dependabot bekommen keine Secrets). Weitere Secrets sind nicht nötig: Projekt-ID, Parent-Branch und URLs leiten sich im Workflow ab.
+
+---
+
 ## Testergebnis-Vorlage
 
 ```
 Datum: ___________  Tester: ___________  Version/Commit: ___________
 
-Automatische Tests: node tests/run_tests.js
-→ Ergebnis: ___/155 bestanden
+Automatische Tests: npm test (Text-Suite + Vitest) · npm run test:db · npm run test:e2e
+→ Ergebnis: ___/156 · ___/70 · ___/21 · ___/3 bestanden
 
 Manuelle Tests:
 [ ] M1 Auth          ✅ / ❌ / ⚠️  Anmerkung: ___

@@ -27,6 +27,9 @@ Aufwand: **S** = < 1 Tag · **M** = 1–3 Tage · **L** = > 3 Tage
 | 2.4 Toter Parallelcode gelöscht (`js/`-Module, `js/vendor/supabase.js`, `supabase/functions/`), Supabase-Reste in Kommentaren/Doku berichtigt | `2c12a66` | grep `<script src=`/`import`: nur `js/vendor/*` geladen; Tests 156/156 |
 | 2.2 CI als Deploy-Tor: Prettier-Check, Inline-JS/.mjs-Syntax, Tests, Versionsgleichstand bei Push/PR auf `main`; Actions SHA-gepinnt, `permissions: contents: read`, Dependabot; `npm test`/`npm run lint`; Version 2.2.0 mit `package.json` als Quelle; Schul-Import gegen totes Supabase entfernt | `7e33522`, `aad756b` | [Actions-Lauf 33630361361](https://github.com/stan73/studybuddy/actions/runs/33630361361) grün |
 
+| **2.1 Tests, die Code ausführen:** Vitest für die Netlify Functions (70), SQL-/RLS-Tests gegen Neon-Dev-Branch inkl. Sieben-Wochen-Test (21), Playwright-Smoke Registrieren→Karte→Reload→zweite Session (3); CI-Stufe `db-e2e` mit Wegwerf-Branch (Secret `NEON_API_KEY`) | `3dcf56c`, `dc234c6`, `f5f8bc4`, `ci.yml` (db-e2e) | Rot-Nachweise in `tests/TESTPLAN.md`; Text-Suite bleibt Kanarienvogel |
+| 1.2 Nachbesserung: `_probeSession` fragte im Rückfall den Better-Auth-Client-**Cache** — eine serverseitig beendete Sitzung wurde nie erkannt. Jetzt echter Request (`$fetch /get-session`) | `716a776` | Playwright „abgelaufene Sitzung“ rot mit altem Code, grün mit Fix |
+
 **Offen (bewusst noch nicht angefasst):** 1.1 Sync-Semantik/Konflikterkennung (Whole-Replace, Last-Writer-Wins) · 1.5 Kind-PIN im Klartext in `sessionStorage` · 2.5 Accessibility · 2.6 Lazy-Loading der Vendor-Bibliotheken · 2.7 Rechtliches (Impressum/Datenschutz/AVV).
 
 **Regel ab jetzt:** „erledigt" nur mit nachgewiesenem Round-Trip gegen Produktion. Jede DB-Änderung — auch wenn per Neon-MCP ausgeführt — wird als `neon/migrations/NNN_….sql` mit Befund, Begründung und Verifikation abgelegt.
