@@ -11,6 +11,8 @@
  *
  * Braucht TEST_DATABASE_URL, TEST_NEON_AUTH_URL, TEST_DATA_API_URL (Dev-Branch).
  * Testkonten werden am Ende restlos gelöscht und die Löschung belegt.
+ * Seit Härtung 1.1 (Konflikterkennung) sendet der Client p_base_version mit;
+ * die Konfliktfälle selbst stehen in sync-conflict.test.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { API_URL, AUTH_URL, DB_URL, hasApi } from './env.mjs';
@@ -107,12 +109,18 @@ describe.skipIf(!hasApi)('Eltern-Persistenz über Neon Auth + Data API (Dev-Bran
   });
 
   it('SIEBEN-WOCHEN-TEST: sync_my_data → load_my_data als authenticated mit echtem JWT (Roundtrip)', async () => {
+    // Seit Härtung 1.1 verlangt sync_my_data die zuletzt geladene Datenversion
+    const v0 = await rpc(A.jwt, 'load_my_data', {});
+    expect(v0.status, v0.text).toBe(200);
+    expect(v0.json.version).toBe(0);
     const sync = await rpc(A.jwt, 'sync_my_data', {
       p_cards: CARDS,
       p_tasks: TASKS,
       p_exams: EXAMS,
+      p_base_version: v0.json.version,
     });
     expect(sync.status, sync.text).toBeLessThan(300);
+    expect(sync.json).toMatchObject({ ok: true, version: 1 });
     const load = await rpc(A.jwt, 'load_my_data', {});
     expect(load.status, load.text).toBe(200);
     expect(load.json.cards).toHaveLength(2);
@@ -153,9 +161,10 @@ describe.skipIf(!hasApi)('Eltern-Persistenz über Neon Auth + Data API (Dev-Bran
   it('Fremdzugriff über RPC: B sieht nichts von A, Bs Sync verändert A nicht', async () => {
     const before = await rpc(B.jwt, 'load_my_data', {});
     expect(before.status).toBe(200);
-    expect(before.json).toEqual({ cards: [], tasks: [], exams: [] });
+    expect(before.json).toEqual({ version: 0, cards: [], tasks: [], exams: [] });
     const sync = await rpc(B.jwt, 'sync_my_data', {
       p_cards: [{ subject: 'Bio', front: 'Zelle', back: 'kleinste Einheit' }],
+      p_base_version: 0,
     });
     expect(sync.status).toBeLessThan(300);
     const a = await rpc(A.jwt, 'load_my_data', {});
@@ -251,7 +260,9 @@ describe.skipIf(!hasApi)('Eltern-Persistenz über Neon Auth + Data API (Dev-Bran
 
   it('anonym (ohne JWT) sind load_my_data/sync_my_data nicht ausführbar', async () => {
     expect((await rpc(null, 'load_my_data', {})).status).toBeGreaterThanOrEqual(400);
-    expect((await rpc(null, 'sync_my_data', { p_cards: [] })).status).toBeGreaterThanOrEqual(400);
+    expect(
+      (await rpc(null, 'sync_my_data', { p_cards: [], p_base_version: 0 })).status
+    ).toBeGreaterThanOrEqual(400);
     const { rows } = await pool.query('select count(*)::int as n from cards where user_id = $1', [
       A.id,
     ]);

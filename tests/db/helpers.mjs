@@ -66,7 +66,7 @@ export async function pgError(promise) {
     await promise;
     return null;
   } catch (e) {
-    return { code: e.code, message: e.message };
+    return { code: e.code, message: e.message, detail: e.detail, hint: e.hint };
   }
 }
 
@@ -121,6 +121,18 @@ export async function fetchJwt(cookie) {
   const { res, json, text } = await authFetch('/token', { headers: { cookie } });
   if (res.status !== 200 || typeof json?.token !== 'string') {
     throw new Error(`JWT-Abruf fehlgeschlagen (${res.status}): ${text.slice(0, 200)}`);
+  }
+  return json.token;
+}
+
+/**
+ * Anonymes JWT (Rolle anonymous) — so bekommt es der Browser über
+ * allowAnonymous: true (Kind-Login ohne Auth-Session).
+ */
+export async function anonymousJwt() {
+  const { res, json, text } = await authFetch('/token/anonymous');
+  if (res.status !== 200 || typeof json?.token !== 'string') {
+    throw new Error(`Anonymes JWT fehlgeschlagen (${res.status}): ${text.slice(0, 200)}`);
   }
   return json.token;
 }
@@ -194,6 +206,12 @@ export async function cleanupTestUsers(pool) {
   const like = `%@${TEST_MAIL_DOMAIN}`;
   await pool.query(`delete from public.profiles where lower(email) like $1`, [like]);
   await pool.query(`delete from neon_auth."user" where lower(email) like $1`, [like]);
+  // sync_state (Härtung 1.1) hängt an user_id/child_id ohne FK — verwaiste Zähler mitnehmen
+  await pool.query(
+    `delete from public.sync_state s
+      where not exists (select 1 from public.profiles p where p.id = s.scope_id)
+        and not exists (select 1 from public.children c where c.id = s.scope_id)`
+  );
   const { rows } = await pool.query(
     `select
        (select count(*)::int from neon_auth."user" where lower(email) like $1) as users,

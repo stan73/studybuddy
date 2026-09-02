@@ -45,9 +45,9 @@ describe.skipIf(!hasDb)('Struktur: SECURITY DEFINER, Rechte, RLS', () => {
       (await pool.query(`select has_function_privilege($1, $2, 'EXECUTE') as ok`, [role, fn]))
         .rows[0].ok;
     expect(await priv('authenticated', 'public.load_my_data()')).toBe(true);
-    expect(await priv('authenticated', 'public.sync_my_data(jsonb,jsonb,jsonb)')).toBe(true);
+    expect(await priv('authenticated', 'public.sync_my_data(jsonb,jsonb,jsonb,bigint)')).toBe(true);
     expect(await priv('anonymous', 'public.load_my_data()')).toBe(false);
-    expect(await priv('anonymous', 'public.sync_my_data(jsonb,jsonb,jsonb)')).toBe(false);
+    expect(await priv('anonymous', 'public.sync_my_data(jsonb,jsonb,jsonb,bigint)')).toBe(false);
   });
 
   it('authenticated hat bewusst kein USAGE auf Schema auth (siehe neon/migrations/004)', async () => {
@@ -72,7 +72,7 @@ describe.skipIf(!hasDb)('Struktur: SECURITY DEFINER, Rechte, RLS', () => {
       expect(load?.code, load?.message).toBe('P0001');
       expect(load?.message).toMatch(/not authenticated/);
       const sync = await asRole(c, 'authenticated', () =>
-        pgError(c.query(`select sync_my_data('[]'::jsonb, '[]'::jsonb, '[]'::jsonb)`))
+        pgError(c.query(`select sync_my_data('[]'::jsonb, '[]'::jsonb, '[]'::jsonb, 0)`))
       );
       expect(sync?.code, sync?.message).toBe('P0001');
       expect(sync?.message).toMatch(/not authenticated/);
@@ -192,12 +192,11 @@ describe.skipIf(!hasDb)('Kind-Pfad: auth_child, sync_child_data, load_child_data
       const cards = JSON.stringify([{ subject: 'Mathe', front: 'Frage A', back: 'Antwort A' }]);
       await asRole(c, 'anonymous', async () => {
         // Kind-B-PIN gegen Kind A: nichts schreiben, nichts lesen
-        const wrongSync = await c.query('select sync_child_data($1::uuid, $2, $3::jsonb) as ok', [
-          s.childA,
-          PIN_B,
-          cards,
-        ]);
-        expect(wrongSync.rows[0].ok).toBe(false);
+        const wrongSync = await c.query(
+          'select sync_child_data($1::uuid, $2, $3::jsonb, p_base_version => 0) as ok',
+          [s.childA, PIN_B, cards]
+        );
+        expect(wrongSync.rows[0].ok).toEqual({ ok: false, error: 'pin' });
         const wrongLoad = await c.query('select load_child_data($1::uuid, $2) as r', [
           s.childA,
           PIN_B,
@@ -210,12 +209,11 @@ describe.skipIf(!hasDb)('Kind-Pfad: auth_child, sync_child_data, load_child_data
         expect(wrongStats.rows[0].ok).toBe(false);
 
         // Richtiger PIN: Roundtrip für Kind A, Kind B bleibt leer
-        const okSync = await c.query('select sync_child_data($1::uuid, $2, $3::jsonb) as ok', [
-          s.childA,
-          PIN_A,
-          cards,
-        ]);
-        expect(okSync.rows[0].ok).toBe(true);
+        const okSync = await c.query(
+          'select sync_child_data($1::uuid, $2, $3::jsonb, p_base_version => 0) as ok',
+          [s.childA, PIN_A, cards]
+        );
+        expect(okSync.rows[0].ok).toMatchObject({ ok: true, version: 1 });
         const loadA = (
           await c.query('select load_child_data($1::uuid, $2) as r', [s.childA, PIN_A])
         ).rows[0].r;
@@ -243,5 +241,124 @@ describe.skipIf(!hasDb)('Kind-Pfad: auth_child, sync_child_data, load_child_data
           .rows[0].n
       ).toBe(0);
     });
+  });
+  it('1.1 Versionierung (SQL): ohne p_base_version → PT428, veraltete Version → PT409 — beides ohne Schreibzugriff', async () => {
+    await inRolledBackTx(pool, async (c) => {
+      const s = await seed(c);
+      const one = JSON.stringify([{ subject: 'Mathe', front: 'v1', back: 'a' }]);
+      const two = JSON.stringify([
+        { subject: 'Mathe', front: 'v1', back: 'a' },
+        { subject: 'Mathe', front: 'v2', back: 'b' },
+      ]);
+      const count = async () =>
+        (await c.query('select count(*)::int as n from cards where child_id = $1', [s.childA]))
+          .rows[0].n;
+      // Jeder erwartete Fehler in einem eigenen Rollenblock (Savepoint), sonst ist die
+      // Transaktion abgebrochen.
+      const anon = (fn) => asRole(c, 'anonymous', fn);
+      const call = (json, version) =>
+        c
+          .query('select sync_child_data($1::uuid, $2, $3::jsonb, p_base_version => $4) as r', [
+            s.childA,
+            PIN_A,
+            json,
+            version,
+          ])
+          .then((r) => r.rows[0].r);
+
+      // alter Client (keine Version): abgelehnt, Server unverändert
+      const old = await anon(() =>
+        pgError(c.query('select sync_child_data($1::uuid, $2, $3::jsonb)', [s.childA, PIN_A, one]))
+      );
+      expect(old?.code, old?.message).toBe('PT428');
+      expect(old?.message).toBe('sync_version_required');
+      expect(await count()).toBe(0);
+
+      // erster echter Sync mit Basis 0 → Version 1
+      expect(await anon(() => call(one, 0))).toMatchObject({ ok: true, version: 1 });
+      expect(await count()).toBe(1);
+
+      // zweites Gerät mit veralteter Basis 0 → Konflikt, Server bleibt bei 1 Karte / Version 1
+      const stale = await anon(() => pgError(call(two, 0)));
+      expect(stale?.code, stale?.message).toBe('PT409');
+      expect(stale?.message).toBe('sync_conflict');
+      expect(JSON.parse(stale.detail || '{}')).toEqual({ server_version: 1, client_version: 0 });
+      expect(await count()).toBe(1);
+      const load = await anon(() =>
+        c
+          .query('select load_child_data($1::uuid, $2) as r', [s.childA, PIN_A])
+          .then((r) => r.rows[0].r)
+      );
+      expect(load.version).toBe(1);
+      expect(load.cards[0]).toHaveProperty('updated_at');
+
+      // mit der richtigen Basis klappt es → Version 2
+      expect(await anon(() => call(two, 1))).toMatchObject({ ok: true, version: 2 });
+      expect(await count()).toBe(2);
+      const st = await c.query('select data_version from sync_state where scope_id = $1', [
+        s.childA,
+      ]);
+      expect(st.rows[0].data_version).toBe('2');
+    });
+  });
+
+  it('1.1 Upsert stempelt updated_at nur bei Inhaltsänderung und lässt fremde ids unangetastet', async () => {
+    await inRolledBackTx(pool, async (c) => {
+      const s = await seed(c);
+      const id = (await c.query('select gen_random_uuid() as u')).rows[0].u;
+      const row = (front) => JSON.stringify([{ id, subject: 'Mathe', front, back: 'a' }]);
+      await asRole(c, 'anonymous', async () => {
+        await c.query('select sync_child_data($1::uuid, $2, $3::jsonb, p_base_version => 0)', [
+          s.childA,
+          PIN_A,
+          row('gleich'),
+        ]);
+      });
+      const t1 = (await c.query('select updated_at from cards where id = $1', [id])).rows[0]
+        .updated_at;
+      await c.query(`select pg_sleep(0.05)`);
+      await asRole(c, 'anonymous', async () => {
+        await c.query('select sync_child_data($1::uuid, $2, $3::jsonb, p_base_version => 1)', [
+          s.childA,
+          PIN_A,
+          row('gleich'),
+        ]);
+      });
+      const t2 = (await c.query('select updated_at from cards where id = $1', [id])).rows[0]
+        .updated_at;
+      expect(t2.getTime(), 'unveränderter Inhalt → updated_at bleibt').toBe(t1.getTime());
+      await asRole(c, 'anonymous', async () => {
+        await c.query('select sync_child_data($1::uuid, $2, $3::jsonb, p_base_version => 2)', [
+          s.childA,
+          PIN_A,
+          row('anders'),
+        ]);
+      });
+      const t3 = (await c.query('select updated_at from cards where id = $1', [id])).rows[0]
+        .updated_at;
+      expect(t3.getTime(), 'geänderter Inhalt → neuer Stempel').toBeGreaterThan(t1.getTime());
+
+      // Kind B schiebt die id von Kind A unter: weder verändert noch übernommen
+      await asRole(c, 'anonymous', async () => {
+        const r = (
+          await c.query(
+            'select sync_child_data($1::uuid, $2, $3::jsonb, p_base_version => 0) as r',
+            [s.childB, PIN_B, JSON.stringify([{ id, subject: 'X', front: 'HACK', back: 'y' }])]
+          )
+        ).rows[0].r;
+        expect(r).toMatchObject({ ok: true });
+      });
+      const rows = (await c.query('select child_id, front from cards where id = $1', [id])).rows;
+      expect(rows).toEqual([{ child_id: s.childA, front: 'anders' }]);
+    });
+  });
+
+  it('1.1 sync_state ist für Client-Rollen unsichtbar', async () => {
+    const { rows } = await pool.query(
+      `select has_table_privilege('authenticated','public.sync_state','SELECT') as a,
+              has_table_privilege('anonymous','public.sync_state','SELECT') as b,
+              (select relrowsecurity from pg_class where oid = 'public.sync_state'::regclass) as rls`
+    );
+    expect(rows[0]).toEqual({ a: false, b: false, rls: true });
   });
 });
