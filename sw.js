@@ -27,7 +27,7 @@
  */
 
 /** @type {string} Cache-Name — bei Asset-Änderungen inkrementieren */
-const CACHE_NAME = 'studybuddy-v6';
+const CACHE_NAME = 'studybuddy-v7';
 
 /** @type {number} Maximales Alter eines Cache-First-Eintrags (7 Tage) — danach Netz bevorzugen */
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -50,6 +50,7 @@ const PRECACHE = [
   '/css/layout.css',
   '/js/vendor/neon-client.js',
   '/js/vendor/purify.min.js',
+  '/js/sync-merge.js',
   '/manifest.json',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',

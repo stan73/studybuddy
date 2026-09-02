@@ -20,6 +20,8 @@
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('sb_theme')||'system';}catch(e){}</script>
 <!-- DOMPurify XSS-Schutz (lokal gebündelt für CDN-Ausfallsicherheit) -->
 <script src="js/vendor/purify.min.js"></script>
+<!-- Sync-Zusammenführung (Härtung 1.1): Drei-Wege-Merge je Karte/Aufgabe/Prüfung, auch in Vitest getestet -->
+<script src="js/sync-merge.js"></script>
 <!-- Neon-Client (Data API + Managed Better Auth), ersetzt Supabase; Supabase-kompatible Fassade -->
 <script type="module" src="js/vendor/neon-client.js"></script>
 <!-- Chart.js für Eltern-Dashboard (lokal gebündelt) -->
@@ -27,6 +29,12 @@
 <!-- SheetJS für XLSX-Export (Feature #14) — lokal gebündelt (CSP-konform, kein CDN) -->
 <script src="js/vendor/xlsx.full.min.js"></script>
 <style>
+/* ── Sync-Zustand (Härtung 1.1) ────────────────────────────────────── */
+.sync-status{display:block;width:100%;margin-top:6px;padding:4px 8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;background:transparent;color:var(--t3,#94a3b8);font:inherit;font-size:11px;line-height:1.3;text-align:left;cursor:pointer;}
+.sync-status:hover{color:var(--t2,#475569);}
+.sync-status[data-state="pending"],.sync-status[data-state="offline"]{color:#b45309;border-color:#f59e0b;}
+.sync-status[data-state="failed"],.sync-status[data-state="conflict"]{color:#b91c1c;border-color:#ef4444;}
+.sync-status[data-state="syncing"]{opacity:.8;}
 /* ── Feature #16: Tooltips ─────────────────────────────────────────── */
 .sb-tooltip-wrap {
   position: relative;
@@ -97,6 +105,7 @@
           <div class="sidebar-role" id="sb-role"></div>
         </div>
       </div>
+      <button type="button" id="sync-status" class="sync-status" data-state="idle" style="display:none" onclick="syncNow()" aria-live="polite"></button>
     </div>
     <div class="xp-bar-wrap" id="xp-wrap">
       <div class="xp-label">
@@ -526,6 +535,26 @@ const I18N = {
     'err.child_pin':'❌ Cloud-Sync abgelehnt (PIN ungültig) — bitte neu anmelden.',
     'err.sync_noop':'⚠️ Cloud-Sync: Server hat nichts gespeichert — bitte neu anmelden.',
     'err.local_data':'⚠️ Lokale Daten konnten nicht gelesen werden.',
+    // Sync-Zustand & Konflikte (Härtung 1.1)
+    'sync.state.syncing':'Speichert in der Cloud …',
+    'sync.state.synced':'Cloud synchron',
+    'sync.state.pending':'Änderungen ausstehend — werden bei Verbindung gesendet',
+    'sync.state.failed':'Cloud-Sync fehlgeschlagen — tippen zum Wiederholen',
+    'sync.state.conflict':'Sync-Konflikt — bitte prüfen',
+    'sync.merged':'🔄 {0} Änderung(en) von anderen Geräten übernommen.',
+    'sync.conflict.title':'Änderungen zusammenführen',
+    'sync.conflict.intro':'{0} Eintrag/Einträge wurden auf diesem und einem anderen Gerät unterschiedlich geändert. Bitte wähle je Eintrag, welche Fassung gelten soll.',
+    'sync.conflict.this_device':'Dieses Gerät',
+    'sync.conflict.other_device':'Anderes Gerät',
+    'sync.conflict.deleted':'gelöscht',
+    'sync.conflict.apply':'Auswahl übernehmen',
+    'sync.conflict.card':'Karte',
+    'sync.conflict.task':'Aufgabe',
+    'sync.conflict.exam':'Prüfung',
+    'sync.conflict.progress':'Stufe {0} · {1} Wdh.',
+    'sync.conflict.done':'erledigt',
+    'sync.conflict.open':'offen',
+    'err.sync_conflict':'⚠️ Cloud-Sync: Konflikt konnte nicht aufgelöst werden — Änderungen bleiben lokal, bitte Seite neu laden.',
     'fatal.title':'StudyBuddy konnte nicht starten',
     'fatal.body':'Beim Laden ist ein Fehler aufgetreten. Bitte die Seite neu laden. Bleibt das Problem bestehen, hilft ein Abmelden über die Startseite.',
     'fatal.reload':'🔄 Neu laden',
@@ -682,6 +711,26 @@ const I18N = {
     'err.child_pin':'❌ Cloud sync rejected (invalid PIN) — please sign in again.',
     'err.sync_noop':'⚠️ Cloud sync: the server saved nothing — please sign in again.',
     'err.local_data':'⚠️ Local data could not be read.',
+    // Sync state & conflicts (hardening 1.1)
+    'sync.state.syncing':'Saving to the cloud …',
+    'sync.state.synced':'Cloud in sync',
+    'sync.state.pending':'Changes pending — sent when back online',
+    'sync.state.failed':'Cloud sync failed — tap to retry',
+    'sync.state.conflict':'Sync conflict — please review',
+    'sync.merged':'🔄 {0} change(s) from other devices applied.',
+    'sync.conflict.title':'Merge changes',
+    'sync.conflict.intro':'{0} item(s) were changed differently on this and another device. Please choose per item which version should win.',
+    'sync.conflict.this_device':'This device',
+    'sync.conflict.other_device':'Other device',
+    'sync.conflict.deleted':'deleted',
+    'sync.conflict.apply':'Apply selection',
+    'sync.conflict.card':'Card',
+    'sync.conflict.task':'Task',
+    'sync.conflict.exam':'Exam',
+    'sync.conflict.progress':'Level {0} · {1} reps',
+    'sync.conflict.done':'done',
+    'sync.conflict.open':'open',
+    'err.sync_conflict':'⚠️ Cloud sync: conflict could not be resolved — changes stay local, please reload the page.',
     'fatal.title':'StudyBuddy could not start',
     'fatal.body':'An error occurred while loading. Please reload the page. If the problem persists, sign out via the start page.',
     'fatal.reload':'🔄 Reload',
@@ -836,6 +885,26 @@ const I18N = {
     'err.child_pin':'❌ Synchronisation refusée (PIN invalide) — veuillez vous reconnecter.',
     'err.sync_noop':'⚠️ Synchronisation cloud : le serveur n\'a rien enregistré — veuillez vous reconnecter.',
     'err.local_data':'⚠️ Impossible de lire les données locales.',
+    // État de synchronisation & conflits (durcissement 1.1)
+    'sync.state.syncing':'Enregistrement dans le cloud …',
+    'sync.state.synced':'Cloud synchronisé',
+    'sync.state.pending':'Modifications en attente — envoyées dès la reconnexion',
+    'sync.state.failed':'Synchronisation échouée — touchez pour réessayer',
+    'sync.state.conflict':'Conflit de synchronisation — à vérifier',
+    'sync.merged':'🔄 {0} modification(s) d\'autres appareils appliquée(s).',
+    'sync.conflict.title':'Fusionner les modifications',
+    'sync.conflict.intro':'{0} élément(s) ont été modifiés différemment sur cet appareil et sur un autre. Choisissez pour chaque élément la version à conserver.',
+    'sync.conflict.this_device':'Cet appareil',
+    'sync.conflict.other_device':'Autre appareil',
+    'sync.conflict.deleted':'supprimé',
+    'sync.conflict.apply':'Appliquer la sélection',
+    'sync.conflict.card':'Fiche',
+    'sync.conflict.task':'Tâche',
+    'sync.conflict.exam':'Examen',
+    'sync.conflict.progress':'Niveau {0} · {1} rép.',
+    'sync.conflict.done':'terminée',
+    'sync.conflict.open':'ouverte',
+    'err.sync_conflict':'⚠️ Synchronisation cloud : conflit non résolu — les modifications restent locales, veuillez recharger la page.',
     'fatal.title':'StudyBuddy n\'a pas pu démarrer',
     'fatal.body':'Une erreur est survenue au chargement. Veuillez recharger la page. Si le problème persiste, déconnectez-vous via la page d\'accueil.',
     'fatal.reload':'🔄 Recharger',
@@ -990,6 +1059,26 @@ const I18N = {
     'err.child_pin':'❌ Sincronización rechazada (PIN no válido) — inicia sesión de nuevo.',
     'err.sync_noop':'⚠️ Sincronización en la nube: el servidor no guardó nada — inicia sesión de nuevo.',
     'err.local_data':'⚠️ No se pudieron leer los datos locales.',
+    // Estado de sincronización y conflictos (endurecimiento 1.1)
+    'sync.state.syncing':'Guardando en la nube …',
+    'sync.state.synced':'Nube sincronizada',
+    'sync.state.pending':'Cambios pendientes — se envían al reconectar',
+    'sync.state.failed':'Sincronización fallida — toca para reintentar',
+    'sync.state.conflict':'Conflicto de sincronización — revisa',
+    'sync.merged':'🔄 {0} cambio(s) de otros dispositivos aplicado(s).',
+    'sync.conflict.title':'Combinar cambios',
+    'sync.conflict.intro':'{0} elemento(s) se cambiaron de forma distinta en este y en otro dispositivo. Elige por elemento qué versión debe valer.',
+    'sync.conflict.this_device':'Este dispositivo',
+    'sync.conflict.other_device':'Otro dispositivo',
+    'sync.conflict.deleted':'eliminado',
+    'sync.conflict.apply':'Aplicar selección',
+    'sync.conflict.card':'Tarjeta',
+    'sync.conflict.task':'Tarea',
+    'sync.conflict.exam':'Examen',
+    'sync.conflict.progress':'Nivel {0} · {1} rep.',
+    'sync.conflict.done':'hecha',
+    'sync.conflict.open':'abierta',
+    'err.sync_conflict':'⚠️ Sincronización en la nube: no se pudo resolver el conflicto — los cambios quedan locales, recarga la página.',
     'fatal.title':'StudyBuddy no pudo iniciarse',
     'fatal.body':'Se produjo un error al cargar. Recarga la página. Si el problema persiste, cierra la sesión desde la página de inicio.',
     'fatal.reload':'🔄 Recargar',
