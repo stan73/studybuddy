@@ -14,126 +14,34 @@
  * überspringen sich alle Tests. Testkonten werden am Ende gelöscht (belegt).
  */
 import { expect, test } from '@playwright/test';
-import { Pool } from '@neondatabase/serverless';
+import {
+  HAS_ENV,
+  PASSWORD,
+  apiSignUp,
+  armOverlayHandler,
+  cleanup as cleanupAccounts,
+  loginViaUi,
+  mail,
+  openFlashcards,
+  openPool,
+  waitForCloudCard as waitForCloudCardIn,
+} from './helpers.mjs';
 
-const DB_URL = process.env.E2E_DATABASE_URL || '';
-const AUTH_URL = (process.env.E2E_NEON_AUTH_URL || '').replace(/\/+$/, '');
-const HAS_ENV = Boolean(DB_URL && AUTH_URL && process.env.E2E_NEON_DATA_API_URL);
-const MAIL_DOMAIN = 'studybuddy-e2e.invalid';
-const PASSWORD = 'E2E-Passwort-1234';
 const CARD_FRONT = 'Wie heißt die Hauptstadt von Frankreich?';
 const CARD_BACK = 'Paris';
 
-const mail = (tag) =>
-  `sb-e2e-${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@${MAIL_DOMAIN}`;
-
 let pool;
 test.beforeAll(() => {
-  if (HAS_ENV) pool = new Pool({ connectionString: DB_URL, max: 2 });
+  if (HAS_ENV) pool = openPool();
 });
 test.afterAll(async () => {
   if (!pool) return;
-  const left = await cleanup();
+  const left = await cleanupAccounts(pool);
   await pool.end();
   expect(left, 'Testkonten müssen restlos gelöscht sein').toEqual({ users: 0, profiles: 0 });
 });
 
-async function cleanup() {
-  const like = `%@${MAIL_DOMAIN}`;
-  await pool.query('delete from public.profiles where lower(email) like $1', [like]);
-  await pool.query('delete from neon_auth."user" where lower(email) like $1', [like]);
-  const { rows } = await pool.query(
-    `select (select count(*)::int from neon_auth."user" where lower(email) like $1) as users,
-            (select count(*)::int from public.profiles where lower(email) like $1) as profiles`,
-    [like]
-  );
-  return rows[0];
-}
-
-/** Konto ohne UI anlegen (Neon Auth HTTP + echte link-profile-Function über den E2E-Server). */
-async function apiSignUp(tag) {
-  const email = mail(tag);
-  const origin = `http://127.0.0.1:${process.env.E2E_PORT || 8888}`;
-  const res = await fetch(`${AUTH_URL}/sign-up/email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin },
-    body: JSON.stringify({ email, password: PASSWORD, name: 'E2E Exp' }),
-  });
-  if (res.status !== 200)
-    throw new Error(`Sign-up ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const cookie = res.headers
-    .getSetCookie()
-    .map((c) => c.split(';')[0])
-    .join('; ');
-  const tok = await fetch(`${AUTH_URL}/token`, { headers: { cookie, origin } });
-  const { token: jwt } = await tok.json();
-  if (!jwt) throw new Error('kein JWT');
-  const link = await fetch(`${origin}/.netlify/functions/link-profile`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${jwt}` },
-    body: JSON.stringify({ full_name: 'E2E Exp' }),
-  });
-  if (!link.ok)
-    throw new Error(`link-profile ${link.status}: ${(await link.text()).slice(0, 200)}`);
-  return { email, jwt };
-}
-
-/** Wartet, bis die Cloud (Owner-Sicht) die Karte des Nutzers enthält. */
-async function waitForCloudCard(email, front, timeoutMs = 20_000) {
-  const t0 = Date.now();
-  for (;;) {
-    const { rows } = await pool.query(
-      `select count(*)::int as n from cards c join profiles p on p.id = c.user_id
-        where lower(p.email) = $1 and c.front = $2 and c.child_id is null`,
-      [email.toLowerCase(), front]
-    );
-    if (rows[0].n > 0) return rows[0].n;
-    if (Date.now() - t0 > timeoutMs)
-      throw new Error(`Karte "${front}" ist nach ${timeoutMs} ms nicht in der Cloud`);
-    await new Promise((r) => setTimeout(r, 500));
-  }
-}
-
-async function loginViaUi(page, email, password = PASSWORD) {
-  await armOverlayHandler(page);
-  await page.goto('/');
-  await page.locator('button[onclick="openAuth(\'login\')"]').first().click();
-  await page.fill('#l-em', email);
-  await page.fill('#l-pw', password);
-  await page.locator('button[onclick="doLogin()"]').click();
-  await page.waitForURL(/\/app\.html/, { timeout: 30_000 });
-  await expect(page.locator('#content .page-header, #content h1').first()).toBeVisible({
-    timeout: 30_000,
-  });
-}
-
-/**
- * Onboarding-Dialog („Los geht's!“) erscheint zeitversetzt nach dem Laden der
- * Cloud-Daten. Ein Locator-Handler schließt ihn automatisch, sobald er eine
- * Aktion blockiert (Playwright-Mechanismus für genau solche Overlays).
- */
-async function armOverlayHandler(page) {
-  await page.addLocatorHandler(
-    // Nur der Onboarding-Knopf (sprachunabhängig über sein onclick); das
-    // versteckte Aktivitäts-Log ist ebenfalls ein role=dialog und darf nicht matchen.
-    page.locator('[role=dialog] button[onclick^="this.closest(\'[role=dialog]\').remove()"]'),
-    async (btn) => {
-      await btn.click();
-    },
-    { times: 5 }
-  );
-}
-
-/**
- * Karteikarten öffnen: Schüler über die Sidebar, Eltern über den Heute-Fokus-CTA
- * des Dashboards („Karten anlegen →“ = goPage('flashcards')).
- */
-async function openFlashcards(page) {
-  const nav = page.locator('.nav-item[data-page="flashcards"]');
-  if (await nav.count()) await nav.click();
-  else await page.locator('button[onclick="goPage(\'flashcards\')"]').first().click();
-  await expect(page.locator('#nf')).toBeVisible();
-}
+const waitForCloudCard = (email, front) => waitForCloudCardIn(pool, email, front);
 
 test.describe('StudyBuddy Smoke (Dev-Branch)', () => {
   test.skip(!HAS_ENV, 'E2E_DATABASE_URL / E2E_NEON_AUTH_URL / E2E_NEON_DATA_API_URL fehlen');
