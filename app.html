@@ -515,6 +515,17 @@ const I18N = {
     'export.empty':'Nichts zu exportieren.',
     'export.success_cards':'✅ Karteikarten exportiert.',
     'export.success_exams':'✅ Prüfungsergebnisse exportiert.',
+    // Fehler sichtbar machen (Härtung 1.7)
+    'err.sync_data':'⚠️ Cloud-Sync fehlgeschlagen — Änderungen sind vorerst nur auf diesem Gerät gespeichert.',
+    'err.sync_stats':'⚠️ Statistiken konnten nicht in die Cloud gespeichert werden.',
+    'err.cloud_load':'⚠️ Cloud-Daten konnten nicht geladen werden — es werden die lokalen Daten verwendet.',
+    'err.child_pin':'❌ Cloud-Sync abgelehnt (PIN ungültig) — bitte neu anmelden.',
+    'err.sync_noop':'⚠️ Cloud-Sync: Server hat nichts gespeichert — bitte neu anmelden.',
+    'err.local_data':'⚠️ Lokale Daten konnten nicht gelesen werden.',
+    'fatal.title':'StudyBuddy konnte nicht starten',
+    'fatal.body':'Beim Laden ist ein Fehler aufgetreten. Bitte die Seite neu laden. Bleibt das Problem bestehen, hilft ein Abmelden über die Startseite.',
+    'fatal.reload':'🔄 Neu laden',
+    'fatal.home':'Zur Startseite',
   },
   en: {
     'nav.learn':'Learning','nav.dashboard':'Dashboard','nav.subjects':'Subjects',
@@ -642,6 +653,16 @@ const I18N = {
     'export.empty':'Nothing to export.',
     'export.success_cards':'✅ Flashcards exported.',
     'export.success_exams':'✅ Exam results exported.',
+    'err.sync_data':'⚠️ Cloud sync failed — changes are only stored on this device for now.',
+    'err.sync_stats':'⚠️ Statistics could not be saved to the cloud.',
+    'err.cloud_load':'⚠️ Cloud data could not be loaded — using local data instead.',
+    'err.child_pin':'❌ Cloud sync rejected (invalid PIN) — please sign in again.',
+    'err.sync_noop':'⚠️ Cloud sync: the server saved nothing — please sign in again.',
+    'err.local_data':'⚠️ Local data could not be read.',
+    'fatal.title':'StudyBuddy could not start',
+    'fatal.body':'An error occurred while loading. Please reload the page. If the problem persists, sign out via the start page.',
+    'fatal.reload':'🔄 Reload',
+    'fatal.home':'Go to start page',
   },
   fr: {
     'nav.learn':'Apprentissage','nav.dashboard':'Tableau de bord','nav.subjects':'Matières',
@@ -769,6 +790,16 @@ const I18N = {
     'export.empty':'Rien à exporter.',
     'export.success_cards':'✅ Fiches exportées.',
     'export.success_exams':'✅ Résultats d\'examen exportés.',
+    'err.sync_data':'⚠️ Synchronisation cloud échouée — les modifications ne sont pour l\'instant enregistrées que sur cet appareil.',
+    'err.sync_stats':'⚠️ Les statistiques n\'ont pas pu être enregistrées dans le cloud.',
+    'err.cloud_load':'⚠️ Impossible de charger les données cloud — utilisation des données locales.',
+    'err.child_pin':'❌ Synchronisation refusée (PIN invalide) — veuillez vous reconnecter.',
+    'err.sync_noop':'⚠️ Synchronisation cloud : le serveur n\'a rien enregistré — veuillez vous reconnecter.',
+    'err.local_data':'⚠️ Impossible de lire les données locales.',
+    'fatal.title':'StudyBuddy n\'a pas pu démarrer',
+    'fatal.body':'Une erreur est survenue au chargement. Veuillez recharger la page. Si le problème persiste, déconnectez-vous via la page d\'accueil.',
+    'fatal.reload':'🔄 Recharger',
+    'fatal.home':'Vers la page d\'accueil',
   },
   es: {
     'nav.learn':'Aprendizaje','nav.dashboard':'Panel','nav.subjects':'Asignaturas',
@@ -896,6 +927,16 @@ const I18N = {
     'export.empty':'Nada que exportar.',
     'export.success_cards':'✅ Tarjetas exportadas.',
     'export.success_exams':'✅ Resultados de examen exportados.',
+    'err.sync_data':'⚠️ Sincronización en la nube fallida — por ahora los cambios solo se guardan en este dispositivo.',
+    'err.sync_stats':'⚠️ Las estadísticas no se pudieron guardar en la nube.',
+    'err.cloud_load':'⚠️ No se pudieron cargar los datos de la nube — se usan los datos locales.',
+    'err.child_pin':'❌ Sincronización rechazada (PIN no válido) — inicia sesión de nuevo.',
+    'err.sync_noop':'⚠️ Sincronización en la nube: el servidor no guardó nada — inicia sesión de nuevo.',
+    'err.local_data':'⚠️ No se pudieron leer los datos locales.',
+    'fatal.title':'StudyBuddy no pudo iniciarse',
+    'fatal.body':'Se produjo un error al cargar. Recarga la página. Si el problema persiste, cierra la sesión desde la página de inicio.',
+    'fatal.reload':'🔄 Recargar',
+    'fatal.home':'Ir a la página de inicio',
   },
 };
 
@@ -1309,7 +1350,7 @@ async function saveAIKeys() {
     localStorage.setItem('sb_aikeys_' + email, JSON.stringify({
       provider: AI.provider, claude: AI.claude, openai: AI.openai, gemini: AI.gemini,
     }));
-  } catch(e) {}
+  } catch(e) { console.warn('[AI-Keys] Lokales Speichern fehlgeschlagen:', e.message); }
 }
 
 /**
@@ -1325,7 +1366,7 @@ function loadAIKeys(emailOrParent) {
   try {
     const saved = localStorage.getItem('sb_aikeys_' + email);
     if (saved) { Object.assign(AI, JSON.parse(saved)); return true; }
-  } catch(e) {}
+  } catch(e) { console.warn('[AI-Keys] Lokales Laden fehlgeschlagen:', e.message); }
   return false;
 }
 
@@ -1341,13 +1382,14 @@ function loadAIKeys(emailOrParent) {
 async function loadConfiguredProviders() {
   if (!sb || !U || U.isChild) return;
   try {
-    const { data } = await sb.rpc('get_configured_providers');
+    const { data, error } = await sb.rpc('get_configured_providers');
+    if (error) reportError('KI-Provider laden', error, { level: 'warning' });
     if (data?.length) {
       AI._configured = data.map(r => r.provider);
     }
     // _hasDbKey = true wenn der aktive Provider einen Key im Backend hat
     AI._hasDbKey = (AI._configured || []).includes(AI.provider);
-  } catch(e) { /* Offline oder RPC-Fehler — ignorieren */ }
+  } catch(e) { reportError('KI-Provider laden', e, { level: 'warning' }); }
 }
 
 /**
@@ -1381,7 +1423,7 @@ let sb = (typeof window.supabase !== 'undefined')
 /** Stellt sicher, dass der Neon-Client geladen und sb gesetzt ist. */
 async function ensureSb() {
   if (sb) return sb;
-  try { if (window.neonReady) await window.neonReady; } catch(e) {}
+  try { if (window.neonReady) await window.neonReady; } catch(e) { console.warn('[Neon] Client-Bootstrap fehlgeschlagen:', e); }
   if (!sb && typeof window.supabase !== 'undefined') {
     sb = window.supabase.createClient();
   }
@@ -1424,7 +1466,7 @@ async function ensureChildToken() {
   if (!r.ok || !data.token) throw new Error(data?.error || 'Kind-Token konnte nicht ausgestellt werden — bitte neu einloggen');
   cs.child_token = data.token;
   cs.child_token_exp = data.exp;
-  try { sessionStorage.setItem('sb_child_session', JSON.stringify(cs)); } catch(e) {}
+  try { sessionStorage.setItem('sb_child_session', JSON.stringify(cs)); } catch(e) { console.warn('[Kind-Token] Session-Cache nicht schreibbar:', e.message); }
   return data.token;
 }
 
@@ -1465,7 +1507,7 @@ async function msHandleRedirect() {
   if (!code && !err) return;
   history.replaceState({}, '', '/app.html'); // ?code aus der URL entfernen
   if (err) return toast('❌ Schul-Login: ' + (q.get('error_description') || err), 7000);
-  let pk = null; try { pk = JSON.parse(sessionStorage.getItem('ms_pkce') || 'null'); } catch (e) {}
+  let pk = null; try { pk = JSON.parse(sessionStorage.getItem('ms_pkce') || 'null'); } catch (e) { console.warn('[MS-Login] PKCE-State unlesbar:', e.message); }
   sessionStorage.removeItem('ms_pkce');
   if (!pk || pk.state !== q.get('state')) return toast('❌ Schul-Login: ungültiger State', 7000);
   try {
@@ -1604,7 +1646,7 @@ function load() {
     // Daten erst laden wenn U bekannt (pro-User-Key)
     const d = localStorage.getItem(_dataKey());
     if (d) D = { ...D, ...JSON.parse(d) };
-  } catch(e) {}
+  } catch(e) { reportError('Lokaler Speicher', e, { level: 'warning', toast: t('err.local_data') }); }
 }
 
 function loadDataForUser(userId) {
@@ -1612,7 +1654,7 @@ function loadDataForUser(userId) {
     const d = localStorage.getItem('sb_data_' + userId);
     if (d) D = { ...{cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0}, ...JSON.parse(d) };
     else   D = {cards:{},tasks:[],exams:[],sessions:[],xp:0,streak:0,lastStudy:0,correct:0,total:0};
-  } catch(e) {}
+  } catch(e) { reportError('Lokale Daten laden', e, { level: 'warning', toast: t('err.local_data') }); }
 }
 
 // ── DB-Sync (fire & forget) ───────────────────────────────────────────────
@@ -1634,7 +1676,7 @@ async function syncStats() {
 
   // Elternteil / Schüler mit Auth
   try {
-    await sb.from('user_stats').upsert({
+    const { error } = await sb.from('user_stats').upsert({
       user_id:       U.id,
       xp:            D.xp || 0,
       streak:        D.streak || 0,
@@ -1646,7 +1688,8 @@ async function syncStats() {
       last_freeze_grant: D.lastFreezeGrant || null,
       updated_at:    new Date().toISOString(),
     }, { onConflict: 'user_id' });
-  } catch(e) { /* Kein Fehler werfen — offline ist ok */ }
+    if (error) reportError('Statistik-Sync', error, { toast: t('err.sync_stats') });
+  } catch(e) { reportError('Statistik-Sync', e, { toast: t('err.sync_stats') }); }
 }
 
 /**
@@ -1720,13 +1763,14 @@ function setDailyGoal(v) {
 async function syncSession(subject, type, durationMin, xpEarned) {
   if (!sb || !U || U.isChild) return;
   try {
-    await sb.from('sessions').insert({
+    const { error } = await sb.from('sessions').insert({
       user_id: U.id,
       subject, session_type: type,
       duration_minutes: durationMin,
       xp_earned: xpEarned,
     });
-  } catch(e) {}
+    if (error) reportError('Session-Sync', error, { level: 'warning' });
+  } catch(e) { reportError('Session-Sync', e, { level: 'warning' }); }
 }
 
 // ── Cloud-Persistenz: Karten/Aufgaben/Prüfungen ⇄ Supabase ──────────────────
@@ -1814,7 +1858,9 @@ async function loadCloudData() {
     let cloud = null;
     if (U.isChild) {
       if (!U.id || !_childPin) return false;
-      const { data } = await sb.rpc('load_child_data', { p_child_id: U.id, p_pin: _childPin });
+      const { data, error } = await sb.rpc('load_child_data', { p_child_id: U.id, p_pin: _childPin });
+      if (error) reportError('Cloud-Daten laden', error, { toast: t('err.cloud_load') });
+      else if (data && data.error) reportError('Cloud-Daten laden', data.error === 'pin' ? 'PIN ungültig' : data.error, { toast: data.error === 'pin' ? t('err.child_pin') : t('err.cloud_load') });
       if (data && !data.error) {
         cloud = data;
         const st = data.stats;
@@ -1828,7 +1874,8 @@ async function loadCloudData() {
         }
       }
     } else {
-      const { data: stats } = await sb.from('user_stats').select('*').eq('user_id', U.id).single();
+      const { data: stats, error: sErr } = await sb.from('user_stats').select('*').eq('user_id', U.id).single();
+      if (sErr && sErr.code !== 'PGRST116') reportError('Statistiken laden', sErr, { level: 'warning' }); // PGRST116 = noch keine Zeile (neuer Nutzer)
       if (stats) {
         D.xp = stats.xp || 0; D.streak = stats.streak || 0;
         D.correct = stats.total_correct || 0; D.total = stats.total_answered || 0;
@@ -1837,7 +1884,8 @@ async function loadCloudData() {
         D.freezes = stats.freezes || 0;
         if (stats.last_freeze_grant) D.lastFreezeGrant = Number(stats.last_freeze_grant);
       }
-      const { data } = await sb.rpc('load_my_data');
+      const { data, error } = await sb.rpc('load_my_data');
+      if (error) reportError('Cloud-Daten laden', error, { toast: t('err.cloud_load') });
       if (data) cloud = data;
     }
     if (cloud) {
@@ -1849,7 +1897,7 @@ async function loadCloudData() {
       if (hasCloud) { _applyCloudData(cloud); }
       else if (hasLocal) { return true; } // Cloud leer → lokale Daten migrieren
     }
-  } catch(e) { /* offline: lokale Daten bleiben Quelle der Wahrheit */ }
+  } catch(e) { reportError('Cloud-Daten laden', e, { toast: t('err.cloud_load') }); } // lokale Daten bleiben Quelle der Wahrheit
   return false;
 }
 
@@ -1864,7 +1912,7 @@ async function _syncDataNow() {
   try {
     if (U.isChild) {
       if (!U.id || !_childPin) return;
-      await sb.rpc('sync_child_data', {
+      const { data, error } = await sb.rpc('sync_child_data', {
         p_child_id: U.id, p_pin: _childPin,
         p_cards: _cardsToRows(), p_tasks: _tasksToRows(), p_exams: _examsToRows(),
         p_xp: D.xp || 0, p_streak: D.streak || 0,
@@ -1872,12 +1920,16 @@ async function _syncDataNow() {
         p_weekly: _weekly(),
         p_daily_goal: D.dailyGoal || 5, p_freezes: D.freezes || 0, p_lfg: D.lastFreezeGrant || null,
       });
+      if (error) reportError('Cloud-Sync', error, { toast: t('err.sync_data') });
+      else if (data && data.error) reportError('Cloud-Sync', data.error === 'pin' ? 'PIN ungültig' : data.error, { toast: data.error === 'pin' ? t('err.child_pin') : t('err.sync_data') });
     } else {
-      await sb.rpc('sync_my_data', {
+      const { data, error } = await sb.rpc('sync_my_data', {
         p_cards: _cardsToRows(), p_tasks: _tasksToRows(), p_exams: _examsToRows(),
       });
+      if (error) reportError('Cloud-Sync', error, { toast: t('err.sync_data') });
+      else if (data === false) reportError('Cloud-Sync', 'Server hat nichts gespeichert (Nutzer unbekannt)', { toast: t('err.sync_noop') });
     }
-  } catch(e) { /* offline ok — lokale Daten bleiben erhalten */ }
+  } catch(e) { reportError('Cloud-Sync', e, { toast: t('err.sync_data') }); } // lokale Daten bleiben erhalten
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2021,7 +2073,7 @@ async function init() {
   try {
     const cs = sessionStorage.getItem('sb_child_session');
     if (cs) _childPin = JSON.parse(cs).pin || null;
-  } catch(e) {}
+  } catch(e) { console.warn('[Kind-Session] PIN nicht wiederherstellbar:', e.message); }
 
   // 1. Supabase-Session prüfen (echter Login)
   if (sb) {
@@ -2118,7 +2170,7 @@ async function init() {
   loadDataForUser(U.id);
   const migrate = await loadCloudData();
   _dataLoaded = true;                 // ab jetzt dürfen save()/sync* in die Cloud schreiben
-  try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch(e) {} // Cloud-Daten in Offline-Cache spiegeln
+  try { localStorage.setItem(_dataKey(), JSON.stringify(D)); } catch(e) { reportError('Offline-Cache', e, { level: 'warning' }); } // Cloud-Daten in Offline-Cache spiegeln
   if (migrate) _syncDataNow();        // lokale Bestandsdaten einmalig in die leere Cloud hochladen
 
   document.getElementById('app').style.display = 'flex';
@@ -2136,7 +2188,7 @@ function maybeNotifyDue() {
     if (!('Notification' in window) || Notification.permission !== 'granted' || U?.role === 'parent') return;
     const due = Object.values(D.cards || {}).flat().filter(c => (c.due || 0) <= Date.now()).length;
     if (due > 0) new Notification('StudyBuddy', { body: t('notify.due_cards', due), icon: '/icons/icon-192.svg' });
-  } catch(e) {}
+  } catch(e) { console.warn('[Erinnerung] Benachrichtigung fehlgeschlagen:', e.message); }
 }
 
 /** Fragt die Erlaubnis für Browser-Erinnerungen an (Opt-in über Button). */
@@ -2171,7 +2223,7 @@ function maybeOnboarding() {
       <button class="btn btn-primary btn-full" onclick="this.closest('[role=dialog]').remove()">${t('onb.start')}</button>
     </div>`;
     document.body.appendChild(ov);
-  } catch(e) {}
+  } catch(e) { console.warn('[Onboarding] Übersprungen:', e.message); }
 }
 
 function populateDemoData() {
@@ -3560,16 +3612,17 @@ async function parentDash(el) {
   // Kinder-Stats aus Supabase nachladen (falls stats-Spalte vorhanden)
   if (sb && children.length) {
     try {
-      const { data } = await sb.from('children')
+      const { data, error } = await sb.from('children')
         .select('id, name, grade, stats')
         .eq('parent_id', U.id);
+      if (error) reportError('Kinder-Statistiken laden', error, { level: 'warning', toast: true });
       if (data) {
         data.forEach(row => {
           const c = children.find(x => x.id === row.id);
           if (c && row.stats) c.dbStats = row.stats;
         });
       }
-    } catch(e) {}
+    } catch(e) { reportError('Kinder-Statistiken laden', e, { level: 'warning', toast: true }); }
   }
 
   // Kinderdaten aus localStorage (selbes Gerät) oder DB-Stats
@@ -4175,7 +4228,7 @@ function subscription(el) {
 /** Setzt das Farbschema (light|dark|system), persistiert es und rendert Settings neu. */
 function setTheme(mode) {
   if (!['light','dark','system'].includes(mode)) mode = 'system';
-  try { localStorage.setItem('sb_theme', mode); } catch(e) {}
+  try { localStorage.setItem('sb_theme', mode); } catch(e) { console.warn('[Theme] Nicht speicherbar:', e.message); }
   document.documentElement.dataset.theme = mode;
   if (_page === 'settings') settings(document.getElementById('content'));
 }
@@ -4183,7 +4236,7 @@ function setTheme(mode) {
 /** HTML-Card für die Theme-Auswahl (Hell/Dunkel/System) — für Eltern & Kinder. */
 function _themeCard() {
   let cur = 'system';
-  try { cur = localStorage.getItem('sb_theme') || 'system'; } catch(e) {}
+  try { cur = localStorage.getItem('sb_theme') || 'system'; } catch(e) { console.warn('[Theme] Nicht lesbar:', e.message); }
   return `<div class="card">
     <div class="card-header"><div class="card-title">🎨 ${t('settings.appearance')}</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -4568,10 +4621,10 @@ function _logType(msg) {
 function appLog(msg) {
   const type = _logType(msg);
   let entries = [];
-  try { entries = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch {}
+  try { entries = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { console.warn('[Log] Nicht lesbar:', e.message); }
   entries.unshift({ ts: Date.now(), msg, type }); // neuester vorne
   if (entries.length > LOG_MAX) entries.length = LOG_MAX;
-  try { localStorage.setItem(LOG_KEY, JSON.stringify(entries)); } catch {}
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(entries)); } catch (e) { console.warn('[Log] Nicht speicherbar:', e.message); }
 
   // Badge aktualisieren (Anzahl Fehler seit letztem Öffnen)
   _updateLogBadge();
@@ -4650,7 +4703,7 @@ function openLog() {
   try {
     const entries = _readLog().map(e => ({ ...e, seen: true }));
     localStorage.setItem(LOG_KEY, JSON.stringify(entries));
-  } catch {}
+  } catch (e) { console.warn('[Log] Gesehen-Status nicht speicherbar:', e.message); }
   _updateLogBadge();
   _logFilter = 'all';
   // Filter-Buttons zurücksetzen
@@ -4690,7 +4743,7 @@ function filterLog(type) {
 /** Löscht alle Log-Einträge nach Bestätigung */
 function clearLog() {
   if (!confirm('Alle Log-Einträge löschen?')) return;
-  try { localStorage.removeItem(LOG_KEY); } catch {}
+  try { localStorage.removeItem(LOG_KEY); } catch (e) { console.warn('[Log] Nicht löschbar:', e.message); }
   _updateLogBadge();
   _renderLogEntries();
 }
@@ -4706,7 +4759,12 @@ function clearLog() {
  */
 function toast(msg, dur=3000) {
   appLog(msg); // ← immer loggen, auch wenn Toast schnell verschwindet
+  _showToast(msg, dur);
+}
+/** Nur anzeigen, nicht loggen (reportError loggt die technische Meldung separat). */
+function _showToast(msg, dur=3000) {
   const t = document.getElementById('toast');
+  if (!t) return;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
@@ -4714,9 +4772,87 @@ function toast(msg, dur=3000) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// FEHLERBEHANDLUNG — nichts mehr lautlos verschlucken (Härtung 1.7)
+// ═══════════════════════════════════════════════════════════════════════════
+/** Lesbare Meldung aus Error / PostgREST-Fehlerobjekt / String extrahieren. */
+function _errMsg(e) {
+  if (e == null) return 'Unbekannter Fehler';
+  if (typeof e === 'string') return e;
+  const m = e.message || e.error_description || e.details || e.hint || e.code;
+  if (m) return String(m);
+  try { return JSON.stringify(e); } catch { return String(e); }
+}
+
+const _toastThrottle = {}; // ctx → Zeitstempel des letzten Toasts
+/**
+ * Meldet einen Fehler sichtbar statt ihn zu verschlucken:
+ *   - immer console + persistenter Aktivitäts-Log (roter Badge am 📋-Button)
+ *   - optional Toast (pro Kontext höchstens alle 60 s, damit Offline-Phasen nicht spammen)
+ * Ändert keine Semantik der aufrufenden Funktion — reine Sichtbarkeit.
+ * @param {string} ctx — Kurzkontext, z.B. 'Cloud-Sync'
+ * @param {*} e — Error, PostgREST-Fehler ({message,code,...}) oder String
+ * @param {{level?:'error'|'warning', toast?:boolean|string}} [opt]
+ *        toast:true → Log-Zeile als Toast; toast:'…' → eigener, nutzerfreundlicher Text
+ */
+function reportError(ctx, e, opt = {}) {
+  const level = opt.level === 'warning' ? 'warning' : 'error';
+  const line = `${level === 'error' ? '❌' : '⚠️'} ${ctx}: ${_errMsg(e)}`;
+  try { (level === 'error' ? console.error : console.warn)(`[${ctx}]`, e); } catch {}
+  try { appLog(line); } catch {}
+  if (opt.toast) {
+    const now = Date.now();
+    if (now - (_toastThrottle[ctx] || 0) > 60000) {
+      _toastThrottle[ctx] = now;
+      try { _showToast(typeof opt.toast === 'string' ? opt.toast : line, 6000); } catch {}
+    }
+  }
+}
+
+// Globale Auffangnetze: unbehandelte Ausnahmen und abgelehnte Promises.
+// (Ressourcen-Fehler wie img onerror bubbeln nicht bis window — hier nur Script-Fehler.)
+window.addEventListener('error', (ev) => {
+  if (!ev || typeof ev.message !== 'string') return;
+  const where = ev.filename ? ` (${ev.filename.split('/').pop()}:${ev.lineno || '?'})` : '';
+  reportError('Unerwarteter Fehler', ev.error || (ev.message + where), { toast: true });
+});
+window.addEventListener('unhandledrejection', (ev) => {
+  reportError('Unbehandelter Fehler', ev && ev.reason, { toast: true });
+});
+
+/**
+ * Verständlicher Fehlerzustand statt weißer Seite, wenn init() wirft
+ * (#app bleibt sonst auf display:none ohne jede Meldung).
+ */
+function renderFatalError(err) {
+  reportError('Start', err);
+  const app = document.getElementById('app');
+  if (app) app.style.display = 'none';
+  let el = document.getElementById('fatal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'fatal';
+    el.setAttribute('role', 'alert');
+    document.body.appendChild(el);
+  }
+  el.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg,#f8fafc);';
+  el.innerHTML = `<div class="card" style="max-width:480px;width:100%;text-align:center;">
+    <div style="font-size:40px;margin-bottom:8px;">😵</div>
+    <h2 style="margin:0 0 8px;">${t('fatal.title')}</h2>
+    <p style="color:var(--t2);font-size:14px;line-height:1.6;margin:0 0 8px;">${t('fatal.body')}</p>
+    <p style="color:var(--t3);font-size:12px;font-family:monospace;word-break:break-word;margin:0 0 18px;">${safe(_errMsg(err))}</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="location.reload()">${t('fatal.reload')}</button>
+      <button class="btn btn-secondary" onclick="location.href='/'">${t('fatal.home')}</button>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // START
 // ═══════════════════════════════════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded', () => {
+  Promise.resolve().then(init).catch(renderFatalError);
+});
 
 // ── PWA: Service Worker registrieren ─────────────────────────────────────
 if ('serviceWorker' in navigator) {
