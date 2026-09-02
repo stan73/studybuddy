@@ -10,13 +10,16 @@
   "devDependencies": {
     "@neondatabase/neon-js": "0.7.0-beta",
     "esbuild": "0.25.9",
-    "prettier": "3.8.1"
+    "prettier": "3.8.1",
+    "vitest": "4.1.11"
   },
   "scripts": {
-    "test": "node tests/run_tests.js",
+    "test": "npm run test:legacy && npm run test:unit",
+    "test:legacy": "node tests/run_tests.js",
+    "test:unit": "vitest run tests/unit",
     "lint": "npm run lint:format && npm run lint:syntax && npm run lint:version",
     "lint:format": "prettier --check .",
-    "lint:syntax": "node scripts/check-syntax.mjs app.html index.html sw.js netlify/functions scripts",
+    "lint:syntax": "node scripts/check-syntax.mjs app.html index.html sw.js netlify/functions scripts tests",
     "lint:version": "node scripts/check-version.mjs",
     "format": "prettier --write .",
     "build:neon": "esbuild scripts/neon-bundle/entry.mjs --bundle --format=esm --platform=browser --target=es2020 --minify --legal-comments=none --alias:@neondatabase/auth/react/adapters=./scripts/neon-bundle/empty.mjs --outfile=js/vendor/neon-js.bundle.js"
