@@ -23,10 +23,11 @@ Aufwand: **S** = < 1 Tag · **M** = 1–3 Tage · **L** = > 3 Tage
 | **1.0 Eltern-Persistenz repariert:** `sync_my_data`/`load_my_data` als `SECURITY DEFINER` mit `search_path`, EXECUTE nur `authenticated` | `183ad4f` | **echter Round-Trip über die Data API** (204/200, 25/25 Felder); `neon/migrations/004` |
 | Service Worker v6: ein Fetch-Listener, Vendor-Precache, `/app/*`-Shell | `105ca26` | — |
 | `search_path = public, pg_temp` bei **allen** 8 `SECURITY DEFINER`-Funktionen | `64178fb` | `pg_proc.proconfig`: 0 ungehärtet; `neon/migrations/005` |
-| `.prettierrc` = Projektstil; `sw.js` zurückformatiert; Formatierungsschuld in `.prettierignore` | `2a88f13` | `prettier --check` |
+| `.prettierrc` = Projektstil; `sw.js` zurückformatiert; Formatierungsschuld in `.prettierignore` | `2a88f13` | `prettier --check .` grün seit `7e33522` |
 | 2.4 Toter Parallelcode gelöscht (`js/`-Module, `js/vendor/supabase.js`, `supabase/functions/`), Supabase-Reste in Kommentaren/Doku berichtigt | `2c12a66` | grep `<script src=`/`import`: nur `js/vendor/*` geladen; Tests 156/156 |
+| 2.2 CI als Deploy-Tor: Prettier-Check, Inline-JS/.mjs-Syntax, Tests, Versionsgleichstand bei Push/PR auf `main`; Actions SHA-gepinnt, `permissions: contents: read`, Dependabot; `npm test`/`npm run lint`; Version 2.2.0 mit `package.json` als Quelle; Schul-Import gegen totes Supabase entfernt | `7e33522`, `aad756b` | [Actions-Lauf 33630361361](https://github.com/stan73/studybuddy/actions/runs/33630361361) grün |
 
-**Offen (bewusst noch nicht angefasst):** 1.1 Sync-Semantik/Konflikterkennung (Whole-Replace, Last-Writer-Wins) · 1.5 Kind-PIN im Klartext in `sessionStorage` · 2.2 CI als Deploy-Tor · 2.5 Accessibility · 2.6 Lazy-Loading der Vendor-Bibliotheken · 2.7 Rechtliches (Impressum/Datenschutz/AVV).
+**Offen (bewusst noch nicht angefasst):** 1.1 Sync-Semantik/Konflikterkennung (Whole-Replace, Last-Writer-Wins) · 1.5 Kind-PIN im Klartext in `sessionStorage` · 2.5 Accessibility · 2.6 Lazy-Loading der Vendor-Bibliotheken · 2.7 Rechtliches (Impressum/Datenschutz/AVV).
 
 **Regel ab jetzt:** „erledigt" nur mit nachgewiesenem Round-Trip gegen Produktion. Jede DB-Änderung — auch wenn per Neon-MCP ausgeführt — wird als `neon/migrations/NNN_….sql` mit Befund, Begründung und Verifikation abgelegt.
 
